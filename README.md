@@ -8,9 +8,17 @@ und 1-gegen-1-Multiplayer. Eigene prozedurale Grafiken (keine Original-Assets).
 **Karten:** Beim Start wählbar – **Ödland** (klassisch, viel Land),
 **Flusstal** (ein Fluss mit einer einzigen Landbrücke als Engpass) und
 **Inselgruppe** (Heimatinseln im Ozean, ohne Bodenverbindung – hier zählen
-Luft- und künftige Marineeinheiten). Karten sind deterministisch aus Seed +
+Luft- und Marineeinheiten). Karten sind deterministisch aus Seed +
 Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
 speichern sie mit.
+
+**Marine:** Die **Werft** wird auf offenem Wasser im Bauradius der Basis
+platziert und baut Schiffe (Tab „See"): **Kanonenboot** (beide Fraktionen),
+**Zerstörer** (Alliierte, Deckgeschütz + Wasserbomben gegen U-Boote),
+**U-Boot** (Sowjets, getaucht – nur von U-Boot-Jägern verwundbar, Torpedos
+nur gegen Schiffe) und **Transportschiff** (bis zu 5 Bodeneinheiten:
+Rechtsklick mit ausgewählten Einheiten auf das Schiff lädt, Taste **E**
+entlädt an der Küste – so erobert man fremde Inseln).
 
 ## Starten
 

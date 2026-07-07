@@ -7,11 +7,24 @@ export function isAir(unit: Unit): boolean {
   return unitRule(unit.type).air === true;
 }
 
+/** Is this unit a ship (sails water, produced by the shipyard)? */
+export function isNaval(unit: Unit): boolean {
+  return unitRule(unit.type).category === 'naval';
+}
+
+/** Submerged submarine: only antiSub weapons (torpedoes/depth charges) hit it. */
+export function isSubmerged(unit: Unit): boolean {
+  return unitRule(unit.type).submerged === true;
+}
+
 /** Unit-layer predicate for a weapon: which units it may engage. */
 export function weaponAcceptsUnit(weapon: WeaponRule): (u: Unit) => boolean {
-  if (weapon.targets === 'air') return isAir;
-  if (weapon.targets === 'both') return () => true;
-  return (u) => !isAir(u); // 'ground'
+  return (u) => {
+    if (isAir(u)) return weapon.targets !== 'ground';
+    if (weapon.targets === 'air') return false;
+    if (isSubmerged(u)) return weapon.antiSub;
+    return true;
+  };
 }
 
 /** Ground weapons and both-target weapons may hit buildings; air-only cannot. */

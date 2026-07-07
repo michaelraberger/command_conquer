@@ -1,11 +1,12 @@
-import { cellIndex, inBounds, isPassableTerrain } from '../map.js';
+import { cellIndex, inBounds, isNavigableWater, isPassableTerrain } from '../map.js';
 import { buildAdjacency, buildingRule, type BuildingType } from '../rules.js';
 import type { GameState } from '../state.js';
 
 /**
  * Placement validation: every footprint cell must be buildable ground (grass,
  * no structure, no unit, no ore) and the footprint must touch the build
- * radius of an existing own building.
+ * radius of an existing own building. Water buildings (shipyard) invert the
+ * terrain rule: the footprint must be open water instead.
  */
 export function canPlaceBuilding(
   state: GameState,
@@ -18,7 +19,9 @@ export function canPlaceBuilding(
   for (let y = cy; y < cy + rule.height; y++) {
     for (let x = cx; x < cx + rule.width; x++) {
       if (!inBounds(state, x, y)) return false;
-      if (!isPassableTerrain(state, x, y)) return false;
+      const buildableHere =
+        rule.onWater === true ? isNavigableWater(state, x, y) : isPassableTerrain(state, x, y);
+      if (!buildableHere) return false;
       const idx = cellIndex(state, x, y);
       if (state.occupancy[idx] !== 0) return false;
       if (state.ore[idx]! > 0) return false;

@@ -24,6 +24,7 @@ export {
   inBounds,
   isPassableTerrain,
   isPassableKind,
+  isNavigableWater,
   cellsAroundRect,
   stampResourcePatch,
   generateTerrain,
@@ -56,6 +57,8 @@ export {
   VEHICLE_REPAIR_HP_PER_TICK,
   VEHICLE_REPAIR_COST_PER_TICK,
   VEHICLE_REPAIR_REACH,
+  TRANSPORT_CAPACITY,
+  TRANSPORT_REACH,
   SUPERWEAPON_STATS,
   SUPERWEAPON_CHARGE_TICKS,
   SUPERWEAPON_TRAVEL_TICKS,
@@ -99,6 +102,9 @@ export {
 export {
   findTarget,
   targetOwner,
+  isAir,
+  isNaval,
+  isSubmerged,
   aimPoint,
   targetDistSq,
   damageTarget,
@@ -109,7 +115,7 @@ export {
 } from './targeting.js';
 export { fnv1a, hashState } from './hash.js';
 export { findPath, type PathOptions } from './path/astar.js';
-export { applyCommands, type Command } from './commands.js';
+export { applyCommands, unloadTransport, type Command } from './commands.js';
 export { canPlaceBuilding } from './systems/placement.js';
 export { powerBalance } from './systems/production.js';
 export { aiSystem } from './ai/controller.js';

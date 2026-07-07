@@ -197,6 +197,10 @@ export class EntityRenderer {
       FLAK: this.tex.flak,
       HELI: this.tex.heli,
       JET: this.tex.jet,
+      GUNBOAT: this.tex.gunboat,
+      DESTROYER: this.tex.destroyer,
+      SUB: this.tex.sub,
+      TRANSPORT: this.tex.transport,
     };
     return sets[unit.type][unit.facing]!;
   }
@@ -306,6 +310,8 @@ export class EntityRenderer {
     body.anchor.set(0.5);
     body.position.set(0, -lift);
     body.tint = this.playerColors.get(unit.owner) ?? 0xffffff;
+    // Submerged submarines shimmer through the water surface.
+    if (unitRule(unit.type).submerged === true) body.alpha = 0.55;
     const bar = new Graphics();
     bar.position.set(0, (big ? -24 : -17) - lift);
     bar.visible = false;

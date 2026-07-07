@@ -1,8 +1,9 @@
 import { cellCenter, distSq, facingFromDelta, isqrt } from '../fixed.js';
-import { isPassableTerrain } from '../map.js';
+import { isNavigableWater, isPassableTerrain } from '../map.js';
 import { findPath } from '../path/astar.js';
 import { unitRule } from '../rules.js';
 import type { GameState, Unit } from '../state.js';
+import { isNaval } from '../targeting.js';
 
 /** Ticks to wait in front of a reserved cell before trying a new path. */
 const BLOCKED_TICKS_BEFORE_REPATH = 8;
@@ -36,7 +37,10 @@ export function movementSystem(state: GameState): void {
         handleBlocked(state, unit);
         continue;
       }
-      if (!isPassableTerrain(state, wp.cx, wp.cy)) {
+      const traversable = isNaval(unit)
+        ? isNavigableWater(state, wp.cx, wp.cy)
+        : isPassableTerrain(state, wp.cx, wp.cy);
+      if (!traversable) {
         stopUnit(unit);
         continue;
       }
@@ -119,6 +123,7 @@ function handleBlocked(state: GameState, unit: Unit): void {
   const newPath = findPath(state, cx, cy, goal.cx, goal.cy, {
     avoidUnits: true,
     selfId: unit.id,
+    water: isNaval(unit),
   });
   if (!newPath) {
     stopUnit(unit);

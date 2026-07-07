@@ -1,11 +1,12 @@
 import { facingFromDelta } from '../fixed.js';
 import { findPath } from '../path/astar.js';
-import { unitRule, type WeaponRule } from '../rules.js';
+import { unitRule, type UnitRule, type WeaponRule } from '../rules.js';
 import {
   aimPoint,
   damageTarget,
   findTarget,
   isAir,
+  isNaval,
   nearestEnemyBuilding,
   nearestEnemyUnit,
   targetDistSq,
@@ -29,19 +30,18 @@ export function combatSystem(state: GameState): void {
     const rule = unitRule(unit.type);
     const weapon = rule.weapon;
     if (!weapon) continue;
-    const antiInfantryOnly = rule.antiInfantryOnly === true;
 
     const order = unit.order;
     if (order && order.kind === 'ATTACK') {
       const target = findTarget(state, order.targetId);
-      if (!target || targetOwner(target) === unit.owner || !canEngage(weapon, antiInfantryOnly, target)) {
+      if (!target || targetOwner(target) === unit.owner || !canEngage(weapon, rule, target)) {
         unit.order = null;
         continue;
       }
       engageOrChase(state, unit, target, weapon);
     } else if (order && order.kind === 'ATTACK_MOVE') {
       // March to the ordered cell; fight units first, then structures.
-      const target = acquireTarget(state, unit, weapon, antiInfantryOnly);
+      const target = acquireTarget(state, unit, weapon, rule);
       if (target) {
         unit.path = null;
         tryFire(state, unit, target, weapon);
@@ -62,6 +62,7 @@ export function combatSystem(state: GameState): void {
         const path = findPath(state, cx, cy, order.cx, order.cy, {
           avoidUnits: false,
           selfId: unit.id,
+          water: isNaval(unit),
         });
         if (!path) {
           unit.order = null;
@@ -78,7 +79,7 @@ export function combatSystem(state: GameState): void {
         unit.x,
         unit.y,
         weapon.rangeSq,
-        unitAccept(weapon, antiInfantryOnly),
+        unitAccept(weapon, rule),
       );
       if (target) tryFire(state, unit, { kind: 'unit', unit: target }, weapon);
     }
@@ -89,17 +90,20 @@ function isInfantry(u: Unit): boolean {
   return unitRule(u.type).category === 'infantry';
 }
 
-/** Combined unit-target filter: weapon layer (ground/air) + anti-infantry. */
-function unitAccept(weapon: WeaponRule, antiInfantryOnly: boolean): (u: Unit) => boolean {
+/** Combined unit-target filter: weapon layer + anti-infantry/naval-only. */
+function unitAccept(weapon: WeaponRule, rule: UnitRule): (u: Unit) => boolean {
   const byLayer = weaponAcceptsUnit(weapon);
-  if (!antiInfantryOnly) return byLayer;
-  return (u) => byLayer(u) && isInfantry(u);
+  if (rule.antiInfantryOnly === true) return (u) => byLayer(u) && isInfantry(u);
+  if (rule.navalOnly === true) return (u) => byLayer(u) && isNaval(u);
+  return byLayer;
 }
 
 /** Whether this weapon may engage the given target at all. */
-function canEngage(weapon: WeaponRule, antiInfantryOnly: boolean, target: Target): boolean {
-  if (target.kind === 'building') return weaponHitsBuildings(weapon) && !antiInfantryOnly;
-  return unitAccept(weapon, antiInfantryOnly)(target.unit);
+function canEngage(weapon: WeaponRule, rule: UnitRule, target: Target): boolean {
+  if (target.kind === 'building') {
+    return weaponHitsBuildings(weapon) && rule.antiInfantryOnly !== true && rule.navalOnly !== true;
+  }
+  return unitAccept(weapon, rule)(target.unit);
 }
 
 /** Units in range first, then enemy structures (walls only via explicit ATTACK). */
@@ -107,7 +111,7 @@ function acquireTarget(
   state: GameState,
   unit: Unit,
   weapon: WeaponRule,
-  antiInfantryOnly: boolean,
+  rule: UnitRule,
 ): Target | null {
   const enemyUnit = nearestEnemyUnit(
     state,
@@ -115,10 +119,12 @@ function acquireTarget(
     unit.x,
     unit.y,
     weapon.rangeSq,
-    unitAccept(weapon, antiInfantryOnly),
+    unitAccept(weapon, rule),
   );
   if (enemyUnit) return { kind: 'unit', unit: enemyUnit };
-  if (antiInfantryOnly || !weaponHitsBuildings(weapon)) return null;
+  if (rule.antiInfantryOnly === true || rule.navalOnly === true || !weaponHitsBuildings(weapon)) {
+    return null;
+  }
   const building = nearestEnemyBuilding(state, unit.owner, unit.x, unit.y, weapon.rangeSq, false);
   if (building) return { kind: 'building', building };
   return null;
@@ -143,7 +149,11 @@ function engageOrChase(state: GameState, unit: Unit, target: Target, weapon: Wea
     }
     const cx = unit.cell % state.mapWidth;
     const cy = (unit.cell - cx) / state.mapWidth;
-    const path = findPath(state, cx, cy, gcx, gcy, { avoidUnits: false, selfId: unit.id });
+    const path = findPath(state, cx, cy, gcx, gcy, {
+      avoidUnits: false,
+      selfId: unit.id,
+      water: isNaval(unit),
+    });
     if (path) {
       unit.path = path;
       unit.pathIndex = 0;

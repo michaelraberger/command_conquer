@@ -1,4 +1,4 @@
-import { inBounds, isPassableTerrain } from './map.js';
+import { cellIndex, cellsAroundRect, inBounds, isNavigableWater, isPassableTerrain } from './map.js';
 import { findPath } from './path/astar.js';
 import { cellCenter } from './fixed.js';
 import {
@@ -11,7 +11,7 @@ import {
   type ProductionCategory,
 } from './rules.js';
 import { constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
-import { findTarget, targetOwner } from './targeting.js';
+import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
 import {
   cancelProduction,
@@ -38,7 +38,9 @@ export type Command =
   | { type: 'UPGRADE_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
-  | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number };
+  | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number }
+  | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
+  | { type: 'UNLOAD'; playerId: number; unitIds: number[] };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
   for (const cmd of commands) {
@@ -58,20 +60,27 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       }
       case 'ATTACK_MOVE': {
-        const units = ownedUnits(state, cmd.unitIds, cmd.playerId);
-        const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length);
-        if (targets.length === 0) break;
-        for (let i = 0; i < units.length; i++) {
-          const unit = units[i]!;
-          const t = targets[i] ?? targets[targets.length - 1]!;
-          if (unitRule(unit.type).weapon === null) {
-            // Weaponless units treat attack-move as a plain move.
-            moveUnitTo(state, unit, t.cx, t.cy);
-            continue;
+        const all = ownedUnits(state, cmd.unitIds, cmd.playerId);
+        const groups: Array<{ units: Unit[]; water: boolean }> = [
+          { units: all.filter((u) => !isNaval(u)), water: false },
+          { units: all.filter((u) => isNaval(u)), water: true },
+        ];
+        for (const { units, water } of groups) {
+          if (units.length === 0) continue;
+          const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length, water);
+          if (targets.length === 0) continue;
+          for (let i = 0; i < units.length; i++) {
+            const unit = units[i]!;
+            const t = targets[i] ?? targets[targets.length - 1]!;
+            if (unitRule(unit.type).weapon === null) {
+              // Weaponless units treat attack-move as a plain move.
+              moveUnitTo(state, unit, t.cx, t.cy);
+              continue;
+            }
+            unit.order = { kind: 'ATTACK_MOVE', cx: t.cx, cy: t.cy };
+            unit.path = null; // combat system paths toward the order cell
+            unit.pathIndex = 0;
           }
-          unit.order = { kind: 'ATTACK_MOVE', cx: t.cx, cy: t.cy };
-          unit.path = null; // combat system paths toward the order cell
-          unit.pathIndex = 0;
         }
         break;
       }
@@ -175,6 +184,26 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         });
         break;
       }
+      case 'LOAD': {
+        // Ground units walk to the shore next to an own transport and board.
+        const transport = state.units.find(
+          (u) => u.id === cmd.transportId && u.owner === cmd.playerId && u.type === 'TRANSPORT',
+        );
+        if (!transport) break;
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (isAir(unit) || isNaval(unit)) continue; // only ground units ride
+          unit.order = { kind: 'BOARD', targetId: transport.id };
+          unit.path = null; // transport system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'UNLOAD':
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unit.type !== 'TRANSPORT') continue;
+          unloadTransport(state, unit);
+        }
+        break;
       case 'SET_RALLY': {
         if (!inBounds(state, cmd.cx, cmd.cy)) break;
         const building = state.buildings.find(
@@ -202,14 +231,23 @@ function ownedUnits(state: GameState, ids: number[], playerId: number): Unit[] {
 }
 
 function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number; cx: number; cy: number }): void {
-  const units = ownedUnits(state, cmd.unitIds, cmd.playerId);
-  if (units.length === 0) return;
-  const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length);
-  if (targets.length === 0) return;
-  for (let i = 0; i < units.length; i++) {
-    const unit = units[i]!;
-    const target = targets[i] ?? targets[targets.length - 1]!;
-    moveUnitTo(state, unit, target.cx, target.cy);
+  const all = ownedUnits(state, cmd.unitIds, cmd.playerId);
+  if (all.length === 0) return;
+  // Ships spread over water cells, everyone else over land — a mixed selection
+  // ordered to the coast splits naturally between shore and sea.
+  const groups: Array<{ units: Unit[]; water: boolean }> = [
+    { units: all.filter((u) => !isNaval(u)), water: false },
+    { units: all.filter((u) => isNaval(u)), water: true },
+  ];
+  for (const { units, water } of groups) {
+    if (units.length === 0) continue;
+    const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length, water);
+    if (targets.length === 0) continue;
+    for (let i = 0; i < units.length; i++) {
+      const unit = units[i]!;
+      const target = targets[i] ?? targets[targets.length - 1]!;
+      moveUnitTo(state, unit, target.cx, target.cy);
+    }
   }
 }
 
@@ -222,11 +260,47 @@ function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void 
   } else {
     const ucx = unit.cell % state.mapWidth;
     const ucy = (unit.cell - ucx) / state.mapWidth;
-    unit.path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id });
+    unit.path = findPath(state, ucx, ucy, cx, cy, {
+      avoidUnits: false,
+      selfId: unit.id,
+      water: isNaval(unit),
+    });
   }
   unit.pathIndex = 0;
   unit.blockedTicks = 0;
   unit.repathCount = 0;
+}
+
+/**
+ * Drops passengers onto free land around the ship (must be parked at a
+ * shore). Unloads as many as fit; the rest stay aboard.
+ */
+export function unloadTransport(state: GameState, transport: Unit): void {
+  if (transport.passengers.length === 0) return;
+  const w = state.mapWidth;
+  const tcx = transport.cell % w;
+  const tcy = (transport.cell - tcx) / w;
+  const remaining = [...transport.passengers];
+  for (let r = 1; r <= 2 && remaining.length > 0; r++) {
+    for (const cell of cellsAroundRect(tcx, tcy, 1, 1, r)) {
+      if (remaining.length === 0) break;
+      if (!isPassableTerrain(state, cell.cx, cell.cy)) continue;
+      const idx = cellIndex(state, cell.cx, cell.cy);
+      if (state.occupancy[idx] !== 0) continue;
+      const unit = remaining.shift()!;
+      unit.x = cellCenter(cell.cx);
+      unit.y = cellCenter(cell.cy);
+      unit.cell = idx;
+      unit.path = null;
+      unit.pathIndex = 0;
+      unit.order = null;
+      unit.blockedTicks = 0;
+      unit.repathCount = 0;
+      state.occupancy[idx] = unit.id;
+      state.units.push(unit);
+    }
+  }
+  transport.passengers = remaining;
 }
 
 /**
@@ -238,7 +312,9 @@ function assignTargetCells(
   cx: number,
   cy: number,
   count: number,
+  water = false,
 ): PathCell[] {
+  const traversable = water ? isNavigableWater : isPassableTerrain;
   const out: PathCell[] = [];
   for (let r = 0; r < 12 && out.length < count; r++) {
     for (let dy = -r; dy <= r && out.length < count; dy++) {
@@ -246,7 +322,7 @@ function assignTargetCells(
         const ax = dx < 0 ? -dx : dx;
         const ay = dy < 0 ? -dy : dy;
         if ((ax > ay ? ax : ay) !== r) continue;
-        if (isPassableTerrain(state, cx + dx, cy + dy)) {
+        if (traversable(state, cx + dx, cy + dy)) {
           out.push({ cx: cx + dx, cy: cy + dy });
         }
       }

@@ -13,6 +13,7 @@ import { repairSystem } from './systems/repair.js';
 import { repairVehicleSystem } from './systems/repairVehicle.js';
 import { resourceGrowthSystem } from './systems/resources.js';
 import { superweaponSystem } from './systems/superweapon.js';
+import { transportSystem } from './systems/transport.js';
 import { victorySystem } from './systems/victory.js';
 
 export const TICKS_PER_SECOND = 15;
@@ -35,6 +36,7 @@ export function tick(state: GameState, commands: Command[] = []): void {
   resourceGrowthSystem(state);
   harvestSystem(state);
   repairVehicleSystem(state);
+  transportSystem(state);
   combatSystem(state);
   defenseSystem(state);
   movementSystem(state);

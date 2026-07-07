@@ -4,6 +4,7 @@ import {
   cellIndex,
   inBounds,
   toCell,
+  unitRule,
   type Command,
   type GameState,
 } from '@cac/sim';
@@ -150,6 +151,24 @@ export class Controls {
     }
   }
 
+  /** Own transport ship under the cursor, or null. */
+  private ownTransportAt(global: { x: number; y: number }): number | null {
+    let bestId: number | null = null;
+    let bestDist = PICK_RADIUS * PICK_RADIUS;
+    for (const unit of this.state.units) {
+      if (unit.owner !== session.localPlayer || unit.type !== 'TRANSPORT') continue;
+      const p = this.unitStagePos(unit.x, unit.y);
+      const dx = p.x - global.x;
+      const dy = p.y - global.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = unit.id;
+      }
+    }
+    return bestId;
+  }
+
   /** Nearest visible enemy (unit or building) under the cursor, or null. */
   private enemyAt(global: { x: number; y: number }): number | null {
     const fog = this.state.fogs[session.localPlayer]!;
@@ -212,6 +231,23 @@ export class Controls {
 
     if (!inBounds(this.state, cx, cy)) return;
     const byId = new Map(this.state.units.map((u) => [u.id, u]));
+
+    // Ground units right-clicking an own transport ship → climb aboard.
+    if (!e.ctrlKey) {
+      const transportId = this.ownTransportAt(e.global);
+      if (transportId !== null) {
+        const boarders = unitIds.filter((id) => {
+          const u = byId.get(id);
+          if (!u || u.id === transportId) return false;
+          const rule = unitRule(u.type);
+          return rule.air !== true && rule.category !== 'naval';
+        });
+        if (boarders.length > 0) {
+          this.send({ type: 'LOAD', playerId: session.localPlayer, unitIds: boarders, transportId });
+          return;
+        }
+      }
+    }
 
     // Repair vehicle right-clicking an own building → repair it.
     if (!e.ctrlKey) {

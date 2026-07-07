@@ -31,7 +31,8 @@ export type UnitOrder =
   | { kind: 'ATTACK_MOVE'; cx: number; cy: number }
   | { kind: 'HARVEST'; cx: number; cy: number }
   | { kind: 'RETURN_ORE'; backCx: number; backCy: number }
-  | { kind: 'REPAIR_BUILDING'; targetId: number };
+  | { kind: 'REPAIR_BUILDING'; targetId: number }
+  | { kind: 'BOARD'; targetId: number };
 
 export interface Unit {
   id: number;
@@ -54,6 +55,9 @@ export interface Unit {
   cooldown: number;
   /** Ore credits on board (harvesters only). */
   cargo: number;
+  /** Ground units riding inside (transport ships only). They are removed from
+   *  state.units while aboard and sink with the ship. */
+  passengers: Unit[];
 }
 
 export interface Building {
@@ -191,6 +195,7 @@ export function spawnUnit(
     order: null,
     cooldown: 0,
     cargo: 0,
+    passengers: [],
   };
   if (!isAir) state.occupancy[cell] = unit.id;
   state.units.push(unit);
@@ -271,6 +276,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       infantry: emptyQueue(),
       vehicle: emptyQueue(),
       air: emptyQueue(),
+      naval: emptyQueue(),
     },
     aiLastAttackTick: 0,
   });

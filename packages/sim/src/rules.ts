@@ -10,7 +10,7 @@ import { SUBCELL } from './fixed.js';
  * cost drains gradually over the build time (RA2 model). sight is in cells.
  */
 export type ArmorClass = 'none' | 'light' | 'heavy';
-export type UnitCategory = 'infantry' | 'vehicle' | 'air';
+export type UnitCategory = 'infantry' | 'vehicle' | 'air' | 'naval';
 export type ProductionCategory = 'building' | UnitCategory;
 /** What layer a weapon can hit. Ground weapons cannot touch aircraft. */
 export type WeaponTargets = 'ground' | 'air' | 'both';
@@ -48,6 +48,8 @@ export interface WeaponRule {
   fx: WeaponFx;
   /** Which layer this weapon can engage (default 'ground'). */
   targets: WeaponTargets;
+  /** Can hit submerged units (depth charges/torpedoes). */
+  antiSub: boolean;
 }
 
 export interface UnitRule {
@@ -71,6 +73,10 @@ export interface UnitRule {
   /** Aircraft: flies in a straight line over any terrain, ignores occupancy,
    *  and can only be hit by anti-air weapons. */
   air?: boolean;
+  /** Weapon only engages ships (torpedoes) — never land targets or buildings. */
+  navalOnly?: boolean;
+  /** Submerged (submarine): only weapons with antiSub can hit it. */
+  submerged?: boolean;
 }
 
 function weapon(
@@ -81,9 +87,10 @@ function weapon(
   vs: Record<ArmorClass, number>,
   fx: WeaponFx,
   targets: WeaponTargets = 'ground',
+  antiSub = false,
 ): WeaponRule {
   const range = Math.round(rangeCells * SUBCELL);
-  return { damage, range, rangeSq: range * range, cooldown, projectileSpeed, vs, fx, targets };
+  return { damage, range, rangeSq: range * range, cooldown, projectileSpeed, vs, fx, targets, antiSub };
 }
 
 export const UNIT_RULES = {
@@ -304,6 +311,67 @@ export const UNIT_RULES = {
     sight: 9,
     air: true,
   },
+  GUNBOAT: {
+    name: 'Kanonenboot',
+    maxHp: 180,
+    speed: 44,
+    radius: 110,
+    armor: 'light',
+    // Fast patrol boat: MG vs shore infantry and other light ships.
+    weapon: weapon(16, 4.5, 8, 0, { none: 100, light: 70, heavy: 30 }, 'BULLET'),
+    cost: 500,
+    buildTime: 50,
+    category: 'naval',
+    requires: ['SHIPYARD'],
+    factions: null,
+    sight: 7,
+  },
+  DESTROYER: {
+    name: 'Zerstörer',
+    maxHp: 420,
+    speed: 30,
+    radius: 130,
+    armor: 'heavy',
+    // Naval workhorse: deck gun for shore bombardment, depth charges vs subs.
+    weapon: weapon(55, 6, 30, 200, { none: 80, light: 90, heavy: 100 }, 'CANNON', 'ground', true),
+    cost: 1200,
+    buildTime: 110,
+    category: 'naval',
+    requires: ['SHIPYARD'],
+    factions: ['ALLIES'],
+    sight: 7,
+  },
+  SUB: {
+    name: 'U-Boot',
+    maxHp: 240,
+    speed: 26,
+    radius: 120,
+    armor: 'light',
+    // Submerged hunter: torpedoes only hit ships; only antiSub weapons hit it.
+    weapon: weapon(95, 5.5, 50, 90, { none: 60, light: 110, heavy: 120 }, 'ROCKET', 'ground', true),
+    cost: 1000,
+    buildTime: 100,
+    category: 'naval',
+    requires: ['SHIPYARD'],
+    factions: ['SOVIETS'],
+    sight: 6,
+    navalOnly: true,
+    submerged: true,
+  },
+  TRANSPORT: {
+    name: 'Transportschiff',
+    maxHp: 400,
+    speed: 32,
+    radius: 130,
+    armor: 'light',
+    weapon: null,
+    cost: 800,
+    buildTime: 90,
+    category: 'naval',
+    requires: ['SHIPYARD'],
+    factions: null,
+    sight: 5,
+  },
 } as const satisfies Record<string, UnitRule>;
 
 export type UnitType = keyof typeof UNIT_RULES;
@@ -334,6 +402,8 @@ export interface BuildingRule {
   buildable: boolean;
   factions: readonly Faction[] | null;
   sight: number;
+  /** Footprint must sit on open water instead of buildable land (shipyard). */
+  onWater?: boolean;
 }
 
 export const BUILDING_RULES = {
@@ -508,6 +578,24 @@ export const BUILDING_RULES = {
     factions: null,
     sight: 7,
   },
+  SHIPYARD: {
+    name: 'Werft',
+    maxHp: 1200,
+    cost: 1500,
+    buildTime: 140,
+    power: -50,
+    width: 3,
+    height: 3,
+    armor: 'light',
+    produces: 'naval',
+    weapon: null,
+    superweapon: null,
+    requires: ['FACTORY'],
+    buildable: true,
+    factions: null,
+    sight: 5,
+    onWater: true,
+  },
   NUKESILO: {
     name: 'Raketensilo',
     maxHp: 1000,
@@ -658,3 +746,7 @@ export const REPAIR_RADIUS = 2;
 export const VEHICLE_REPAIR_HP_PER_TICK = 8;
 export const VEHICLE_REPAIR_COST_PER_TICK = 1;
 export const VEHICLE_REPAIR_REACH = 1.6;
+/** Ground units a transport ship can carry. */
+export const TRANSPORT_CAPACITY = 5;
+/** Board/unload reach between a shore unit and the ship, in cells. */
+export const TRANSPORT_REACH = 2;

@@ -42,6 +42,13 @@ export function isPassableTerrain(grid: GridView, cx: number, cy: number): boole
   return isPassableKind(grid.terrain[idx]!) && grid.structures[idx] === 0;
 }
 
+/** Sailable for ships: open water without a structure (shipyard blocks). */
+export function isNavigableWater(grid: GridView, cx: number, cy: number): boolean {
+  if (!inBounds(grid, cx, cy)) return false;
+  const idx = cellIndex(grid, cx, cy);
+  return grid.terrain[idx] === TERRAIN_WATER && grid.structures[idx] === 0;
+}
+
 /** Selectable map layouts. Islands make air (and later naval) units matter. */
 export type MapType = 'BADLANDS' | 'RIVER' | 'ISLANDS';
 export const MAP_TYPES: readonly MapType[] = ['BADLANDS', 'RIVER', 'ISLANDS'];

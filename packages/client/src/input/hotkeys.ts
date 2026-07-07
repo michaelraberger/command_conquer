@@ -10,7 +10,7 @@ import type { Controls } from './controls.js';
  * Camera keys (WASD/arrows) and the debug toggle live in their own handlers.
  *
  * P pause · U upgrade selected building · R toggle full build radius ·
- * H center camera on own base.
+ * H center camera on own base · E unload selected transport ships.
  */
 export class Hotkeys {
   paused = false;
@@ -43,7 +43,19 @@ export class Hotkeys {
       case 'h':
         this.centerOnBase();
         break;
+      case 'e':
+        this.tryUnload();
+        break;
     }
+  }
+
+  /** Unload the selected transport ships at their current shore position. */
+  private tryUnload(): void {
+    const transports = [...this.controls.selected]
+      .sort((a, b) => a - b)
+      .filter((id) => this.state.units.find((u) => u.id === id)?.type === 'TRANSPORT');
+    if (transports.length === 0) return;
+    this.send({ type: 'UNLOAD', playerId: session.localPlayer, unitIds: transports });
   }
 
   private togglePause(): void {

@@ -27,6 +27,7 @@ const TABS: Array<{ key: ProductionCategory; label: string }> = [
   { key: 'infantry', label: 'Infanterie' },
   { key: 'vehicle', label: 'Fahrzeuge' },
   { key: 'air', label: 'Luft' },
+  { key: 'naval', label: 'See' },
 ];
 
 interface ItemEl {

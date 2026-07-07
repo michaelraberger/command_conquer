@@ -1,4 +1,4 @@
-import { cellsAroundRect, isPassableTerrain, cellIndex, inBounds } from '../map.js';
+import { cellsAroundRect, isNavigableWater, isPassableTerrain, cellIndex, inBounds } from '../map.js';
 import { findPath } from '../path/astar.js';
 import {
   availableToFaction,
@@ -86,7 +86,7 @@ export function placeQueuedBuilding(state: GameState, playerId: number, cx: numb
   queue.ready = false;
 }
 
-const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehicle', 'air'];
+const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehicle', 'air', 'naval'];
 
 /**
  * Advances all build queues: credits drain gradually over the build time
@@ -136,12 +136,17 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
   if (!producer) return false;
   const rule = buildingRule(producer.type);
   const air = unitRule(item).air === true;
+  const naval = unitRule(item).category === 'naval';
   for (let r = 1; r <= 6; r++) {
     for (const cell of cellsAroundRect(producer.cx, producer.cy, rule.width, rule.height, r)) {
       if (!inBounds(state, cell.cx, cell.cy)) continue;
-      // Aircraft can appear over any cell; ground units need clear passable ground.
+      // Aircraft appear over any cell; ships need open water, ground units
+      // clear passable ground.
       if (!air) {
-        if (!isPassableTerrain(state, cell.cx, cell.cy)) continue;
+        const ok = naval
+          ? isNavigableWater(state, cell.cx, cell.cy)
+          : isPassableTerrain(state, cell.cx, cell.cy);
+        if (!ok) continue;
         if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
       }
       const unit = spawnUnit(state, item, player.id, cell.cx, cell.cy);
@@ -151,6 +156,7 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
           : findPath(state, cell.cx, cell.cy, producer.rallyCx, producer.rallyCy, {
               avoidUnits: false,
               selfId: unit.id,
+              water: naval,
             });
         unit.pathIndex = 0;
       }

@@ -46,6 +46,10 @@ export interface GameTextures {
   flak: Texture[];
   heli: Texture[];
   jet: Texture[];
+  gunboat: Texture[];
+  destroyer: Texture[];
+  sub: Texture[];
+  transport: Texture[];
   projectile: Texture;
   selectSmall: Texture;
   selectLarge: Texture;
@@ -321,6 +325,38 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.circle(c.x + 11, c.y - 39, 2.5).fill(accent);
     },
   },
+  SHIPYARD: {
+    frameTop: 30,
+    accent: 0x6db4d6,
+    draw: (g, w, h, accent) => {
+      // Dock platform floating on the water with a slipway and a crane.
+      const p00 = iso(0.1, 0.1);
+      const pw0 = iso(w - 0.1, 0.1);
+      const pwh = iso(w - 0.1, h - 0.1);
+      const p0h = iso(0.1, h - 0.1);
+      g.poly([p00.x, p00.y, pw0.x, pw0.y, pwh.x, pwh.y, p0h.x, p0h.y]).fill(0x8a7f6a);
+      g.poly([p00.x, p00.y, pw0.x, pw0.y, pwh.x, pwh.y, p0h.x, p0h.y])
+        .stroke({ width: 2, color: 0x5d5546 });
+      // Open wet slipway in the middle where hulls are launched.
+      const s0 = iso(0.9, 1.1);
+      const s1 = iso(2.1, 1.1);
+      const s2 = iso(2.1, 2.6);
+      const s3 = iso(0.9, 2.6);
+      g.poly([s0.x, s0.y, s1.x, s1.y, s2.x, s2.y, s3.x, s3.y]).fill(0x2b5d8a);
+      g.poly([s0.x, s0.y, s1.x, s1.y, s2.x, s2.y, s3.x, s3.y])
+        .stroke({ width: 1.5, color: 0x1d3f5e });
+      // Half-built hull sitting in the slip.
+      const hc = iso(1.5, 1.85);
+      g.ellipse(hc.x, hc.y, 16, 6).fill(0x9aa0a6).stroke({ width: 1, color: 0x4a4a4a });
+      prismAt(g, 0.2, 0.2, 0.9, 0.7, 16, 0xb0a794); // workshop hall
+      // Crane over the slipway.
+      const cb = iso(2.55, 0.5);
+      g.rect(cb.x - 2, cb.y - 34, 4, 32).fill(0x6f675a);
+      g.rect(cb.x - 26, cb.y - 34, 30, 3).fill(0x6f675a);
+      g.moveTo(cb.x - 24, cb.y - 31).lineTo(cb.x - 24, cb.y - 16).stroke({ width: 1, color: 0x4a443a });
+      g.circle(cb.x, cb.y - 36, 2.5).fill(accent);
+    },
+  },
   WALL: {
     // Level 1 sandbags — levels 2/3 get their own bake below.
     frameTop: 18,
@@ -548,6 +584,50 @@ function drawJet(g: Graphics): void {
   g.circle(-16, 0, 2.4).fill(0xff8a3a); // exhaust glow
 }
 
+/* Ships face +x like vehicles; bakeVehicle's drop shadow reads as their wake. */
+
+/** Patrol gunboat: small pointed hull with a single deck MG. */
+function drawGunboat(g: Graphics): void {
+  g.poly([18, 0, 10, -5, -14, -5, -17, 0, -14, 5, 10, 5]).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c }); // hull
+  g.poly([18, 0, 10, -5, 10, 5]).fill(0xdedede); // bow deck
+  g.roundRect(-10, -3, 12, 6, 2).fill(0x9aa4b0); // cabin
+  g.circle(4, 0, 3).fill(0x8f8f8f).stroke({ width: 1, color: 0x4a4a4a }); // MG mount
+  g.rect(6, -0.8, 9, 1.6).fill(0x6f6f6f);
+  g.rect(-16, -1, 3, 2).fill(0x6f6f6f); // stern
+}
+
+/** Destroyer: long hull, two gun turrets and a radar mast. */
+function drawDestroyer(g: Graphics): void {
+  g.poly([26, 0, 16, -6, -20, -6, -25, 0, -20, 6, 16, 6]).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c }); // hull
+  g.poly([26, 0, 16, -6, 16, 6]).fill(0xd6d6d6); // bow
+  g.roundRect(-12, -4, 16, 8, 2).fill(0x9a9a9a); // superstructure
+  g.rect(-2, -10, 2, 8).fill(0x6f6f6f); // mast
+  g.circle(-1, -11, 2).fill(0xcfd6dc); // radar
+  for (const ox of [10, -18]) {
+    g.circle(ox, 0, 3.5).fill(0xdedede).stroke({ width: 1, color: 0x4a4a4a }); // turret
+    g.rect(ox + 2, -1, 9, 2).fill(0x8f8f8f); // barrel
+  }
+}
+
+/** Submarine: slender teardrop hull with a conning tower (rendered dimmed). */
+function drawSub(g: Graphics): void {
+  g.ellipse(0, 0, 22, 5.5).fill(0x707a84).stroke({ width: 1, color: 0x2f353b }); // hull
+  g.ellipse(8, 0, 8, 3).fill(0x828c96); // fore deck
+  g.roundRect(-6, -3, 10, 6, 2.5).fill(0x59636d).stroke({ width: 1, color: 0x2f353b }); // tower
+  g.rect(-2, -6, 1.6, 4).fill(0x3f474f); // periscope
+  g.ellipse(-19, 0, 4, 2.2).fill(0x59636d); // stern planes
+}
+
+/** Transport: broad hull with a flat cargo deck and loading ramp at the bow. */
+function drawTransportShip(g: Graphics): void {
+  g.poly([20, 0, 14, -8, -18, -8, -22, 0, -18, 8, 14, 8]).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c }); // hull
+  g.roundRect(-16, -6, 28, 12, 2).fill(0x8f8f8f); // cargo well
+  g.rect(-16, -6, 28, 12).stroke({ width: 1, color: 0x5f5f5f });
+  for (const ox of [-10, -2, 6]) g.rect(ox, -6, 1, 12).fill(0x6f6f6f); // deck ribs
+  g.poly([20, 0, 14, -8, 14, 8]).fill(0xa8a8a8); // bow ramp
+  g.roundRect(-21, -3, 5, 6, 1.5).fill(0x9aa4b0); // pilot house
+}
+
 /**
  * Craggy 3D rock outcrop: irregular silhouette with a sun-lit north-west
  * face, a mid-tone top and a shaded south-east face — same light direction
@@ -634,6 +714,10 @@ export function createTextures(renderer: Renderer): GameTextures {
   const flak: Texture[] = [];
   const heli: Texture[] = [];
   const jet: Texture[] = [];
+  const gunboat: Texture[] = [];
+  const destroyer: Texture[] = [];
+  const sub: Texture[] = [];
+  const transport: Texture[] = [];
   for (let f = 0; f < FACING_COUNT; f++) {
     tank.push(bakeVehicle(renderer, f, 28, drawTank));
     mammoth.push(bakeVehicle(renderer, f, 34, drawMammoth));
@@ -646,6 +730,10 @@ export function createTextures(renderer: Renderer): GameTextures {
     flak.push(bakeVehicle(renderer, f, 26, drawFlak));
     heli.push(bakeVehicle(renderer, f, 30, drawHeli));
     jet.push(bakeVehicle(renderer, f, 30, drawJet));
+    gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat));
+    destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer));
+    sub.push(bakeVehicle(renderer, f, 28, drawSub));
+    transport.push(bakeVehicle(renderer, f, 28, drawTransportShip));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer));
     flamer.push(bakeInfantry(renderer, f, drawFlamer));
@@ -736,6 +824,10 @@ export function createTextures(renderer: Renderer): GameTextures {
     flak,
     heli,
     jet,
+    gunboat,
+    destroyer,
+    sub,
+    transport,
     projectile: renderer.generateTexture({
       target: shell,
       frame: new Rectangle(-5, -5, 10, 10),
