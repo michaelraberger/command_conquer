@@ -407,6 +407,40 @@
         margin-right: 14px;
         cursor: pointer;
       }
+      .panel .map-cards {
+        display: flex;
+        gap: 8px;
+      }
+      .panel .map-card {
+        flex: 1;
+        margin: 0;
+        text-align: center;
+        border: 1px solid #2c3a4a;
+        border-radius: 5px;
+        padding: 5px 5px 4px;
+        font-size: 11px;
+        color: #8fa1b3;
+      }
+      .panel .map-card:hover {
+        border-color: #3d5a7a;
+      }
+      .panel .map-card:has(input:checked) {
+        border-color: #4da6ff;
+        background: #16222f;
+        color: #d7e0ea;
+      }
+      .panel .map-card input {
+        display: none;
+      }
+      .panel .map-card canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 3px;
+        margin-bottom: 4px;
+        image-rendering: pixelated;
+        background: #0e1319;
+      }
       .panel button {
         width: 100%;
         background: #24405c;
@@ -511,9 +545,23 @@
         </fieldset>
         <fieldset>
           <legend>Karte</legend>
-          <label><input type="radio" name="maptype" value="BADLANDS" checked /> Ödland</label>
-          <label><input type="radio" name="maptype" value="RIVER" /> Flusstal</label>
-          <label><input type="radio" name="maptype" value="ISLANDS" /> Inselgruppe</label>
+          <div class="map-cards">
+            <label class="map-card">
+              <input type="radio" name="maptype" value="BADLANDS" checked />
+              <canvas class="map-preview" data-maptype="BADLANDS"></canvas>
+              <span>Ödland</span>
+            </label>
+            <label class="map-card">
+              <input type="radio" name="maptype" value="RIVER" />
+              <canvas class="map-preview" data-maptype="RIVER"></canvas>
+              <span>Flusstal</span>
+            </label>
+            <label class="map-card">
+              <input type="radio" name="maptype" value="ISLANDS" />
+              <canvas class="map-preview" data-maptype="ISLANDS"></canvas>
+              <span>Inselgruppe</span>
+            </label>
+          </div>
         </fieldset>
         <button id="start-ai">Gefecht gegen KI starten</button>
         <button id="replay-open" class="secondary">Replay ansehen …</button>

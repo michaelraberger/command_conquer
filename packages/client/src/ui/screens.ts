@@ -1,5 +1,60 @@
-import { DEFAULT_SERVER_PORT, type AiDifficulty, type Faction, type MapType } from '@cac/sim';
+import {
+  DEFAULT_SERVER_PORT,
+  RESOURCE_GEMS,
+  TERRAIN_GRASS,
+  TERRAIN_ROCK,
+  TERRAIN_TREE,
+  TERRAIN_WATER,
+  createGame,
+  type AiDifficulty,
+  type Faction,
+  type MapType,
+} from '@cac/sim';
 import { parseReplay, type ReplayFile } from '../replay.js';
+
+/** Fixed seed for the start-screen thumbnails — a representative sample; the
+ * actual match rolls its own seed, so details (blobs, islets) will vary. */
+const PREVIEW_SEED = 1337;
+
+/** Paints a top-down thumbnail (terrain, resources, HQ spots) per map card. */
+function renderMapPreviews(): void {
+  const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas.map-preview');
+  for (const canvas of canvases) {
+    const state = createGame(PREVIEW_SEED, { mapType: canvas.dataset['maptype'] as MapType });
+    canvas.width = state.mapWidth;
+    canvas.height = state.mapHeight;
+    const ctx = canvas.getContext('2d')!;
+    const img = ctx.createImageData(state.mapWidth, state.mapHeight);
+    for (let i = 0; i < state.terrain.length; i++) {
+      const t = state.terrain[i]!;
+      const [r, g, b] =
+        t === TERRAIN_WATER
+          ? [43, 93, 138]
+          : t === TERRAIN_ROCK
+            ? [125, 122, 114]
+            : t === TERRAIN_TREE
+              ? [46, 74, 30]
+              : t === TERRAIN_GRASS
+                ? [77, 122, 53]
+                : [138, 111, 77];
+      img.data[i * 4] = r;
+      img.data[i * 4 + 1] = g;
+      img.data[i * 4 + 2] = b;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+
+    for (let i = 0; i < state.ore.length; i++) {
+      if (state.ore[i]! === 0) continue;
+      ctx.fillStyle = state.resourceKind[i] === RESOURCE_GEMS ? '#9d7bff' : '#d9a62e';
+      ctx.fillRect(i % state.mapWidth, Math.floor(i / state.mapWidth), 1, 1);
+    }
+    for (const b of state.buildings) {
+      ctx.fillStyle = `#${state.players[b.owner]!.color.toString(16).padStart(6, '0')}`;
+      ctx.fillRect(b.cx - 1, b.cy - 1, 4, 4);
+    }
+  }
+}
 
 export type StartChoice =
   | { mode: 'ai'; faction: Faction; difficulty: AiDifficulty; mapType: MapType }
@@ -11,6 +66,7 @@ export type StartChoice =
 export function showStartScreen(): Promise<StartChoice> {
   const root = document.getElementById('start')!;
   root.style.display = 'flex';
+  renderMapPreviews();
   const urlInput = document.getElementById('mp-url') as HTMLInputElement;
   if (!urlInput.value) urlInput.value = `ws://${location.hostname}:${DEFAULT_SERVER_PORT}`;
 
