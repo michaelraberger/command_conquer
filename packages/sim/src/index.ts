@@ -18,13 +18,17 @@ export {
   RESOURCE_NONE,
   RESOURCE_ORE,
   RESOURCE_GEMS,
+  MAP_TYPES,
+  MAP_NAMES,
   cellIndex,
   inBounds,
   isPassableTerrain,
   isPassableKind,
   cellsAroundRect,
   stampResourcePatch,
+  generateTerrain,
   type GridView,
+  type MapType,
 } from './map.js';
 export {
   UNIT_RULES,

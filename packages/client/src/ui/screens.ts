@@ -1,9 +1,9 @@
-import { DEFAULT_SERVER_PORT, type AiDifficulty, type Faction } from '@cac/sim';
+import { DEFAULT_SERVER_PORT, type AiDifficulty, type Faction, type MapType } from '@cac/sim';
 import { parseReplay, type ReplayFile } from '../replay.js';
 
 export type StartChoice =
-  | { mode: 'ai'; faction: Faction; difficulty: AiDifficulty }
-  | { mode: 'host'; faction: Faction; url: string }
+  | { mode: 'ai'; faction: Faction; difficulty: AiDifficulty; mapType: MapType }
+  | { mode: 'host'; faction: Faction; url: string; mapType: MapType }
   | { mode: 'join'; faction: Faction; url: string; code: string }
   | { mode: 'replay'; file: ReplayFile };
 
@@ -19,6 +19,8 @@ export function showStartScreen(): Promise<StartChoice> {
   const difficulty = (): AiDifficulty =>
     (document.querySelector('input[name="difficulty"]:checked') as HTMLInputElement)
       .value as AiDifficulty;
+  const mapType = (): MapType =>
+    (document.querySelector('input[name="maptype"]:checked') as HTMLInputElement).value as MapType;
 
   return new Promise((resolve) => {
     const done = (choice: StartChoice): void => {
@@ -26,10 +28,10 @@ export function showStartScreen(): Promise<StartChoice> {
       resolve(choice);
     };
     document.getElementById('start-ai')!.addEventListener('click', () => {
-      done({ mode: 'ai', faction: faction(), difficulty: difficulty() });
+      done({ mode: 'ai', faction: faction(), difficulty: difficulty(), mapType: mapType() });
     });
     document.getElementById('mp-host')!.addEventListener('click', () => {
-      done({ mode: 'host', faction: faction(), url: urlInput.value.trim() });
+      done({ mode: 'host', faction: faction(), url: urlInput.value.trim(), mapType: mapType() });
     });
     document.getElementById('mp-join')!.addEventListener('click', () => {
       const code = (document.getElementById('mp-code') as HTMLInputElement).value.trim().toUpperCase();

@@ -7,6 +7,7 @@ import {
   clearArea,
   generateTerrain,
   stampResourcePatch,
+  type MapType,
 } from './map.js';
 import {
   FACTION_COLORS,
@@ -245,6 +246,8 @@ export interface GameOptions {
   /** Player 1 is controlled by the built-in AI. */
   ai?: boolean;
   aiDifficulty?: AiDifficulty;
+  /** Map layout (default BADLANDS). Part of replays/multiplayer setup. */
+  mapType?: MapType;
   mapWidth?: number;
   mapHeight?: number;
 }
@@ -297,17 +300,28 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     events: [],
   };
 
-  state.terrain = generateTerrain(mapWidth, mapHeight, state);
+  const mapType = options.mapType ?? 'BADLANDS';
+  state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType);
   for (const [sx, sy] of PLAYER_SPAWNS) {
     clearArea(state.terrain, mapWidth, sx, sy, 4);
   }
-  // Ore fields: one per spawn plus a rich contested one in the middle.
-  stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
-  stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
-  stampResourcePatch(state, state, 32, 32, 3, RESOURCE_ORE);
-  // Gem fields ("Edelsteine", double value): mirrored off-center prizes.
-  stampResourcePatch(state, state, 20, 44, 1, RESOURCE_GEMS);
-  stampResourcePatch(state, state, 44, 20, 1, RESOURCE_GEMS);
+  if (mapType === 'ISLANDS') {
+    // Everything a player can reach by ground must sit on their home island;
+    // the center islet holds a contested prize for air (and later naval) play.
+    stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, 32, 32, 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, 22, 10, 1, RESOURCE_GEMS);
+    stampResourcePatch(state, state, 40, 52, 1, RESOURCE_GEMS);
+  } else {
+    // Ore fields: one per spawn plus a rich contested one in the middle.
+    stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, 32, 32, 3, RESOURCE_ORE);
+    // Gem fields ("Edelsteine", double value): mirrored off-center prizes.
+    stampResourcePatch(state, state, 20, 44, 1, RESOURCE_GEMS);
+    stampResourcePatch(state, state, 44, 20, 1, RESOURCE_GEMS);
+  }
 
   // Symmetric starts: construction yard, harvester, small guard force.
   constructBuilding(state, 'CONYARD', 0, 13, 13);

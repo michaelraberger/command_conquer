@@ -1,4 +1,4 @@
-import type { ClientMessage, Faction, ServerMessage } from '@cac/sim';
+import type { ClientMessage, Faction, MapType, ServerMessage } from '@cac/sim';
 import { WebSocket, WebSocketServer } from 'ws';
 
 /**
@@ -11,6 +11,8 @@ interface Room {
   code: string;
   seed: number;
   factions: [Faction, Faction];
+  /** Map layout chosen by the host. */
+  mapType: MapType;
   sockets: [WebSocket, WebSocket | null];
   /** tick → playerId → hash, for desync detection. */
   hashes: Map<number, Map<number, string>>;
@@ -57,6 +59,7 @@ export function createGameServer(port: number): Promise<GameServer> {
             code,
             seed: Math.floor(Math.random() * 0xffffffff) >>> 0,
             factions: [msg.faction, msg.faction],
+            mapType: msg.mapType ?? 'BADLANDS',
             sockets: [ws, null],
             hashes: new Map(),
             started: false,
@@ -83,6 +86,7 @@ export function createGameServer(port: number): Promise<GameServer> {
               seed: room.seed,
               playerId: id,
               factions: room.factions,
+              mapType: room.mapType,
             });
           }
           break;

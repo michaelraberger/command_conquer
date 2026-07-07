@@ -5,6 +5,13 @@ Tesla-Spulen, Mammutpanzer, aufrüstbare Mauern, Nebel des Krieges, KI-Gegner
 in drei Schwierigkeitsgraden, Superwaffen (Atomrakete/Wettersturm), Replays
 und 1-gegen-1-Multiplayer. Eigene prozedurale Grafiken (keine Original-Assets).
 
+**Karten:** Beim Start wählbar – **Ödland** (klassisch, viel Land),
+**Flusstal** (ein Fluss mit einer einzigen Landbrücke als Engpass) und
+**Inselgruppe** (Heimatinseln im Ozean, ohne Bodenverbindung – hier zählen
+Luft- und künftige Marineeinheiten). Karten sind deterministisch aus Seed +
+Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
+speichern sie mit.
+
 ## Starten
 
 ```bash

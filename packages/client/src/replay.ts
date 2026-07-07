@@ -1,4 +1,4 @@
-import type { AiDifficulty, Command, Faction, GameState } from '@cac/sim';
+import type { AiDifficulty, Command, Faction, GameState, MapType } from '@cac/sim';
 import { drainCommands } from './commandQueue.js';
 import type { TickDriver } from './loop.js';
 
@@ -13,6 +13,8 @@ export interface ReplayFile {
     factions: [Faction, Faction];
     ai: boolean;
     aiDifficulty: AiDifficulty;
+    /** Older replays omit this; createGame defaults to BADLANDS. */
+    mapType?: MapType;
   };
   commands: Array<{ tick: number; cmds: Command[] }>;
 }

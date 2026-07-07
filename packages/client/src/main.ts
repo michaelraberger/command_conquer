@@ -46,6 +46,7 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
       factions: [choice.faction, enemy] as [Faction, Faction],
       ai: true,
       aiDifficulty: choice.difficulty,
+      mapType: choice.mapType,
     };
     const recorder = new Recorder(seed, options);
     return {
@@ -69,7 +70,7 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
   setLobbyStatus('Verbinde…');
   const conn = await Connection.connect(choice.url);
   if (choice.mode === 'host') {
-    conn.send({ t: 'host', faction: choice.faction });
+    conn.send({ t: 'host', faction: choice.faction, mapType: choice.mapType });
     const hosted = await conn.waitFor('hosted');
     setLobbyStatus(`Partie eröffnet – Code: ${hosted.code} (warte auf Mitspieler …)`);
   } else {
@@ -84,7 +85,7 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
     if (msg.t === 'left') setLobbyStatus('Der Mitspieler hat die Partie verlassen.');
   });
   return {
-    state: createGame(start.seed, { factions: start.factions }),
+    state: createGame(start.seed, { factions: start.factions, mapType: start.mapType }),
     driver: new LockstepDriver(conn),
     recorder: null,
     canPause: false,

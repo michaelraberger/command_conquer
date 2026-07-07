@@ -37,7 +37,7 @@ class TestClient {
       if (msg.t === 'hosted') this.resolveHosted(msg.code);
       if (msg.t === 'start') {
         this.playerId = msg.playerId;
-        this.state = createGame(msg.seed, { factions: msg.factions });
+        this.state = createGame(msg.seed, { factions: msg.factions, mapType: msg.mapType });
         this.resolveStarted();
       }
       if (msg.t === 'batch') {
@@ -95,7 +95,7 @@ describe('lockstep relay', () => {
     await host.connect(server.port);
     await guest.connect(server.port);
 
-    host.send({ t: 'host', faction: 'ALLIES' });
+    host.send({ t: 'host', faction: 'ALLIES', mapType: 'BADLANDS' });
     const code = await host.hosted;
     guest.send({ t: 'join', code, faction: 'SOVIETS' });
     await Promise.all([host.started, guest.started]);

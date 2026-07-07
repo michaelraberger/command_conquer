@@ -75,7 +75,7 @@ describe('air vs ground targeting', () => {
 
   it('flak shreds aircraft but ignores ground units', () => {
     const state = arena();
-    const flak = spawnUnit(state, 'FLAK', 0, 18, 18);
+    spawnUnit(state, 'FLAK', 0, 18, 18);
     const enemyHeli = spawnUnit(state, 'HELI', 1, 20, 18);
     const enemyTank = spawnUnit(state, 'TANK', 1, 18, 20);
     enemyHeli.path = null;
