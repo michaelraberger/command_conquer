@@ -1,0 +1,154 @@
+import { cellsAroundRect, isPassableTerrain, cellIndex } from '../map.js';
+import { findPath } from '../path/astar.js';
+import {
+  availableToFaction,
+  buildingRule,
+  isBuildingType,
+  isUnitType,
+  unitRule,
+  type ProductionCategory,
+} from '../rules.js';
+import { constructBuilding, spawnUnit, type GameState, type Player } from '../state.js';
+import { canPlaceBuilding } from './placement.js';
+
+/** Net power balance for a player (produced minus consumed). */
+export function powerBalance(state: GameState, playerId: number): { produced: number; used: number } {
+  let produced = 0;
+  let used = 0;
+  for (const b of state.buildings) {
+    if (b.owner !== playerId) continue;
+    const p = buildingRule(b.type).power;
+    if (p >= 0) produced += p;
+    else used -= p;
+  }
+  return { produced, used };
+}
+
+function prereqsMet(state: GameState, playerId: number, requires: readonly string[]): boolean {
+  return requires.every((req) =>
+    state.buildings.some((b) => b.owner === playerId && b.type === req),
+  );
+}
+
+/** Total credits paid for `progress` of `buildTime` ticks at `cost`. */
+function paidUpTo(cost: number, buildTime: number, progress: number): number {
+  return Math.trunc((cost * progress) / buildTime);
+}
+
+function categoryOf(item: string): ProductionCategory | null {
+  if (isBuildingType(item)) return 'building';
+  if (isUnitType(item)) return unitRule(item).category;
+  return null;
+}
+
+function costTimeOf(item: string): { cost: number; buildTime: number } {
+  if (isBuildingType(item)) return buildingRule(item);
+  if (isUnitType(item)) return unitRule(item);
+  throw new Error(`unknown production item ${item}`);
+}
+
+export function startProduction(state: GameState, playerId: number, item: string): void {
+  const player = state.players.find((p) => p.id === playerId);
+  const category = categoryOf(item);
+  if (!player || !category) return;
+  const queue = player.queues[category];
+  if (queue.item !== null || queue.ready) return;
+  const rule = isBuildingType(item) ? buildingRule(item) : isUnitType(item) ? unitRule(item) : null;
+  if (rule === null) return;
+  if (isBuildingType(item) && !buildingRule(item).buildable) return;
+  if (!availableToFaction(rule.factions, player.faction)) return;
+  if (!prereqsMet(state, playerId, rule.requires)) return;
+  queue.item = item;
+  queue.progress = 0;
+}
+
+export function cancelProduction(state: GameState, playerId: number, category: ProductionCategory): void {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return;
+  const queue = player.queues[category];
+  if (queue.item === null) return;
+  const { cost, buildTime } = costTimeOf(queue.item);
+  player.credits += queue.ready ? cost : paidUpTo(cost, buildTime, queue.progress);
+  queue.item = null;
+  queue.progress = 0;
+  queue.ready = false;
+}
+
+export function placeQueuedBuilding(state: GameState, playerId: number, cx: number, cy: number): void {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return;
+  const queue = player.queues.building;
+  if (!queue.ready || queue.item === null || !isBuildingType(queue.item)) return;
+  if (!canPlaceBuilding(state, playerId, queue.item, cx, cy)) return;
+  constructBuilding(state, queue.item, playerId, cx, cy);
+  queue.item = null;
+  queue.progress = 0;
+  queue.ready = false;
+}
+
+const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehicle'];
+
+/**
+ * Advances all build queues: credits drain gradually over the build time
+ * (RA2 model), progress stalls when broke, and a power deficit halves the
+ * build speed (queues only advance on even ticks).
+ */
+export function productionSystem(state: GameState): void {
+  for (const player of state.players) {
+    const { produced, used } = powerBalance(state, player.id);
+    const lowPower = used > produced;
+    if (lowPower && state.tick % 2 === 1) continue;
+
+    for (const category of CATEGORIES) {
+      const queue = player.queues[category];
+      if (queue.item === null) continue;
+
+      if (queue.ready) continue; // building waits for placement
+
+      if (queue.progress < costTimeOf(queue.item).buildTime) {
+        const { cost, buildTime } = costTimeOf(queue.item);
+        const price = paidUpTo(cost, buildTime, queue.progress + 1) - paidUpTo(cost, buildTime, queue.progress);
+        if (player.credits < price) continue; // stalled, no funds
+        player.credits -= price;
+        queue.progress++;
+      }
+
+      if (queue.progress >= costTimeOf(queue.item).buildTime) {
+        if (category === 'building') {
+          queue.ready = true;
+        } else if (isUnitType(queue.item) && trySpawnProduced(state, player, queue.item)) {
+          queue.item = null;
+          queue.progress = 0;
+        }
+        // else: no free spawn cell — retry next tick.
+      }
+    }
+  }
+}
+
+/** Spawns a finished unit next to its producing building; false if blocked. */
+function trySpawnProduced(state: GameState, player: Player, item: string): boolean {
+  if (!isUnitType(item)) return false;
+  const category = unitRule(item).category;
+  const producer = state.buildings.find(
+    (b) => b.owner === player.id && buildingRule(b.type).produces === category,
+  );
+  if (!producer) return false;
+  const rule = buildingRule(producer.type);
+  for (let r = 1; r <= 6; r++) {
+    for (const cell of cellsAroundRect(producer.cx, producer.cy, rule.width, rule.height, r)) {
+      if (!isPassableTerrain(state, cell.cx, cell.cy)) continue;
+      if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
+      const unit = spawnUnit(state, item, player.id, cell.cx, cell.cy);
+      if (producer.rallyCx >= 0) {
+        unit.path = findPath(state, cell.cx, cell.cy, producer.rallyCx, producer.rallyCy, {
+          avoidUnits: false,
+          selfId: unit.id,
+        });
+        unit.pathIndex = 0;
+      }
+      return true;
+    }
+  }
+  return false;
+}

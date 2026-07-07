@@ -1,0 +1,13 @@
+{
+  "name": "cac",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @cac/client",
+    "test": "npm run test -w @cac/sim",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

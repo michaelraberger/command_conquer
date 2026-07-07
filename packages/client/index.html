@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CAC – Browser-RTS</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #101418;
+        width: 100%;
+        height: 100%;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      #app canvas {
+        display: block;
+      }
+      .overlay {
+        position: fixed;
+        color: #d7e0ea;
+        font-size: 12px;
+        pointer-events: none;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      }
+      #debug {
+        top: 10px;
+        left: 10px;
+        white-space: pre;
+        background: rgba(10, 14, 18, 0.7);
+        padding: 8px 10px;
+        border-radius: 4px;
+        display: none;
+      }
+      #help {
+        bottom: 10px;
+        left: 12px;
+        max-width: calc(100% - 220px);
+        background: rgba(10, 14, 18, 0.6);
+        padding: 6px 12px;
+        border-radius: 4px;
+      }
+      #pause {
+        position: fixed;
+        inset: 0 188px 0 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: rgba(10, 14, 18, 0.45);
+        color: #d7e0ea;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        pointer-events: none;
+        z-index: 5;
+      }
+      #pause span {
+        font-size: 44px;
+        letter-spacing: 8px;
+        font-weight: 700;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+      }
+      #pause small {
+        font-size: 12px;
+        color: #8fa1b3;
+      }
+      #lowpower,
+      #attack {
+        position: fixed;
+        left: calc((100% - 188px) / 2);
+        transform: translateX(-50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 8px 20px;
+        border-radius: 6px;
+        background: rgba(40, 12, 12, 0.9);
+        border: 1px solid #e04a3a;
+        color: #ff9a8a;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        text-align: center;
+        pointer-events: none;
+        z-index: 6;
+        animation: lowpulse 1s ease-in-out infinite;
+      }
+      #attack {
+        top: 16px;
+        background: rgba(48, 10, 10, 0.92);
+      }
+      #lowpower {
+        top: 60px;
+      }
+      #lowpower strong,
+      #attack strong {
+        font-size: 15px;
+        letter-spacing: 2px;
+        color: #ff5a48;
+      }
+      #lowpower small {
+        font-size: 11px;
+        color: #d99080;
+      }
+      @keyframes lowpulse {
+        0%,
+        100% {
+          opacity: 1;
+          box-shadow: 0 0 0 rgba(224, 74, 58, 0);
+        }
+        50% {
+          opacity: 0.7;
+          box-shadow: 0 0 14px rgba(224, 74, 58, 0.7);
+        }
+      }
+      #powerbar.low #powerfill {
+        animation: barflash 0.7s ease-in-out infinite;
+      }
+      @keyframes barflash {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      /* RA2-style build sidebar */
+      #sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 188px;
+        background: rgba(16, 20, 26, 0.92);
+        border-left: 1px solid #2c3a4a;
+        color: #d7e0ea;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        user-select: none;
+      }
+      #resources {
+        padding: 10px 12px 6px;
+        border-bottom: 1px solid #2c3a4a;
+      }
+      #credits {
+        font-size: 16px;
+        color: #ffd94d;
+      }
+      #faction {
+        font-size: 10px;
+        color: #8fa1b3;
+        margin: 2px 0 6px;
+      }
+      #powerbar {
+        height: 6px;
+        background: #232b35;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #powerfill {
+        height: 100%;
+        width: 0;
+        background: #53c94f;
+        transition: width 0.2s;
+      }
+      #powerlabel {
+        font-size: 10px;
+        color: #8fa1b3;
+        margin-top: 3px;
+      }
+      #tabs {
+        display: flex;
+        border-bottom: 1px solid #2c3a4a;
+      }
+      #tabs button {
+        flex: 1;
+        background: none;
+        border: none;
+        color: #8fa1b3;
+        font: inherit;
+        font-size: 11px;
+        padding: 7px 0;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+      }
+      #tabs button.active {
+        color: #fff;
+        border-bottom-color: #4da6ff;
+      }
+      #items {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .item {
+        position: relative;
+        border: 1px solid #2c3a4a;
+        border-radius: 4px;
+        padding: 7px 9px;
+        cursor: pointer;
+        background: #1a2129;
+        overflow: hidden;
+      }
+      .item:hover:not(.disabled) {
+        border-color: #4da6ff;
+      }
+      .item.disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .item.ready {
+        border-color: #53c94f;
+        box-shadow: 0 0 6px rgba(83, 201, 79, 0.4);
+      }
+      .item .progress {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        background: rgba(77, 166, 255, 0.22);
+        pointer-events: none;
+      }
+      .item .row {
+        display: flex;
+        justify-content: space-between;
+        position: relative;
+      }
+      .item .cost {
+        color: #ffd94d;
+      }
+      .item .state {
+        position: relative;
+        font-size: 10px;
+        color: #8fa1b3;
+        margin-top: 2px;
+        min-height: 12px;
+      }
+      .item .power {
+        position: relative;
+        font-size: 10px;
+        margin-top: 2px;
+      }
+      #binfo {
+        display: none;
+        border-top: 1px solid #2c3a4a;
+        padding: 8px 12px;
+      }
+      #binfo .btitle {
+        color: #fff;
+        margin-bottom: 2px;
+      }
+      #binfo .bhp {
+        font-size: 10px;
+        color: #8fa1b3;
+      }
+      #binfo .bhint {
+        font-size: 10px;
+        color: #6d7d8e;
+        margin-top: 4px;
+      }
+      #binfo .bupgrade {
+        margin-top: 6px;
+        width: 100%;
+        background: #1f2c1f;
+        border: 1px solid #53c94f;
+        color: #aef0a0;
+        font: inherit;
+        font-size: 11px;
+        padding: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #binfo .bupgrade:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #binfo .bsell {
+        margin-top: 6px;
+        width: 100%;
+        background: #2c1f1f;
+        border: 1px solid #a3542e;
+        color: #f0b090;
+        font: inherit;
+        font-size: 11px;
+        padding: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #binfo .bsell:hover {
+        background: #3a2828;
+      }
+      #superweapon {
+        display: none;
+        border-top: 1px solid #2c3a4a;
+        padding: 8px 12px;
+      }
+      #sw-label {
+        font-size: 11px;
+        color: #ff9a8a;
+        margin-bottom: 4px;
+      }
+      #sw-bar {
+        height: 6px;
+        background: #232b35;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 6px;
+      }
+      #sw-fill {
+        height: 100%;
+        width: 0;
+        background: #ff4d4d;
+      }
+      #sw-fire {
+        width: 100%;
+        background: #401f1f;
+        border: 1px solid #e04a3a;
+        color: #ffb0a5;
+        font: inherit;
+        font-size: 11px;
+        padding: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #sw-fire:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #minimap-wrap {
+        padding: 10px;
+        border-top: 1px solid #2c3a4a;
+      }
+      #save-replay {
+        margin-top: 8px;
+        width: 100%;
+        background: #1a2129;
+        border: 1px solid #2c3a4a;
+        color: #8fa1b3;
+        font: inherit;
+        font-size: 10px;
+        padding: 4px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .panel button.secondary {
+        background: #1a2129;
+        border-color: #2c3a4a;
+        color: #8fa1b3;
+      }
+      #minimap {
+        width: 100%;
+        image-rendering: pixelated;
+        border: 1px solid #2c3a4a;
+        cursor: crosshair;
+        display: block;
+      }
+
+      /* Start & end screens */
+      .fullscreen {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 35%, #1c2733 0%, #0b0f14 70%);
+        color: #d7e0ea;
+        z-index: 10;
+      }
+      .panel {
+        background: rgba(16, 20, 26, 0.95);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 26px 30px;
+        width: 320px;
+      }
+      .panel h1 {
+        margin: 0 0 4px;
+        font-size: 22px;
+        letter-spacing: 2px;
+      }
+      .panel .sub {
+        color: #8fa1b3;
+        font-size: 11px;
+        margin-bottom: 18px;
+      }
+      .panel fieldset {
+        border: 1px solid #2c3a4a;
+        border-radius: 6px;
+        margin: 0 0 14px;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      .panel legend {
+        color: #8fa1b3;
+        font-size: 11px;
+        padding: 0 6px;
+      }
+      .panel label {
+        margin-right: 14px;
+        cursor: pointer;
+      }
+      .panel button {
+        width: 100%;
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        padding: 9px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+      .panel button:hover {
+        background: #2d5175;
+      }
+      .panel .mp {
+        border-top: 1px solid #2c3a4a;
+        margin-top: 10px;
+        padding-top: 12px;
+      }
+      .panel input[type='text'] {
+        width: 100%;
+        box-sizing: border-box;
+        background: #0e1319;
+        border: 1px solid #2c3a4a;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 11px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+      .mp-row {
+        display: flex;
+        gap: 8px;
+      }
+      .mp-row input {
+        flex: 1;
+      }
+      .mp-row button {
+        width: auto;
+        padding: 6px 12px;
+      }
+      #mp-status {
+        min-height: 16px;
+        font-size: 11px;
+        color: #ffd94d;
+      }
+      #end .panel {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="sidebar">
+      <div id="resources">
+        <div id="credits">$ 0</div>
+        <div id="faction"></div>
+        <div id="powerbar"><div id="powerfill"></div></div>
+        <div id="powerlabel">Strom 0 / 0</div>
+      </div>
+      <div id="tabs"></div>
+      <div id="items"></div>
+      <div id="binfo"></div>
+      <div id="superweapon">
+        <div id="sw-label">…</div>
+        <div id="sw-bar"><div id="sw-fill"></div></div>
+        <button id="sw-fire" disabled>Ziel wählen</button>
+      </div>
+      <div id="minimap-wrap">
+        <canvas id="minimap" width="64" height="64"></canvas>
+        <button id="save-replay" style="display: none">Replay speichern</button>
+      </div>
+    </div>
+    <div id="debug" class="overlay"></div>
+    <div id="pause"><span>PAUSE</span><small>P zum Fortsetzen</small></div>
+    <div id="lowpower">
+      <strong>⚠ ZU WENIG STROM</strong>
+      <small>Verteidigung offline · Produktion langsamer · Kraftwerk bauen</small>
+    </div>
+    <div id="attack"><strong>⚠ EINHEITEN WERDEN ANGEGRIFFEN</strong></div>
+    <div id="help" class="overlay">
+      Linksklick/Ziehen: Auswählen · Rechtsklick: Bewegen / Angriff / Ernten /
+      Sammelpunkt · Strg+Rechtsklick: Angriffsbewegung · WASD/Pfeile: Kamera ·
+      P: Pause · U: Ausbauen · R: Bauradius · H: Basis zentrieren · ^/`: Debug
+    </div>
+
+    <div id="start" class="fullscreen" style="display: flex">
+      <div class="panel">
+        <h1>CAC</h1>
+        <div class="sub">Echtzeitstrategie im Browser</div>
+        <fieldset>
+          <legend>Fraktion</legend>
+          <label><input type="radio" name="faction" value="ALLIES" checked /> Alliierte</label>
+          <label><input type="radio" name="faction" value="SOVIETS" /> Sowjets</label>
+        </fieldset>
+        <fieldset>
+          <legend>KI-Schwierigkeit</legend>
+          <label><input type="radio" name="difficulty" value="easy" /> Leicht</label>
+          <label><input type="radio" name="difficulty" value="normal" checked /> Normal</label>
+          <label><input type="radio" name="difficulty" value="hard" /> Schwer</label>
+        </fieldset>
+        <button id="start-ai">Gefecht gegen KI starten</button>
+        <button id="replay-open" class="secondary">Replay ansehen …</button>
+        <input id="replay-file" type="file" accept=".json" style="display: none" />
+        <div class="mp">
+          <input id="mp-url" type="text" placeholder="ws://localhost:8787" />
+          <button id="mp-host">Mehrspieler-Partie eröffnen</button>
+          <div class="mp-row">
+            <input id="mp-code" type="text" placeholder="Code" maxlength="6" />
+            <button id="mp-join">Beitreten</button>
+          </div>
+          <div id="mp-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="end" class="fullscreen">
+      <div class="panel">
+        <h1>SIEG!</h1>
+        <div class="sub">Die Partie ist beendet.</div>
+        <button id="end-replay" style="display: none">Replay speichern</button>
+        <button id="end-restart">Neue Partie</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+import { cellIndex, inBounds, isPassableTerrain } from '../map.js';
+import { buildAdjacency, buildingRule, type BuildingType } from '../rules.js';
+import type { GameState } from '../state.js';
+
+/**
+ * Placement validation: every footprint cell must be buildable ground (grass,
+ * no structure, no unit, no ore) and the footprint must touch the build
+ * radius of an existing own building.
+ */
+export function canPlaceBuilding(
+  state: GameState,
+  playerId: number,
+  type: BuildingType,
+  cx: number,
+  cy: number,
+): boolean {
+  const rule = buildingRule(type);
+  for (let y = cy; y < cy + rule.height; y++) {
+    for (let x = cx; x < cx + rule.width; x++) {
+      if (!inBounds(state, x, y)) return false;
+      if (!isPassableTerrain(state, x, y)) return false;
+      const idx = cellIndex(state, x, y);
+      if (state.occupancy[idx] !== 0) return false;
+      if (state.ore[idx]! > 0) return false;
+    }
+  }
+  // Adjacency: the footprint must lie within a real building's build radius.
+  // Walls never open buildable area, so they are skipped as sources — you can
+  // only place a wall inside the zone your real buildings already opened.
+  for (const b of state.buildings) {
+    if (b.owner !== playerId || b.type === 'WALL') continue;
+    const br = buildingRule(b.type);
+    const dx = rectGap(cx, rule.width, b.cx, br.width);
+    const dy = rectGap(cy, rule.height, b.cy, br.height);
+    if ((dx > dy ? dx : dy) <= buildAdjacency(b.type)) return true;
+  }
+  return false;
+}
+
+/** Gap in cells between two 1-D intervals (0 if they touch/overlap). */
+function rectGap(a: number, aLen: number, b: number, bLen: number): number {
+  if (a + aLen - 1 < b) return b - (a + aLen - 1);
+  if (b + bLen - 1 < a) return a - (b + bLen - 1);
+  return 0;
+}

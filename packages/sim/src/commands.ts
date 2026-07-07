@@ -1,0 +1,251 @@
+import { inBounds, isPassableTerrain } from './map.js';
+import { findPath } from './path/astar.js';
+import { cellCenter } from './fixed.js';
+import {
+  SUPERWEAPON_CHARGE_TICKS,
+  SUPERWEAPON_TRAVEL_TICKS,
+  WALL_LEVELS,
+  buildingRule,
+  sellRefund,
+  unitRule,
+  type ProductionCategory,
+} from './rules.js';
+import { constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
+import { findTarget, targetOwner } from './targeting.js';
+import { canPlaceBuilding } from './systems/placement.js';
+import {
+  cancelProduction,
+  placeQueuedBuilding,
+  startProduction,
+} from './systems/production.js';
+
+/**
+ * Commands are the ONLY external mutation entry point into the sim — in
+ * multiplayer this union IS the network protocol. Target coordinates are
+ * cell coordinates.
+ */
+export type Command =
+  | { type: 'MOVE'; playerId: number; unitIds: number[]; cx: number; cy: number }
+  | { type: 'ATTACK'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'ATTACK_MOVE'; playerId: number; unitIds: number[]; cx: number; cy: number }
+  | { type: 'STOP'; playerId: number; unitIds: number[] }
+  | { type: 'HARVEST'; playerId: number; unitIds: number[]; cx: number; cy: number }
+  | { type: 'REPAIR'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'BUILD_START'; playerId: number; item: string }
+  | { type: 'BUILD_CANCEL'; playerId: number; category: ProductionCategory }
+  | { type: 'PLACE_BUILDING'; playerId: number; cx: number; cy: number }
+  | { type: 'PLACE_WALL'; playerId: number; cx: number; cy: number }
+  | { type: 'UPGRADE_BUILDING'; playerId: number; buildingId: number }
+  | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
+  | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
+  | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number };
+
+export function applyCommands(state: GameState, commands: Command[]): void {
+  for (const cmd of commands) {
+    switch (cmd.type) {
+      case 'MOVE':
+        applyMove(state, cmd);
+        break;
+      case 'ATTACK': {
+        const target = findTarget(state, cmd.targetId);
+        if (!target || targetOwner(target) === cmd.playerId) break;
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unitRule(unit.type).weapon === null) continue; // harvesters can't attack
+          unit.order = { kind: 'ATTACK', targetId: cmd.targetId };
+          unit.path = null; // combat system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'ATTACK_MOVE': {
+        const units = ownedUnits(state, cmd.unitIds, cmd.playerId);
+        const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length);
+        if (targets.length === 0) break;
+        for (let i = 0; i < units.length; i++) {
+          const unit = units[i]!;
+          const t = targets[i] ?? targets[targets.length - 1]!;
+          if (unitRule(unit.type).weapon === null) {
+            // Weaponless units treat attack-move as a plain move.
+            moveUnitTo(state, unit, t.cx, t.cy);
+            continue;
+          }
+          unit.order = { kind: 'ATTACK_MOVE', cx: t.cx, cy: t.cy };
+          unit.path = null; // combat system paths toward the order cell
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'STOP':
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          unit.order = null;
+          unit.path = null;
+          unit.pathIndex = 0;
+          unit.blockedTicks = 0;
+          unit.repathCount = 0;
+        }
+        break;
+      case 'HARVEST':
+        if (!inBounds(state, cmd.cx, cmd.cy)) break;
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unit.type !== 'HARVESTER') continue;
+          unit.order = { kind: 'HARVEST', cx: cmd.cx, cy: cmd.cy };
+          unit.path = null;
+          unit.pathIndex = 0;
+        }
+        break;
+      case 'REPAIR': {
+        const building = state.buildings.find((b) => b.id === cmd.targetId);
+        if (!building || building.owner !== cmd.playerId) break;
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unit.type !== 'REPAIR') continue; // only the repair vehicle repairs
+          unit.order = { kind: 'REPAIR_BUILDING', targetId: cmd.targetId };
+          unit.path = null; // repair system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'BUILD_START':
+        startProduction(state, cmd.playerId, cmd.item);
+        break;
+      case 'BUILD_CANCEL':
+        cancelProduction(state, cmd.playerId, cmd.category);
+        break;
+      case 'PLACE_BUILDING':
+        placeQueuedBuilding(state, cmd.playerId, cmd.cx, cmd.cy);
+        break;
+      case 'PLACE_WALL': {
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        const cost = buildingRule('WALL').cost;
+        if (!player || player.credits < cost) break;
+        if (!canPlaceBuilding(state, cmd.playerId, 'WALL', cmd.cx, cmd.cy)) break;
+        player.credits -= cost;
+        constructBuilding(state, 'WALL', cmd.playerId, cmd.cx, cmd.cy);
+        break;
+      }
+      case 'UPGRADE_BUILDING': {
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        const building = state.buildings.find(
+          (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
+        );
+        if (!player || !building || building.type !== 'WALL') break;
+        if (building.level >= WALL_LEVELS.length) break;
+        const next = WALL_LEVELS[building.level]!;
+        if (player.credits < next.upgradeCost) break;
+        player.credits -= next.upgradeCost;
+        building.level++;
+        building.hp = next.maxHp; // upgrading fully repairs the wall
+        break;
+      }
+      case 'SELL_BUILDING': {
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        const building = state.buildings.find(
+          (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
+        );
+        if (!player || !building) break;
+        player.credits += sellRefund(building.type, building.level);
+        // Deconstruct without an explosion: free the footprint, drop the record.
+        const rule = buildingRule(building.type);
+        for (let y = building.cy; y < building.cy + rule.height; y++) {
+          for (let x = building.cx; x < building.cx + rule.width; x++) {
+            const idx = y * state.mapWidth + x;
+            if (state.structures[idx] === building.id) state.structures[idx] = 0;
+          }
+        }
+        state.buildings = state.buildings.filter((b) => b.id !== building.id);
+        break;
+      }
+      case 'FIRE_SUPERWEAPON': {
+        if (!inBounds(state, cmd.cx, cmd.cy)) break;
+        // Lowest-id charged silo fires (deterministic pick).
+        const silo = state.buildings.find(
+          (b) =>
+            b.owner === cmd.playerId &&
+            buildingRule(b.type).superweapon !== null &&
+            b.charge >= SUPERWEAPON_CHARGE_TICKS,
+        );
+        if (!silo) break;
+        silo.charge = 0;
+        state.strikes.push({
+          id: state.nextEntityId++,
+          kind: buildingRule(silo.type).superweapon!,
+          owner: cmd.playerId,
+          x: cellCenter(cmd.cx),
+          y: cellCenter(cmd.cy),
+          countdown: SUPERWEAPON_TRAVEL_TICKS,
+        });
+        break;
+      }
+      case 'SET_RALLY': {
+        if (!inBounds(state, cmd.cx, cmd.cy)) break;
+        const building = state.buildings.find(
+          (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
+        );
+        if (!building || buildingRule(building.type).produces === null) break;
+        building.rallyCx = cmd.cx;
+        building.rallyCy = cmd.cy;
+        break;
+      }
+    }
+  }
+}
+
+/** Resolves ids to living units of the player, in ascending-id order. */
+function ownedUnits(state: GameState, ids: number[], playerId: number): Unit[] {
+  const byId = new Map<number, Unit>();
+  for (const unit of state.units) byId.set(unit.id, unit);
+  const out: Unit[] = [];
+  for (const id of [...ids].sort((a, b) => a - b)) {
+    const unit = byId.get(id);
+    if (unit && unit.owner === playerId) out.push(unit);
+  }
+  return out;
+}
+
+function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number; cx: number; cy: number }): void {
+  const units = ownedUnits(state, cmd.unitIds, cmd.playerId);
+  if (units.length === 0) return;
+  const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length);
+  if (targets.length === 0) return;
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i]!;
+    const target = targets[i] ?? targets[targets.length - 1]!;
+    moveUnitTo(state, unit, target.cx, target.cy);
+  }
+}
+
+/** Plain move: clears any order (manual moves override attack/harvest). */
+function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void {
+  const ucx = unit.cell % state.mapWidth;
+  const ucy = (unit.cell - ucx) / state.mapWidth;
+  unit.order = null;
+  unit.path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id });
+  unit.pathIndex = 0;
+  unit.blockedTicks = 0;
+  unit.repathCount = 0;
+}
+
+/**
+ * Spreads a group order over distinct passable cells spiraling out from the
+ * clicked cell, so formations don't all fight over one destination.
+ */
+function assignTargetCells(
+  state: GameState,
+  cx: number,
+  cy: number,
+  count: number,
+): PathCell[] {
+  const out: PathCell[] = [];
+  for (let r = 0; r < 12 && out.length < count; r++) {
+    for (let dy = -r; dy <= r && out.length < count; dy++) {
+      for (let dx = -r; dx <= r && out.length < count; dx++) {
+        const ax = dx < 0 ? -dx : dx;
+        const ay = dy < 0 ? -dy : dy;
+        if ((ax > ay ? ax : ay) !== r) continue;
+        if (isPassableTerrain(state, cx + dx, cy + dy)) {
+          out.push({ cx: cx + dx, cy: cy + dy });
+        }
+      }
+    }
+  }
+  return out;
+}
