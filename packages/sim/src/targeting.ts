@@ -2,6 +2,23 @@ import { SUBCELL, distSq } from './fixed.js';
 import { WALL_LEVELS, buildingRule, unitRule, type WeaponRule } from './rules.js';
 import type { Building, GameState, Unit } from './state.js';
 
+/** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
+export function isAir(unit: Unit): boolean {
+  return unitRule(unit.type).air === true;
+}
+
+/** Unit-layer predicate for a weapon: which units it may engage. */
+export function weaponAcceptsUnit(weapon: WeaponRule): (u: Unit) => boolean {
+  if (weapon.targets === 'air') return isAir;
+  if (weapon.targets === 'both') return () => true;
+  return (u) => !isAir(u); // 'ground'
+}
+
+/** Ground weapons and both-target weapons may hit buildings; air-only cannot. */
+export function weaponHitsBuildings(weapon: WeaponRule): boolean {
+  return weapon.targets !== 'air';
+}
+
 /** Anything a weapon can shoot at. */
 export type Target =
   | { kind: 'unit'; unit: Unit }

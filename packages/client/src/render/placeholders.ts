@@ -43,6 +43,9 @@ export interface GameTextures {
   flamer: Texture[];
   dog: Texture[];
   teslatank: Texture[];
+  flak: Texture[];
+  heli: Texture[];
+  jet: Texture[];
   projectile: Texture;
   selectSmall: Texture;
   selectLarge: Texture;
@@ -259,6 +262,34 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.ellipse(c.x, c.y - 10, 13, 8).fill(0xbdb5a4);
       g.rect(c.x - 9, c.y - 9, 18, 3.5).fill(0x3a352c); // firing slit
       g.circle(c.x, c.y - 15, 2).fill(accent);
+    },
+  },
+  HELIPAD: {
+    frameTop: 22,
+    accent: 0x6db4d6,
+    draw: (g, w, h, accent) => {
+      concretePlate(g, w, h);
+      const c = iso(1.5, 1.5);
+      // Tarmac landing circle with a yellow rim and an "H" marking.
+      g.ellipse(c.x, c.y, 46, 24).fill(0x4a463d).stroke({ width: 2, color: 0xd8b13c });
+      g.rect(c.x - 11, c.y - 8, 3.5, 16).fill(accent);
+      g.rect(c.x + 7.5, c.y - 8, 3.5, 16).fill(accent);
+      g.rect(c.x - 11, c.y - 2, 22, 3.5).fill(accent);
+      prismAt(g, 0.1, 0.1, 0.7, 0.7, 14, 0xb0a794); // control shack
+    },
+  },
+  FLAKTOWER: {
+    frameTop: 28,
+    accent: 0xcfd6dc,
+    draw: (g, _w, _h, accent) => {
+      concretePlate(g, 1, 1);
+      const c = iso(0.5, 0.5);
+      prismAt(g, 0.28, 0.28, 0.44, 0.44, 8, 0x8f8775); // turret base
+      g.circle(c.x, c.y - 12, 5).fill(0x9aa0a6).stroke({ width: 1, color: 0x4a4a4a }); // hub
+      for (const ox of [-6, -2, 2, 6]) {
+        g.rect(c.x + ox, c.y - 23, 1.8, 12).fill(0x6f6f6f); // AA barrels pointing up
+      }
+      g.circle(c.x, c.y - 12, 2).fill(accent);
     },
   },
   NUKESILO: {
@@ -486,6 +517,37 @@ function drawTeslaTank(g: Graphics): void {
   g.circle(0, 0, 6.5).stroke({ width: 1, color: 0xbfeaff, alpha: 0.6 });
 }
 
+function drawFlak(g: Graphics): void {
+  g.rect(-13, -11, 26, 5).fill(0x62615e);
+  g.rect(-13, 6, 26, 5).fill(0x62615e);
+  g.roundRect(-12, -8, 24, 16, 3).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c });
+  g.circle(-1, 0, 5).fill(0xdedede).stroke({ width: 1, color: 0x4a4a4a }); // turret
+  // Quad flak barrels angled forward-up.
+  for (const oy of [-3.5, -1.2, 1.2, 3.5]) g.rect(3, oy - 0.6, 16, 1.6).fill(0x8f8f8f);
+}
+
+/** Attack helicopter: hull + tail boom + a faint spinning rotor disc. */
+function drawHeli(g: Graphics): void {
+  g.ellipse(-16, 0, 8, 2.5).fill(0x9a9a9a); // tail boom
+  g.rect(-24, -4, 4, 8).fill(0x8f8f8f); // tail fin
+  g.roundRect(-8, -6, 22, 12, 5).fill(0xcfcfcf).stroke({ width: 1, color: 0x3c3c3c }); // fuselage
+  g.roundRect(6, -4, 8, 8, 3).fill(0x9aa4b0); // cockpit
+  g.rect(2, -9, 3, 18).fill(0x6f6f6f); // stub wings / weapon pylons
+  g.circle(0, 0, 22).fill({ color: 0xdedede, alpha: 0.18 }); // rotor disc
+  g.circle(0, 0, 22).stroke({ width: 1, color: 0xffffff, alpha: 0.25 });
+}
+
+/** Jet: pointed fuselage with swept wings and tailplanes. */
+function drawJet(g: Graphics): void {
+  g.poly([22, 0, 6, -4, -16, -3, -16, 3, 6, 4]).fill(0xcfcfcf).stroke({ width: 1, color: 0x3c3c3c }); // fuselage
+  g.poly([-2, -3, -10, -18, -16, -18, -8, -3]).fill(0xb8b8b8); // left wing
+  g.poly([-2, 3, -10, 18, -16, 18, -8, 3]).fill(0xb8b8b8); // right wing
+  g.poly([-13, -2, -20, -8, -20, -2].map((v) => v)).fill(0xa8a8a8); // tailplane L
+  g.poly([-13, 2, -20, 8, -20, 2]).fill(0xa8a8a8); // tailplane R
+  g.circle(10, 0, 2.4).fill(0x9aa4b0); // canopy
+  g.circle(-16, 0, 2.4).fill(0xff8a3a); // exhaust glow
+}
+
 /**
  * Craggy 3D rock outcrop: irregular silhouette with a sun-lit north-west
  * face, a mid-tone top and a shaded south-east face — same light direction
@@ -569,6 +631,9 @@ export function createTextures(renderer: Renderer): GameTextures {
   const flamer: Texture[] = [];
   const dog: Texture[] = [];
   const teslatank: Texture[] = [];
+  const flak: Texture[] = [];
+  const heli: Texture[] = [];
+  const jet: Texture[] = [];
   for (let f = 0; f < FACING_COUNT; f++) {
     tank.push(bakeVehicle(renderer, f, 28, drawTank));
     mammoth.push(bakeVehicle(renderer, f, 34, drawMammoth));
@@ -578,6 +643,9 @@ export function createTextures(renderer: Renderer): GameTextures {
     scout.push(bakeVehicle(renderer, f, 24, drawScout));
     lighttank.push(bakeVehicle(renderer, f, 26, drawLightTank));
     teslatank.push(bakeVehicle(renderer, f, 30, drawTeslaTank));
+    flak.push(bakeVehicle(renderer, f, 26, drawFlak));
+    heli.push(bakeVehicle(renderer, f, 30, drawHeli));
+    jet.push(bakeVehicle(renderer, f, 30, drawJet));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer));
     flamer.push(bakeInfantry(renderer, f, drawFlamer));
@@ -665,6 +733,9 @@ export function createTextures(renderer: Renderer): GameTextures {
     flamer,
     dog,
     teslatank,
+    flak,
+    heli,
+    jet,
     projectile: renderer.generateTexture({
       target: shell,
       frame: new Rectangle(-5, -5, 10, 10),

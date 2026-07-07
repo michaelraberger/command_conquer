@@ -1,4 +1,4 @@
-import { cellsAroundRect, isPassableTerrain, cellIndex } from '../map.js';
+import { cellsAroundRect, isPassableTerrain, cellIndex, inBounds } from '../map.js';
 import { findPath } from '../path/astar.js';
 import {
   availableToFaction,
@@ -86,7 +86,7 @@ export function placeQueuedBuilding(state: GameState, playerId: number, cx: numb
   queue.ready = false;
 }
 
-const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehicle'];
+const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehicle', 'air'];
 
 /**
  * Advances all build queues: credits drain gradually over the build time
@@ -135,16 +135,23 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
   );
   if (!producer) return false;
   const rule = buildingRule(producer.type);
+  const air = unitRule(item).air === true;
   for (let r = 1; r <= 6; r++) {
     for (const cell of cellsAroundRect(producer.cx, producer.cy, rule.width, rule.height, r)) {
-      if (!isPassableTerrain(state, cell.cx, cell.cy)) continue;
-      if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
+      if (!inBounds(state, cell.cx, cell.cy)) continue;
+      // Aircraft can appear over any cell; ground units need clear passable ground.
+      if (!air) {
+        if (!isPassableTerrain(state, cell.cx, cell.cy)) continue;
+        if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
+      }
       const unit = spawnUnit(state, item, player.id, cell.cx, cell.cy);
       if (producer.rallyCx >= 0) {
-        unit.path = findPath(state, cell.cx, cell.cy, producer.rallyCx, producer.rallyCy, {
-          avoidUnits: false,
-          selfId: unit.id,
-        });
+        unit.path = air
+          ? [{ cx: producer.rallyCx, cy: producer.rallyCy }]
+          : findPath(state, cell.cx, cell.cy, producer.rallyCx, producer.rallyCy, {
+              avoidUnits: false,
+              selfId: unit.id,
+            });
         unit.pathIndex = 0;
       }
       return true;

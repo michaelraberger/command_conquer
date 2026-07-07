@@ -24,6 +24,8 @@ interface UnitView {
   lastHp: number;
   prevX: number;
   prevY: number;
+  /** Aircraft fly at altitude and always draw above ground entities. */
+  air: boolean;
 }
 
 interface BuildingView {
@@ -47,6 +49,10 @@ interface ProjectileView {
 const BAR_HEIGHT = 3;
 /** Dark cold tint for own power-consuming buildings during a power deficit. */
 const OFFLINE_TINT = 0x424a55;
+/** Screen-pixel lift for aircraft (body drawn this far above its ground shadow). */
+const AIR_ALTITUDE = 24;
+/** zIndex floor for aircraft so they always render above ground entities. */
+const AIR_Z = 1_000_000;
 
 /**
  * Presentation layer: keeps one sprite tree per sim entity and interpolates
@@ -106,7 +112,7 @@ export class EntityRenderer {
 
       const { x, y } = worldToScreen(fx, fy);
       view.root.position.set(x, y);
-      view.root.zIndex = depthOf(fx, fy);
+      view.root.zIndex = view.air ? AIR_Z + depthOf(fx, fy) : depthOf(fx, fy);
       view.body.texture = this.textureFor(unit);
       view.sel.visible = selected.has(unit.id);
       this.updateUnitBar(unit, view, selected.has(unit.id));
@@ -188,6 +194,9 @@ export class EntityRenderer {
       FLAMER: this.tex.flamer,
       DOG: this.tex.dog,
       TESLATANK: this.tex.teslatank,
+      FLAK: this.tex.flak,
+      HELI: this.tex.heli,
+      JET: this.tex.jet,
     };
     return sets[unit.type][unit.facing]!;
   }
@@ -285,21 +294,29 @@ export class EntityRenderer {
   }
 
   private createView(unit: Unit): UnitView {
+    const air = unitRule(unit.type).air === true;
+    const lift = air ? AIR_ALTITUDE : 0;
     const root = new Container();
     const big = unit.type !== 'RIFLEMAN';
     const sel = new Sprite(big ? this.tex.selectLarge : this.tex.selectSmall);
     sel.anchor.set(0.5);
-    sel.position.set(0, big ? 0 : 2);
+    sel.position.set(0, (big ? 0 : 2) - lift);
     sel.visible = false;
     const body = new Sprite(this.textureFor(unit));
     body.anchor.set(0.5);
+    body.position.set(0, -lift);
     body.tint = this.playerColors.get(unit.owner) ?? 0xffffff;
     const bar = new Graphics();
-    bar.position.set(0, big ? -24 : -17);
+    bar.position.set(0, (big ? -24 : -17) - lift);
     bar.visible = false;
+    if (air) {
+      // Ground shadow directly under the aircraft.
+      const shadow = new Graphics().ellipse(0, 0, 11, 6).fill({ color: 0x000000, alpha: 0.28 });
+      root.addChild(shadow);
+    }
     root.addChild(sel, body, bar);
     this.layer.addChild(root);
-    const view: UnitView = { root, body, sel, bar, lastHp: -1, prevX: unit.x, prevY: unit.y };
+    const view: UnitView = { root, body, sel, bar, lastHp: -1, prevX: unit.x, prevY: unit.y, air };
     this.views.set(unit.id, view);
     return view;
   }

@@ -10,8 +10,10 @@ import { SUBCELL } from './fixed.js';
  * cost drains gradually over the build time (RA2 model). sight is in cells.
  */
 export type ArmorClass = 'none' | 'light' | 'heavy';
-export type UnitCategory = 'infantry' | 'vehicle';
+export type UnitCategory = 'infantry' | 'vehicle' | 'air';
 export type ProductionCategory = 'building' | UnitCategory;
+/** What layer a weapon can hit. Ground weapons cannot touch aircraft. */
+export type WeaponTargets = 'ground' | 'air' | 'both';
 export type Faction = 'ALLIES' | 'SOVIETS';
 
 export type SuperweaponKind = 'NUKE' | 'STORM';
@@ -44,6 +46,8 @@ export interface WeaponRule {
   /** Warhead vs armor-class damage multiplier in percent (RA2 model). */
   vs: Record<ArmorClass, number>;
   fx: WeaponFx;
+  /** Which layer this weapon can engage (default 'ground'). */
+  targets: WeaponTargets;
 }
 
 export interface UnitRule {
@@ -64,6 +68,9 @@ export interface UnitRule {
   sight: number;
   /** Weapon only engages enemy infantry (e.g. attack dog) — never vehicles or buildings. */
   antiInfantryOnly?: boolean;
+  /** Aircraft: flies in a straight line over any terrain, ignores occupancy,
+   *  and can only be hit by anti-air weapons. */
+  air?: boolean;
 }
 
 function weapon(
@@ -73,9 +80,10 @@ function weapon(
   projectileSpeed: number,
   vs: Record<ArmorClass, number>,
   fx: WeaponFx,
+  targets: WeaponTargets = 'ground',
 ): WeaponRule {
   const range = Math.round(rangeCells * SUBCELL);
-  return { damage, range, rangeSq: range * range, cooldown, projectileSpeed, vs, fx };
+  return { damage, range, rangeSq: range * range, cooldown, projectileSpeed, vs, fx, targets };
 }
 
 export const UNIT_RULES = {
@@ -251,6 +259,51 @@ export const UNIT_RULES = {
     factions: ['SOVIETS'],
     sight: 6,
   },
+  FLAK: {
+    name: 'Flak-Panzer',
+    maxHp: 180,
+    speed: 36,
+    radius: 100,
+    armor: 'light',
+    // Anti-air only: rapid flak that shreds aircraft but can't touch the ground.
+    weapon: weapon(20, 6, 6, 0, { none: 100, light: 100, heavy: 100 }, 'BULLET', 'air'),
+    cost: 700,
+    buildTime: 70,
+    category: 'vehicle',
+    requires: ['FACTORY'],
+    factions: null,
+    sight: 7,
+  },
+  HELI: {
+    name: 'Kampfhubschrauber',
+    maxHp: 160,
+    speed: 48,
+    radius: 100,
+    armor: 'light',
+    weapon: weapon(35, 5, 28, 220, { none: 60, light: 100, heavy: 85 }, 'ROCKET'),
+    cost: 1200,
+    buildTime: 110,
+    category: 'air',
+    requires: ['HELIPAD'],
+    factions: null,
+    sight: 8,
+    air: true,
+  },
+  JET: {
+    name: 'Kampfjet',
+    maxHp: 120,
+    speed: 72,
+    radius: 100,
+    armor: 'light',
+    weapon: weapon(50, 4.5, 35, 0, { none: 70, light: 100, heavy: 80 }, 'CANNON'),
+    cost: 1400,
+    buildTime: 120,
+    category: 'air',
+    requires: ['HELIPAD'],
+    factions: ['SOVIETS'],
+    sight: 9,
+    air: true,
+  },
 } as const satisfies Record<string, UnitRule>;
 
 export type UnitType = keyof typeof UNIT_RULES;
@@ -419,6 +472,41 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: ['ALLIES'],
     sight: 6,
+  },
+  HELIPAD: {
+    name: 'Flugplatz',
+    maxHp: 900,
+    cost: 1000,
+    buildTime: 120,
+    power: -40,
+    width: 3,
+    height: 3,
+    armor: 'light',
+    produces: 'air',
+    weapon: null,
+    superweapon: null,
+    requires: ['FACTORY'],
+    buildable: true,
+    factions: null,
+    sight: 5,
+  },
+  FLAKTOWER: {
+    name: 'Flak-Turm',
+    maxHp: 600,
+    cost: 800,
+    buildTime: 70,
+    power: -20,
+    width: 1,
+    height: 1,
+    armor: 'heavy',
+    produces: null,
+    // Static anti-air: only shoots aircraft.
+    weapon: weapon(22, 7, 5, 0, { none: 100, light: 100, heavy: 100 }, 'BULLET', 'air'),
+    superweapon: null,
+    requires: ['BARRACKS'],
+    buildable: true,
+    factions: null,
+    sight: 7,
   },
   NUKESILO: {
     name: 'Raketensilo',

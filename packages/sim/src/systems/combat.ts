@@ -5,10 +5,13 @@ import {
   aimPoint,
   damageTarget,
   findTarget,
+  isAir,
   nearestEnemyBuilding,
   nearestEnemyUnit,
   targetDistSq,
   targetOwner,
+  weaponAcceptsUnit,
+  weaponHitsBuildings,
   type Target,
 } from '../targeting.js';
 import type { GameState, Unit } from '../state.js';
@@ -31,7 +34,7 @@ export function combatSystem(state: GameState): void {
     const order = unit.order;
     if (order && order.kind === 'ATTACK') {
       const target = findTarget(state, order.targetId);
-      if (!target || targetOwner(target) === unit.owner || !canEngage(antiInfantryOnly, target)) {
+      if (!target || targetOwner(target) === unit.owner || !canEngage(weapon, antiInfantryOnly, target)) {
         unit.order = null;
         continue;
       }
@@ -49,6 +52,11 @@ export function combatSystem(state: GameState): void {
         const dy = cy - order.cy;
         if ((dx < 0 ? -dx : dx) <= 1 && (dy < 0 ? -dy : dy) <= 1) {
           unit.order = null;
+          continue;
+        }
+        if (isAir(unit)) {
+          unit.path = [{ cx: order.cx, cy: order.cy }];
+          unit.pathIndex = 0;
           continue;
         }
         const path = findPath(state, cx, cy, order.cx, order.cy, {
@@ -70,7 +78,7 @@ export function combatSystem(state: GameState): void {
         unit.x,
         unit.y,
         weapon.rangeSq,
-        antiInfantryOnly ? isInfantry : undefined,
+        unitAccept(weapon, antiInfantryOnly),
       );
       if (target) tryFire(state, unit, { kind: 'unit', unit: target }, weapon);
     }
@@ -81,10 +89,17 @@ function isInfantry(u: Unit): boolean {
   return unitRule(u.type).category === 'infantry';
 }
 
-/** Anti-infantry weapons refuse buildings and non-infantry units. */
-function canEngage(antiInfantryOnly: boolean, target: Target): boolean {
-  if (!antiInfantryOnly) return true;
-  return target.kind === 'unit' && isInfantry(target.unit);
+/** Combined unit-target filter: weapon layer (ground/air) + anti-infantry. */
+function unitAccept(weapon: WeaponRule, antiInfantryOnly: boolean): (u: Unit) => boolean {
+  const byLayer = weaponAcceptsUnit(weapon);
+  if (!antiInfantryOnly) return byLayer;
+  return (u) => byLayer(u) && isInfantry(u);
+}
+
+/** Whether this weapon may engage the given target at all. */
+function canEngage(weapon: WeaponRule, antiInfantryOnly: boolean, target: Target): boolean {
+  if (target.kind === 'building') return weaponHitsBuildings(weapon) && !antiInfantryOnly;
+  return unitAccept(weapon, antiInfantryOnly)(target.unit);
 }
 
 /** Units in range first, then enemy structures (walls only via explicit ATTACK). */
@@ -100,10 +115,10 @@ function acquireTarget(
     unit.x,
     unit.y,
     weapon.rangeSq,
-    antiInfantryOnly ? isInfantry : undefined,
+    unitAccept(weapon, antiInfantryOnly),
   );
   if (enemyUnit) return { kind: 'unit', unit: enemyUnit };
-  if (antiInfantryOnly) return null; // dogs never bite buildings
+  if (antiInfantryOnly || !weaponHitsBuildings(weapon)) return null;
   const building = nearestEnemyBuilding(state, unit.owner, unit.x, unit.y, weapon.rangeSq, false);
   if (building) return { kind: 'building', building };
   return null;
@@ -115,16 +130,20 @@ function engageOrChase(state: GameState, unit: Unit, target: Target, weapon: Wea
     tryFire(state, unit, target, weapon);
     return;
   }
-  // Out of range: (re)path toward the target. The goal cell is occupied by
-  // the target itself, so the best-effort path ends next to it.
+  // Out of range: (re)path toward the target.
   if (!unit.path || (state.tick + unit.id) % CHASE_REPATH_INTERVAL === 0) {
+    const goal = aimPoint(target, unit.x, unit.y);
+    const gcx = goal.x >> 8;
+    const gcy = goal.y >> 8;
+    if (isAir(unit)) {
+      // Aircraft fly straight at the target, ignoring terrain.
+      unit.path = [{ cx: gcx, cy: gcy }];
+      unit.pathIndex = 0;
+      return;
+    }
     const cx = unit.cell % state.mapWidth;
     const cy = (unit.cell - cx) / state.mapWidth;
-    const goal = aimPoint(target, unit.x, unit.y);
-    const path = findPath(state, cx, cy, goal.x >> 8, goal.y >> 8, {
-      avoidUnits: false,
-      selfId: unit.id,
-    });
+    const path = findPath(state, cx, cy, gcx, gcy, { avoidUnits: false, selfId: unit.id });
     if (path) {
       unit.path = path;
       unit.pathIndex = 0;

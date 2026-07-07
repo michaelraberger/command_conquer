@@ -215,10 +215,15 @@ function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number;
 
 /** Plain move: clears any order (manual moves override attack/harvest). */
 function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void {
-  const ucx = unit.cell % state.mapWidth;
-  const ucy = (unit.cell - ucx) / state.mapWidth;
   unit.order = null;
-  unit.path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id });
+  if (unitRule(unit.type).air === true) {
+    // Aircraft fly straight there — no ground path.
+    unit.path = [{ cx, cy }];
+  } else {
+    const ucx = unit.cell % state.mapWidth;
+    const ucy = (unit.cell - ucx) / state.mapWidth;
+    unit.path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id });
+  }
   unit.pathIndex = 0;
   unit.blockedTicks = 0;
   unit.repathCount = 0;

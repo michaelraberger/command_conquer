@@ -47,11 +47,16 @@ den Code weiter, Spieler 2 tritt mit dem Code bei.
   Werkstatt – auswählen, Rechtsklick auf ein beschädigtes eigenes Gebäude,
   es fährt hin und repariert es gegen Credits (Werkstatt = Fahrzeuge,
   Reparaturfahrzeug = Gebäude)
-- Einheiten (eigenständige RA-inspirierte Designs, keine Original-Assets):
-  gemeinsam Raketensoldat (Anti-Panzer-Infanterie); Alliierte Späher (schnelle
-  Aufklärung) + Leichter Panzer; Sowjets Flammenwerfer + Kampfhund (nur gegen
-  Infanterie) + Tesla-Panzer. Neue Waffeneffekte Flamme und Rakete. Boden-Kader
-  von Phase A; Luft- und Seeeinheiten sind geplante Folge-Meilensteine.
+- Einheiten (eigenständige, selbst entworfene Designs, keine Original-Assets):
+  - Boden: gemeinsam Raketensoldat (Anti-Panzer-Infanterie); Alliierte Späher
+    (schnelle Aufklärung) + Leichter Panzer; Sowjets Flammenwerfer + Kampfhund
+    (nur gegen Infanterie) + Tesla-Panzer. Waffeneffekte Flamme und Rakete.
+  - Luft: Flugplatz baut Kampfhubschrauber (beide) und Kampfjet (Sowjets).
+    Flugeinheiten fliegen geradlinig über jedes Gelände (mit Schatten, über
+    dem Boden gerendert) und greifen Boden an. Nur Anti-Luft trifft sie:
+    Flak-Panzer (mobil) und Flak-Turm (Basisverteidigung). Bodenwaffen können
+    Flugzeuge nicht treffen.
+  - See ist der geplante nächste Meilenstein.
 - Mauern erweitern den Baubereich gar nicht – sie sind nur innerhalb des von
   echten Gebäuden geöffneten Bauradius platzierbar (kein „Sandsack-Marsch")
 - Strom: Bei Defizit (`Verbrauch > Erzeugung`) fällt die Verteidigung aus,

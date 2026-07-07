@@ -18,6 +18,10 @@ export function movementSystem(state: GameState): void {
   const w = state.mapWidth;
   for (const unit of state.units) {
     if (!unit.path) continue;
+    if (unitRule(unit.type).air === true) {
+      flyAir(state, unit);
+      continue;
+    }
     const wp = unit.path[unit.pathIndex];
     if (!wp) {
       stopUnit(unit);
@@ -71,6 +75,33 @@ function stopUnit(unit: Unit): void {
   unit.pathIndex = 0;
   unit.blockedTicks = 0;
   unit.repathCount = 0;
+}
+
+/**
+ * Free flight: aircraft ignore terrain, occupancy and pathfinding. They steer
+ * straight at their destination cell (the last waypoint) and never reserve a
+ * ground cell — `unit.cell` is only kept current for fog/sight.
+ */
+function flyAir(state: GameState, unit: Unit): void {
+  const dest = unit.path![unit.path!.length - 1]!;
+  const wx = cellCenter(dest.cx);
+  const wy = cellCenter(dest.cy);
+  const dx = wx - unit.x;
+  const dy = wy - unit.y;
+  if (dx !== 0 || dy !== 0) {
+    unit.facing = facingFromDelta(dx, dy);
+    const speed = unitRule(unit.type).speed;
+    const dist = isqrt(distSq(dx, dy));
+    if (dist <= speed) {
+      unit.x = wx;
+      unit.y = wy;
+    } else {
+      unit.x += Math.trunc((dx * speed) / dist);
+      unit.y += Math.trunc((dy * speed) / dist);
+    }
+  }
+  unit.cell = (unit.y >> 8) * state.mapWidth + (unit.x >> 8);
+  if (unit.x === wx && unit.y === wy) stopUnit(unit);
 }
 
 function handleBlocked(state: GameState, unit: Unit): void {

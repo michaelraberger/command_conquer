@@ -169,7 +169,9 @@ export function spawnUnit(
   cy: number,
 ): Unit {
   const cell = cellIndex(state, cx, cy);
-  if (state.occupancy[cell] !== 0 || state.structures[cell] !== 0) {
+  const isAir = unitRule(type).air === true;
+  // Aircraft fly over everything, so they never claim a ground cell.
+  if (!isAir && (state.occupancy[cell] !== 0 || state.structures[cell] !== 0)) {
     throw new Error(`spawn cell ${cx},${cy} occupied`);
   }
   const unit: Unit = {
@@ -189,7 +191,7 @@ export function spawnUnit(
     cooldown: 0,
     cargo: 0,
   };
-  state.occupancy[cell] = unit.id;
+  if (!isAir) state.occupancy[cell] = unit.id;
   state.units.push(unit);
   return unit;
 }
@@ -261,7 +263,12 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     difficulty: options.aiDifficulty ?? 'normal',
     color,
     credits: 5000,
-    queues: { building: emptyQueue(), infantry: emptyQueue(), vehicle: emptyQueue() },
+    queues: {
+      building: emptyQueue(),
+      infantry: emptyQueue(),
+      vehicle: emptyQueue(),
+      air: emptyQueue(),
+    },
     aiLastAttackTick: 0,
   });
 
