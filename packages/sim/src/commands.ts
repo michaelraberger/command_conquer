@@ -2,6 +2,8 @@ import { cellIndex, cellsAroundRect, inBounds, isNavigableWater, isPassableTerra
 import { findPath } from './path/astar.js';
 import { cellCenter } from './fixed.js';
 import {
+  CHEAT_MONEY,
+  CHEAT_POWER,
   SUPERWEAPON_CHARGE_TICKS,
   SUPERWEAPON_TRAVEL_TICKS,
   WALL_LEVELS,
@@ -40,7 +42,8 @@ export type Command =
   | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
   | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number }
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
-  | { type: 'UNLOAD'; playerId: number; unitIds: number[] };
+  | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
+  | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
   for (const cmd of commands) {
@@ -204,6 +207,16 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           unloadTransport(state, unit);
         }
         break;
+      case 'CHEAT': {
+        // Cheats are ordinary commands so replays reproduce them faithfully;
+        // the client only offers the hotkeys in solo games.
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        if (!player) break;
+        if (cmd.cheat === 'MONEY') player.credits += CHEAT_MONEY;
+        else if (cmd.cheat === 'POWER') player.powerBonus += CHEAT_POWER;
+        else if (cmd.cheat === 'REVEAL') player.mapRevealed = true;
+        break;
+      }
       case 'SET_RALLY': {
         if (!inBounds(state, cmd.cx, cmd.cy)) break;
         const building = state.buildings.find(

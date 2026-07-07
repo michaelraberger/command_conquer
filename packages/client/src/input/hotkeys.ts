@@ -11,12 +11,23 @@ import type { Controls } from './controls.js';
  *
  * P pause · U upgrade selected building · R toggle full build radius ·
  * H center camera on own base · E unload selected transport ships.
+ * C opens the cheat console (solo only): "money" · "visible" · "power".
  */
+/** Typed console codes → sim cheat kinds. */
+const CHEAT_CODES: Record<string, 'MONEY' | 'REVEAL' | 'POWER'> = {
+  money: 'MONEY',
+  visible: 'REVEAL',
+  power: 'POWER',
+};
+
 export class Hotkeys {
   paused = false;
   /** R toggles showing the whole buildable area (read by the loop). */
   showAllRadius = false;
   private readonly overlay = document.getElementById('pause')!;
+  private readonly cheatOverlay = document.getElementById('cheat')!;
+  private readonly cheatInput = document.getElementById('cheat-input') as HTMLInputElement;
+  private readonly cheatStatus = document.getElementById('cheat-status')!;
 
   constructor(
     private state: GameState,
@@ -26,6 +37,14 @@ export class Hotkeys {
     private canPause: boolean,
   ) {
     window.addEventListener('keydown', (e) => this.onKey(e));
+    this.cheatInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') this.submitCheat();
+      if (e.key === 'Escape') this.closeCheatConsole();
+    });
+    this.cheatOverlay.addEventListener('pointerdown', (e) => {
+      if (e.target === this.cheatOverlay) this.closeCheatConsole(); // click outside
+    });
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -46,7 +65,39 @@ export class Hotkeys {
       case 'e':
         this.tryUnload();
         break;
+      case 'c':
+        this.openCheatConsole();
+        break;
     }
+  }
+
+  /**
+   * Cheat console: C opens an input, the player types a code and confirms
+   * with Enter. Cheats ride the command stream (replay-safe); solo only.
+   */
+  private openCheatConsole(): void {
+    if (!this.canPause) return; // lockstep multiplayer: no cheating
+    this.cheatOverlay.style.display = 'flex';
+    this.cheatInput.value = '';
+    this.cheatStatus.textContent = '';
+    this.cheatInput.focus();
+  }
+
+  private closeCheatConsole(): void {
+    this.cheatOverlay.style.display = 'none';
+    this.cheatInput.blur();
+  }
+
+  private submitCheat(): void {
+    const code = this.cheatInput.value.trim().toLowerCase();
+    const cheat = CHEAT_CODES[code];
+    if (!cheat) {
+      this.cheatStatus.textContent = `Unbekannter Cheat: „${code}“`;
+      this.cheatInput.select();
+      return;
+    }
+    this.send({ type: 'CHEAT', playerId: session.localPlayer, cheat });
+    this.closeCheatConsole();
   }
 
   /** Unload the selected transport ships at their current shore position. */

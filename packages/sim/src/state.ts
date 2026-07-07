@@ -129,6 +129,10 @@ export interface Player {
   queues: Record<ProductionCategory, ProductionQueue>;
   /** AI scratch memory — plain data so it hashes/replays. */
   aiLastAttackTick: number;
+  /** Cheat: the whole map stays visible for this player. */
+  mapRevealed: boolean;
+  /** Cheat: flat extra power added to the balance. */
+  powerBonus: number;
 }
 
 /** Fog states per cell: 0 = hidden, 1 = explored, 2 = visible. */
@@ -286,6 +290,8 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       naval: emptyQueue(),
     },
     aiLastAttackTick: 0,
+    mapRevealed: false,
+    powerBonus: 0,
   });
 
   const state: GameState = {

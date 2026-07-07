@@ -11,9 +11,9 @@ import {
 import { constructBuilding, spawnUnit, type GameState, type Player } from '../state.js';
 import { canPlaceBuilding } from './placement.js';
 
-/** Net power balance for a player (produced minus consumed). */
+/** Net power balance for a player (produced minus consumed + cheat bonus). */
 export function powerBalance(state: GameState, playerId: number): { produced: number; used: number } {
-  let produced = 0;
+  let produced = state.players.find((p) => p.id === playerId)?.powerBonus ?? 0;
   let used = 0;
   for (const b of state.buildings) {
     if (b.owner !== playerId) continue;

@@ -59,6 +59,8 @@ export {
   VEHICLE_REPAIR_REACH,
   TRANSPORT_CAPACITY,
   TRANSPORT_REACH,
+  CHEAT_MONEY,
+  CHEAT_POWER,
   STARTING_CREDITS,
   applyBalance,
   type BalanceConfig,

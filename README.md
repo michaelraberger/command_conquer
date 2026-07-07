@@ -50,6 +50,17 @@ alle Werte werden auf Ganzzahlen gestutzt (Determinismus). Die Konfig ist
 Teil der Spieloptionen: Replays speichern sie mit, im Multiplayer gilt die
 Konfig des Hosts für beide Spieler. Fehlt die Datei, gelten die Standardwerte.
 
+## Cheats (nur Solo)
+
+**C** öffnet die Cheat-Konsole (Enter bestätigt, Esc schließt):
+
+- `money` — +10.000 Credits
+- `visible` — deckt die ganze Karte dauerhaft auf
+- `power` — +300 Strom
+
+Cheats laufen als normale Befehle durch die Sim: Replays spielen sie
+originalgetreu ab. Im Multiplayer ist die Konsole deaktiviert.
+
 ## Steuerung
 
 - Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot** (Einheiten,

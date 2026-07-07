@@ -56,6 +56,54 @@
         pointer-events: none;
         z-index: 5;
       }
+      #cheat {
+        position: fixed;
+        inset: 0 188px 0 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 14, 18, 0.45);
+        z-index: 6;
+      }
+      #cheat .cheat-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 260px;
+        background: rgba(16, 20, 26, 0.97);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 16px 18px;
+        color: #d7e0ea;
+      }
+      #cheat label {
+        font-size: 11px;
+        color: #8fa1b3;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      #cheat input {
+        background: #0e1319;
+        border: 1px solid #2c3a4a;
+        border-radius: 4px;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 9px;
+        outline: none;
+      }
+      #cheat input:focus {
+        border-color: #4da6ff;
+      }
+      #cheat-status {
+        min-height: 14px;
+        font-size: 11px;
+        color: #e04a3a;
+      }
+      #cheat small {
+        font-size: 10px;
+        color: #8fa1b3;
+      }
       #pause span {
         font-size: 44px;
         letter-spacing: 8px;
@@ -518,6 +566,15 @@
     </div>
     <div id="debug" class="overlay"></div>
     <div id="pause"><span>PAUSE</span><small>P zum Fortsetzen</small></div>
+
+    <div id="cheat">
+      <div class="cheat-box">
+        <label for="cheat-input">Cheat-Konsole</label>
+        <input id="cheat-input" type="text" placeholder="money · visible · power" autocomplete="off" spellcheck="false" />
+        <div id="cheat-status"></div>
+        <small>Enter: ausführen · Esc: schließen</small>
+      </div>
+    </div>
     <div id="lowpower">
       <strong>⚠ ZU WENIG STROM</strong>
       <small>Verteidigung offline · Produktion langsamer · Kraftwerk bauen</small>
@@ -527,7 +584,8 @@
       Linksklick/Ziehen: Auswählen · Rechtsklick: Bewegen / Angriff / Ernten /
       Sammelpunkt · Strg+Rechtsklick: Angriffsbewegung · WASD/Pfeile: Kamera ·
       P: Pause · U: Ausbauen · R: Bauradius · H: Basis zentrieren · E: Transporter entladen ·
-      Rechtsklick auf Transportschiff: Einheiten verladen · ^/`: Debug
+      Rechtsklick auf Transportschiff: Einheiten verladen ·
+      C: Cheat-Konsole (Solo: money / visible / power) · ^/`: Debug
     </div>
 
     <div id="start" class="fullscreen" style="display: flex">

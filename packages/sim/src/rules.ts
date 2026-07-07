@@ -765,6 +765,9 @@ export const VEHICLE_REPAIR_REACH = 1.6;
 export const TRANSPORT_CAPACITY = 5;
 /** Board/unload reach between a shore unit and the ship, in cells. */
 export const TRANSPORT_REACH = 2;
+/** Cheats (solo games): credits per money cheat, watts per power cheat. */
+export const CHEAT_MONEY = 10_000;
+export const CHEAT_POWER = 300;
 
 /* ----------------------------- balance config ---------------------------- */
 

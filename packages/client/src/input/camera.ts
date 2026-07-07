@@ -43,6 +43,7 @@ export class Camera {
 
   attach(canvas: HTMLCanvasElement): void {
     window.addEventListener('keydown', (e) => {
+      if (e.target instanceof HTMLInputElement) return; // typing, not panning
       if (e.key in PAN_KEYS || e.key.toLowerCase() in PAN_KEYS) {
         this.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
         e.preventDefault();

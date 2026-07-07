@@ -31,6 +31,11 @@ export function fogSystem(state: GameState): void {
 
   for (const player of state.players) {
     const fog = state.fogs[player.id]!;
+    if (player.mapRevealed) {
+      // Reveal cheat: everything stays permanently visible.
+      fog.fill(FOG_VISIBLE);
+      continue;
+    }
     for (let i = 0; i < fog.length; i++) {
       if (fog[i] === FOG_VISIBLE) fog[i] = FOG_EXPLORED;
     }
