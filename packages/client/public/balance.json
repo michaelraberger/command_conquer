@@ -1,4 +1,9 @@
 {
+  "cheats": {
+    "money": "MONEY",
+    "visible": "REVEAL",
+    "power": "POWER"
+  },
   "economy": {
     "startCredits": 5000,
     "harvestCapacity": 500,

@@ -3,7 +3,7 @@ import { Application, Container } from 'pixi.js';
 import { sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
 import { Controls } from './input/controls.js';
-import { Hotkeys } from './input/hotkeys.js';
+import { Hotkeys, type CheatCodes, type CheatKind } from './input/hotkeys.js';
 import { startLoop, type TickDriver } from './loop.js';
 import { Connection } from './net/connection.js';
 import { LockstepDriver } from './net/lockstep.js';
@@ -37,21 +37,57 @@ interface GameSetup {
   canPause: boolean;
 }
 
+/** balance.json also carries a client-only `cheats` section (see below). */
+interface RawConfig extends BalanceConfig {
+  cheats?: Record<string, string>;
+}
+
+/** Secret cheat codes when balance.json has no `cheats` section of its own. */
+const DEFAULT_CHEATS: CheatCodes = { money: 'MONEY', visible: 'REVEAL', power: 'POWER' };
+const CHEAT_KINDS = new Set<CheatKind>(['MONEY', 'REVEAL', 'POWER']);
+
+let configPromise: Promise<RawConfig | null> | null = null;
+
+/** Fetches and caches public/balance.json once (shared by balance + cheats). */
+function loadConfig(): Promise<RawConfig | null> {
+  if (!configPromise) {
+    configPromise = fetch('balance.json')
+      .then((res) => (res.ok ? (res.json() as Promise<RawConfig>) : null))
+      .catch(() => {
+        console.warn('balance.json fehlt oder ist ungültig — Standardwerte aktiv.');
+        return null;
+      });
+  }
+  return configPromise;
+}
+
 /**
- * Optional balance overrides from public/balance.json — lets players retune
- * prices, power, speeds and the ore economy without touching code. The config
- * becomes part of the game options, so replays store it and the multiplayer
- * host hands it to the guest.
+ * Balance overrides from public/balance.json — retune prices, power, speeds
+ * and the ore economy without touching code. The config is part of the game
+ * options, so replays store it and the multiplayer host hands it to the guest.
+ * The `cheats` section is stripped: it is a client-only naming convenience and
+ * must not leak into replays or the wire protocol.
  */
 async function loadBalance(): Promise<BalanceConfig | undefined> {
-  try {
-    const res = await fetch('balance.json');
-    if (!res.ok) return undefined;
-    return (await res.json()) as BalanceConfig;
-  } catch {
-    console.warn('balance.json fehlt oder ist ungültig — Standardwerte aktiv.');
-    return undefined;
+  const cfg = await loadConfig();
+  if (!cfg) return undefined;
+  const { cheats: _cheats, ...balance } = cfg;
+  return balance;
+}
+
+/**
+ * Cheat codes are renamable in balance.json's `cheats` map ({ "<code>":
+ * "MONEY" | "REVEAL" | "POWER" }). Kept secret: nothing in the UI reveals
+ * them, so operators pick their own words. Falls back to the defaults.
+ */
+async function loadCheatCodes(): Promise<CheatCodes> {
+  const raw = (await loadConfig())?.cheats;
+  if (!raw) return DEFAULT_CHEATS;
+  const codes: CheatCodes = {};
+  for (const [code, kind] of Object.entries(raw)) {
+    if (CHEAT_KINDS.has(kind as CheatKind)) codes[code.trim().toLowerCase()] = kind as CheatKind;
   }
+  return Object.keys(codes).length > 0 ? codes : DEFAULT_CHEATS;
 }
 
 async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
@@ -156,7 +192,7 @@ async function boot(): Promise<void> {
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
   const minimap = new Minimap(state, camera);
   const debug = new DebugOverlay();
-  const hotkeys = new Hotkeys(state, controls, sendCommand, camera, canPause);
+  const hotkeys = new Hotkeys(state, controls, sendCommand, camera, canPause, await loadCheatCodes());
   const alerts = new Alerts();
 
   ore.sync(state);

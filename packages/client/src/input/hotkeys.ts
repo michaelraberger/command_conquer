@@ -11,14 +11,13 @@ import type { Controls } from './controls.js';
  *
  * P pause · U upgrade selected building · R toggle full build radius ·
  * H center camera on own base · E unload selected transport ships.
- * C opens the cheat console (solo only): "money" · "visible" · "power".
+ * C opens the (solo-only) cheat console; the codes are secret and named in
+ * balance.json, so nothing on screen reveals them.
  */
-/** Typed console codes → sim cheat kinds. */
-const CHEAT_CODES: Record<string, 'MONEY' | 'REVEAL' | 'POWER'> = {
-  money: 'MONEY',
-  visible: 'REVEAL',
-  power: 'POWER',
-};
+/** Cheat kinds the sim understands. */
+export type CheatKind = 'MONEY' | 'REVEAL' | 'POWER';
+/** Console code (as typed) → cheat kind, supplied from the config. */
+export type CheatCodes = Record<string, CheatKind>;
 
 export class Hotkeys {
   paused = false;
@@ -35,6 +34,7 @@ export class Hotkeys {
     private send: (cmd: Command) => void,
     private camera: Camera,
     private canPause: boolean,
+    private cheatCodes: CheatCodes,
   ) {
     window.addEventListener('keydown', (e) => this.onKey(e));
     this.cheatInput.addEventListener('keydown', (e) => {
@@ -66,14 +66,18 @@ export class Hotkeys {
         this.tryUnload();
         break;
       case 'c':
+        // preventDefault so this very keystroke isn't typed into the field.
+        e.preventDefault();
         this.openCheatConsole();
         break;
     }
   }
 
   /**
-   * Cheat console: C opens an input, the player types a code and confirms
-   * with Enter. Cheats ride the command stream (replay-safe); solo only.
+   * Cheat console: C opens an input, the player types a secret code and
+   * confirms with Enter. Cheats ride the command stream (replay-safe); solo
+   * only. The opening keystroke is preventDefault'd in onKey so the "c" is
+   * never typed into the freshly-focused field.
    */
   private openCheatConsole(): void {
     if (!this.canPause) return; // lockstep multiplayer: no cheating
@@ -90,9 +94,10 @@ export class Hotkeys {
 
   private submitCheat(): void {
     const code = this.cheatInput.value.trim().toLowerCase();
-    const cheat = CHEAT_CODES[code];
+    const cheat = this.cheatCodes[code];
     if (!cheat) {
-      this.cheatStatus.textContent = `Unbekannter Cheat: „${code}“`;
+      // Deliberately vague — never confirm or hint at valid codes.
+      this.cheatStatus.textContent = 'Ungültig';
       this.cheatInput.select();
       return;
     }

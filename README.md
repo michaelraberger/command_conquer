@@ -44,6 +44,7 @@ Seite neu laden, fertig (kein Rebuild nötig):
 - `units`: pro Einheit `cost`, `buildTime`, `maxHp`, `speed` (Subzellen/Tick,
   256 = 1 Zelle), `sight` sowie `damage`/`rangeCells`/`cooldown` der Waffe
 - `buildings`: dasselbe plus `power` (+ erzeugt, − verbraucht)
+- `cheats`: eigene Codewörter für die Cheats (siehe unten)
 
 Unbekannte Schlüssel und kaputte Werte werden ignoriert (Standard greift);
 alle Werte werden auf Ganzzahlen gestutzt (Determinismus). Die Konfig ist
@@ -52,14 +53,23 @@ Konfig des Hosts für beide Spieler. Fehlt die Datei, gelten die Standardwerte.
 
 ## Cheats (nur Solo)
 
-**C** öffnet die Cheat-Konsole (Enter bestätigt, Esc schließt):
+**C** öffnet eine Konsole (Enter bestätigt, Esc schließt). Dort tippt man das
+Codewort und drückt Enter. Die Codes sind **geheim** — nichts im Spiel verrät
+sie — und werden in `balance.json` unter `cheats` frei benannt:
 
-- `money` — +10.000 Credits
-- `visible` — deckt die ganze Karte dauerhaft auf
-- `power` — +300 Strom
+```json
+"cheats": {
+  "money":   "MONEY",   // +10.000 Credits
+  "visible": "REVEAL",  // deckt die ganze Karte dauerhaft auf
+  "power":   "POWER"    // +300 Strom
+}
+```
 
-Cheats laufen als normale Befehle durch die Sim: Replays spielen sie
-originalgetreu ab. Im Multiplayer ist die Konsole deaktiviert.
+Links steht das (frei wählbare) Codewort, rechts die feste Cheat-Art
+(`MONEY`/`REVEAL`/`POWER`). So kann jeder seine eigenen Wörter vergeben; das
+Standard-Set oben gilt, wenn die Sektion fehlt. Cheats laufen als normale
+Befehle durch die Sim, Replays spielen sie originalgetreu ab. Im Multiplayer
+ist die Konsole deaktiviert.
 
 ## Steuerung
 
