@@ -1,4 +1,4 @@
-import { createGame, type Faction, type GameState } from '@cac/sim';
+import { createGame, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
 import { Application, Container } from 'pixi.js';
 import { sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
@@ -37,6 +37,23 @@ interface GameSetup {
   canPause: boolean;
 }
 
+/**
+ * Optional balance overrides from public/balance.json — lets players retune
+ * prices, power, speeds and the ore economy without touching code. The config
+ * becomes part of the game options, so replays store it and the multiplayer
+ * host hands it to the guest.
+ */
+async function loadBalance(): Promise<BalanceConfig | undefined> {
+  try {
+    const res = await fetch('balance.json');
+    if (!res.ok) return undefined;
+    return (await res.json()) as BalanceConfig;
+  } catch {
+    console.warn('balance.json fehlt oder ist ungültig — Standardwerte aktiv.');
+    return undefined;
+  }
+}
+
 async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
   if (choice.mode === 'ai') {
     const seed = (Math.random() * 0xffffffff) >>> 0;
@@ -47,6 +64,7 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
       ai: true,
       aiDifficulty: choice.difficulty,
       mapType: choice.mapType,
+      balance: await loadBalance(),
     };
     const recorder = new Recorder(seed, options);
     return {
@@ -70,7 +88,12 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
   setLobbyStatus('Verbinde…');
   const conn = await Connection.connect(choice.url);
   if (choice.mode === 'host') {
-    conn.send({ t: 'host', faction: choice.faction, mapType: choice.mapType });
+    conn.send({
+      t: 'host',
+      faction: choice.faction,
+      mapType: choice.mapType,
+      balance: await loadBalance(),
+    });
     const hosted = await conn.waitFor('hosted');
     setLobbyStatus(`Partie eröffnet – Code: ${hosted.code} (warte auf Mitspieler …)`);
   } else {
@@ -85,7 +108,11 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
     if (msg.t === 'left') setLobbyStatus('Der Mitspieler hat die Partie verlassen.');
   });
   return {
-    state: createGame(start.seed, { factions: start.factions, mapType: start.mapType }),
+    state: createGame(start.seed, {
+      factions: start.factions,
+      mapType: start.mapType,
+      balance: start.balance,
+    }),
     driver: new LockstepDriver(conn),
     recorder: null,
     canPause: false,

@@ -1,4 +1,4 @@
-import type { ClientMessage, Faction, MapType, ServerMessage } from '@cac/sim';
+import type { BalanceConfig, ClientMessage, Faction, MapType, ServerMessage } from '@cac/sim';
 import { WebSocket, WebSocketServer } from 'ws';
 
 /**
@@ -13,6 +13,8 @@ interface Room {
   factions: [Faction, Faction];
   /** Map layout chosen by the host. */
   mapType: MapType;
+  /** Host's balance overrides — relayed so both peers apply identical rules. */
+  balance: BalanceConfig | undefined;
   sockets: [WebSocket, WebSocket | null];
   /** tick → playerId → hash, for desync detection. */
   hashes: Map<number, Map<number, string>>;
@@ -60,6 +62,7 @@ export function createGameServer(port: number): Promise<GameServer> {
             seed: Math.floor(Math.random() * 0xffffffff) >>> 0,
             factions: [msg.faction, msg.faction],
             mapType: msg.mapType ?? 'BADLANDS',
+            balance: msg.balance,
             sockets: [ws, null],
             hashes: new Map(),
             started: false,
@@ -87,6 +90,7 @@ export function createGameServer(port: number): Promise<GameServer> {
               playerId: id,
               factions: room.factions,
               mapType: room.mapType,
+              balance: room.balance,
             });
           }
           break;

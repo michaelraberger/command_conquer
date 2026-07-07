@@ -11,9 +11,12 @@ import {
 } from './map.js';
 import {
   FACTION_COLORS,
+  STARTING_CREDITS,
+  applyBalance,
   buildingRule,
   unitRule,
   type AiDifficulty,
+  type BalanceConfig,
   type BuildingType,
   type Faction,
   type ProductionCategory,
@@ -255,9 +258,13 @@ export interface GameOptions {
   mapType?: MapType;
   mapWidth?: number;
   mapHeight?: number;
+  /** Balance overrides (balance.json). Part of replays/multiplayer setup —
+   *  every peer must apply the identical config or the lockstep desyncs. */
+  balance?: BalanceConfig | undefined;
 }
 
 export function createGame(seed: number, options: GameOptions = {}): GameState {
+  applyBalance(options.balance); // resets to defaults when no config is given
   const mapWidth = options.mapWidth ?? 64;
   const mapHeight = options.mapHeight ?? 64;
   const factions = options.factions ?? ['ALLIES', 'SOVIETS'];
@@ -270,7 +277,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     isAi: id === 1 && options.ai === true,
     difficulty: options.aiDifficulty ?? 'normal',
     color,
-    credits: 5000,
+    credits: STARTING_CREDITS,
     queues: {
       building: emptyQueue(),
       infantry: emptyQueue(),

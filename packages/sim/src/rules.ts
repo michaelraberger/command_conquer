@@ -719,21 +719,36 @@ export const BUILD_ADJACENCY = 3;
 export function buildAdjacency(type: BuildingType): number {
   return type === 'WALL' ? 0 : BUILD_ADJACENCY;
 }
-/** Ore credits a harvester can carry per trip. */
-export const HARVEST_CAPACITY = 500;
-/** Ore extracted per tick while parked on an ore cell (lower = slower mining). */
-export const HARVEST_RATE = 4;
-/** Credits per extracted unit from a gem cell ("Edelsteine"). */
-export const GEM_VALUE = 2;
 /**
- * Resource regrowth: every N ticks fertile cells gain AMOUNT, up to CAP.
- * Deliberately slow (~1 min per pulse, ~2 h to fully refill a depleted
- * field) so fields still run dry under active harvesting and only recover
- * over a long game — never fast enough to be free income.
+ * Economy defaults. The live values below are `let` exports so a balance
+ * config (see applyBalance) can retune them; importers see the live binding.
  */
-export const REGROWTH_INTERVAL = 900;
-export const REGROWTH_AMOUNT = 4;
-export const REGROWTH_CAP = 500;
+const ECONOMY_DEFAULTS = {
+  /** Credits every player starts with. */
+  startCredits: 5000,
+  /** Ore credits a harvester can carry per trip. */
+  harvestCapacity: 500,
+  /** Ore extracted per tick while parked on an ore cell (lower = slower). */
+  harvestRate: 4,
+  /** Credits per extracted unit from a gem cell ("Edelsteine"). */
+  gemValue: 2,
+  /**
+   * Resource regrowth: every N ticks fertile cells gain AMOUNT, up to CAP.
+   * Deliberately slow (~1 min per pulse, ~2 h to fully refill a depleted
+   * field) so fields still run dry under active harvesting and only recover
+   * over a long game — never fast enough to be free income.
+   */
+  regrowthInterval: 900,
+  regrowthAmount: 4,
+  regrowthCap: 500,
+};
+export let STARTING_CREDITS = ECONOMY_DEFAULTS.startCredits;
+export let HARVEST_CAPACITY = ECONOMY_DEFAULTS.harvestCapacity;
+export let HARVEST_RATE = ECONOMY_DEFAULTS.harvestRate;
+export let GEM_VALUE = ECONOMY_DEFAULTS.gemValue;
+export let REGROWTH_INTERVAL = ECONOMY_DEFAULTS.regrowthInterval;
+export let REGROWTH_AMOUNT = ECONOMY_DEFAULTS.regrowthAmount;
+export let REGROWTH_CAP = ECONOMY_DEFAULTS.regrowthCap;
 /** Werkstatt repair: hp per tick and credits per tick, radius in cells. */
 export const REPAIR_HP_PER_TICK = 4;
 export const REPAIR_COST_PER_TICK = 1;
@@ -750,3 +765,135 @@ export const VEHICLE_REPAIR_REACH = 1.6;
 export const TRANSPORT_CAPACITY = 5;
 /** Board/unload reach between a shore unit and the ship, in cells. */
 export const TRANSPORT_REACH = 2;
+
+/* ----------------------------- balance config ---------------------------- */
+
+/**
+ * Runtime-tunable balance ("rules.ini light"). A config is applied per game
+ * via GameOptions.balance: it is stored in replays and, in multiplayer, sent
+ * by the host — every peer applies the identical config, so lockstep and
+ * replays stay deterministic. Unknown keys are ignored; broken numbers fall
+ * back to the default. All values are truncated to integers (the sim only
+ * does integer math); rangeCells may be fractional (converted to sub-cells).
+ */
+export interface EconomyBalance {
+  startCredits?: number;
+  harvestCapacity?: number;
+  harvestRate?: number;
+  gemValue?: number;
+  regrowthInterval?: number;
+  regrowthAmount?: number;
+  regrowthCap?: number;
+}
+export interface UnitBalance {
+  cost?: number;
+  buildTime?: number;
+  maxHp?: number;
+  speed?: number;
+  sight?: number;
+  /** Weapon tuning — ignored for weaponless units. */
+  damage?: number;
+  rangeCells?: number;
+  cooldown?: number;
+}
+export interface BuildingBalance {
+  cost?: number;
+  buildTime?: number;
+  maxHp?: number;
+  power?: number;
+  sight?: number;
+  /** Defense-weapon tuning — ignored for unarmed buildings. */
+  damage?: number;
+  rangeCells?: number;
+  cooldown?: number;
+}
+export interface BalanceConfig {
+  economy?: EconomyBalance;
+  units?: Partial<Record<UnitType, UnitBalance>>;
+  buildings?: Partial<Record<BuildingType, BuildingBalance>>;
+}
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+/** Pristine copies of the shipped tables, taken before any config touches them. */
+const UNIT_DEFAULTS = JSON.parse(JSON.stringify(UNIT_RULES)) as Record<UnitType, UnitRule>;
+const BUILDING_DEFAULTS = JSON.parse(JSON.stringify(BUILDING_RULES)) as Record<
+  BuildingType,
+  BuildingRule
+>;
+
+/** Truncated integer clamped to `min`, or null when the value is unusable. */
+function intOr(v: number | undefined, min: number): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const t = Math.trunc(v);
+  return t < min ? min : t;
+}
+
+function applyWeapon(
+  weapon: WeaponRule | null,
+  o: { damage?: number; rangeCells?: number; cooldown?: number },
+): void {
+  if (!weapon) return;
+  const w = weapon as Mutable<WeaponRule>;
+  w.damage = intOr(o.damage, 1) ?? w.damage;
+  w.cooldown = intOr(o.cooldown, 1) ?? w.cooldown;
+  if (typeof o.rangeCells === 'number' && Number.isFinite(o.rangeCells) && o.rangeCells > 0) {
+    w.range = Math.round(o.rangeCells * SUBCELL);
+    w.rangeSq = w.range * w.range;
+  }
+}
+
+/**
+ * Resets all rules to the shipped defaults, then applies the overrides.
+ * Called by createGame with GameOptions.balance — configs never stack across
+ * games. Do NOT call this mid-game; rules must stay frozen within a match.
+ */
+export function applyBalance(config?: BalanceConfig): void {
+  for (const type of Object.keys(UNIT_RULES) as UnitType[]) {
+    Object.assign(UNIT_RULES[type], JSON.parse(JSON.stringify(UNIT_DEFAULTS[type])));
+  }
+  for (const type of Object.keys(BUILDING_RULES) as BuildingType[]) {
+    Object.assign(BUILDING_RULES[type], JSON.parse(JSON.stringify(BUILDING_DEFAULTS[type])));
+  }
+  STARTING_CREDITS = ECONOMY_DEFAULTS.startCredits;
+  HARVEST_CAPACITY = ECONOMY_DEFAULTS.harvestCapacity;
+  HARVEST_RATE = ECONOMY_DEFAULTS.harvestRate;
+  GEM_VALUE = ECONOMY_DEFAULTS.gemValue;
+  REGROWTH_INTERVAL = ECONOMY_DEFAULTS.regrowthInterval;
+  REGROWTH_AMOUNT = ECONOMY_DEFAULTS.regrowthAmount;
+  REGROWTH_CAP = ECONOMY_DEFAULTS.regrowthCap;
+  if (!config) return;
+
+  const eco = config.economy;
+  if (eco) {
+    STARTING_CREDITS = intOr(eco.startCredits, 0) ?? STARTING_CREDITS;
+    HARVEST_CAPACITY = intOr(eco.harvestCapacity, 1) ?? HARVEST_CAPACITY;
+    HARVEST_RATE = intOr(eco.harvestRate, 1) ?? HARVEST_RATE;
+    GEM_VALUE = intOr(eco.gemValue, 1) ?? GEM_VALUE;
+    REGROWTH_INTERVAL = intOr(eco.regrowthInterval, 1) ?? REGROWTH_INTERVAL;
+    REGROWTH_AMOUNT = intOr(eco.regrowthAmount, 0) ?? REGROWTH_AMOUNT;
+    REGROWTH_CAP = intOr(eco.regrowthCap, 0) ?? REGROWTH_CAP;
+  }
+
+  for (const [type, o] of Object.entries(config.units ?? {})) {
+    if (!o || !isUnitType(type)) continue;
+    const rule = UNIT_RULES[type] as unknown as Mutable<UnitRule>;
+    rule.cost = intOr(o.cost, 0) ?? rule.cost;
+    rule.buildTime = intOr(o.buildTime, 1) ?? rule.buildTime;
+    rule.maxHp = intOr(o.maxHp, 1) ?? rule.maxHp;
+    rule.speed = intOr(o.speed, 1) ?? rule.speed;
+    rule.sight = intOr(o.sight, 0) ?? rule.sight;
+    applyWeapon(rule.weapon, o);
+  }
+
+  for (const [type, o] of Object.entries(config.buildings ?? {})) {
+    if (!o || !isBuildingType(type)) continue;
+    const rule = BUILDING_RULES[type] as unknown as Mutable<BuildingRule>;
+    rule.cost = intOr(o.cost, 0) ?? rule.cost;
+    rule.buildTime = intOr(o.buildTime, 1) ?? rule.buildTime;
+    rule.maxHp = intOr(o.maxHp, 1) ?? rule.maxHp;
+    rule.power = intOr(o.power, -100000) ?? rule.power;
+    rule.sight = intOr(o.sight, 0) ?? rule.sight;
+    applyWeapon(rule.weapon, o);
+  }
+}

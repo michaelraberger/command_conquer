@@ -1,4 +1,4 @@
-import type { AiDifficulty, Command, Faction, GameState, MapType } from '@cac/sim';
+import type { AiDifficulty, BalanceConfig, Command, Faction, GameState, MapType } from '@cac/sim';
 import { drainCommands } from './commandQueue.js';
 import type { TickDriver } from './loop.js';
 
@@ -15,6 +15,8 @@ export interface ReplayFile {
     aiDifficulty: AiDifficulty;
     /** Older replays omit this; createGame defaults to BADLANDS. */
     mapType?: MapType;
+    /** Balance overrides active during the recording (default rules if absent). */
+    balance?: BalanceConfig | undefined;
   };
   commands: Array<{ tick: number; cmds: Command[] }>;
 }

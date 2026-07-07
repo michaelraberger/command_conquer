@@ -1,0 +1,303 @@
+{
+  "economy": {
+    "startCredits": 5000,
+    "harvestCapacity": 500,
+    "harvestRate": 4,
+    "gemValue": 2,
+    "regrowthInterval": 900,
+    "regrowthAmount": 4,
+    "regrowthCap": 500
+  },
+  "units": {
+    "TANK": {
+      "cost": 900,
+      "buildTime": 80,
+      "maxHp": 300,
+      "speed": 36,
+      "sight": 6,
+      "damage": 45,
+      "rangeCells": 4.5,
+      "cooldown": 25
+    },
+    "MAMMOTH": {
+      "cost": 1800,
+      "buildTime": 150,
+      "maxHp": 900,
+      "speed": 20,
+      "sight": 6,
+      "damage": 60,
+      "rangeCells": 4.75,
+      "cooldown": 15
+    },
+    "ARTILLERY": {
+      "cost": 1200,
+      "buildTime": 120,
+      "maxHp": 200,
+      "speed": 22,
+      "sight": 7,
+      "damage": 90,
+      "rangeCells": 7,
+      "cooldown": 45
+    },
+    "RIFLEMAN": {
+      "cost": 200,
+      "buildTime": 30,
+      "maxHp": 100,
+      "speed": 20,
+      "sight": 5,
+      "damage": 12,
+      "rangeCells": 3.5,
+      "cooldown": 8
+    },
+    "HARVESTER": {
+      "cost": 1400,
+      "buildTime": 100,
+      "maxHp": 600,
+      "speed": 30,
+      "sight": 6
+    },
+    "REPAIR": {
+      "cost": 800,
+      "buildTime": 80,
+      "maxHp": 250,
+      "speed": 32,
+      "sight": 6
+    },
+    "ROCKETEER": {
+      "cost": 400,
+      "buildTime": 45,
+      "maxHp": 90,
+      "speed": 18,
+      "sight": 5,
+      "damage": 30,
+      "rangeCells": 5,
+      "cooldown": 30
+    },
+    "SCOUT": {
+      "cost": 500,
+      "buildTime": 40,
+      "maxHp": 140,
+      "speed": 54,
+      "sight": 9,
+      "damage": 10,
+      "rangeCells": 4,
+      "cooldown": 6
+    },
+    "LIGHTTANK": {
+      "cost": 650,
+      "buildTime": 60,
+      "maxHp": 220,
+      "speed": 46,
+      "sight": 6,
+      "damage": 32,
+      "rangeCells": 4.25,
+      "cooldown": 22
+    },
+    "FLAMER": {
+      "cost": 450,
+      "buildTime": 50,
+      "maxHp": 120,
+      "speed": 17,
+      "sight": 4,
+      "damage": 24,
+      "rangeCells": 2.75,
+      "cooldown": 14
+    },
+    "DOG": {
+      "cost": 200,
+      "buildTime": 20,
+      "maxHp": 60,
+      "speed": 62,
+      "sight": 5,
+      "damage": 50,
+      "rangeCells": 1.5,
+      "cooldown": 20
+    },
+    "TESLATANK": {
+      "cost": 1300,
+      "buildTime": 110,
+      "maxHp": 260,
+      "speed": 30,
+      "sight": 6,
+      "damage": 90,
+      "rangeCells": 5,
+      "cooldown": 35
+    },
+    "FLAK": {
+      "cost": 700,
+      "buildTime": 70,
+      "maxHp": 180,
+      "speed": 36,
+      "sight": 7,
+      "damage": 20,
+      "rangeCells": 6,
+      "cooldown": 6
+    },
+    "HELI": {
+      "cost": 1200,
+      "buildTime": 110,
+      "maxHp": 160,
+      "speed": 48,
+      "sight": 8,
+      "damage": 35,
+      "rangeCells": 5,
+      "cooldown": 28
+    },
+    "JET": {
+      "cost": 1400,
+      "buildTime": 120,
+      "maxHp": 120,
+      "speed": 72,
+      "sight": 9,
+      "damage": 50,
+      "rangeCells": 4.5,
+      "cooldown": 35
+    },
+    "GUNBOAT": {
+      "cost": 500,
+      "buildTime": 50,
+      "maxHp": 180,
+      "speed": 44,
+      "sight": 7,
+      "damage": 16,
+      "rangeCells": 4.5,
+      "cooldown": 8
+    },
+    "DESTROYER": {
+      "cost": 1200,
+      "buildTime": 110,
+      "maxHp": 420,
+      "speed": 30,
+      "sight": 7,
+      "damage": 55,
+      "rangeCells": 6,
+      "cooldown": 30
+    },
+    "SUB": {
+      "cost": 1000,
+      "buildTime": 100,
+      "maxHp": 240,
+      "speed": 26,
+      "sight": 6,
+      "damage": 95,
+      "rangeCells": 5.5,
+      "cooldown": 50
+    },
+    "TRANSPORT": {
+      "cost": 800,
+      "buildTime": 90,
+      "maxHp": 400,
+      "speed": 32,
+      "sight": 5
+    }
+  },
+  "buildings": {
+    "CONYARD": {
+      "cost": 3000,
+      "buildTime": 300,
+      "maxHp": 1500,
+      "power": 0,
+      "sight": 6
+    },
+    "POWER": {
+      "cost": 300,
+      "buildTime": 60,
+      "maxHp": 750,
+      "power": 150,
+      "sight": 4
+    },
+    "REFINERY": {
+      "cost": 2000,
+      "buildTime": 150,
+      "maxHp": 1000,
+      "power": -50,
+      "sight": 4
+    },
+    "BARRACKS": {
+      "cost": 500,
+      "buildTime": 90,
+      "maxHp": 800,
+      "power": -20,
+      "sight": 4
+    },
+    "FACTORY": {
+      "cost": 2000,
+      "buildTime": 150,
+      "maxHp": 1200,
+      "power": -50,
+      "sight": 4
+    },
+    "WERKSTATT": {
+      "cost": 1200,
+      "buildTime": 100,
+      "maxHp": 900,
+      "power": -30,
+      "sight": 4
+    },
+    "TESLA": {
+      "cost": 1200,
+      "buildTime": 90,
+      "maxHp": 600,
+      "power": -75,
+      "sight": 7,
+      "damage": 130,
+      "rangeCells": 6,
+      "cooldown": 35
+    },
+    "PILLBOX": {
+      "cost": 600,
+      "buildTime": 60,
+      "maxHp": 700,
+      "power": -10,
+      "sight": 6,
+      "damage": 14,
+      "rangeCells": 4.5,
+      "cooldown": 6
+    },
+    "HELIPAD": {
+      "cost": 1000,
+      "buildTime": 120,
+      "maxHp": 900,
+      "power": -40,
+      "sight": 5
+    },
+    "FLAKTOWER": {
+      "cost": 800,
+      "buildTime": 70,
+      "maxHp": 600,
+      "power": -20,
+      "sight": 7,
+      "damage": 22,
+      "rangeCells": 7,
+      "cooldown": 5
+    },
+    "SHIPYARD": {
+      "cost": 1500,
+      "buildTime": 140,
+      "maxHp": 1200,
+      "power": -50,
+      "sight": 5
+    },
+    "NUKESILO": {
+      "cost": 2500,
+      "buildTime": 240,
+      "maxHp": 1000,
+      "power": -100,
+      "sight": 4
+    },
+    "WEATHER": {
+      "cost": 2500,
+      "buildTime": 240,
+      "maxHp": 1000,
+      "power": -100,
+      "sight": 4
+    },
+    "WALL": {
+      "cost": 50,
+      "buildTime": 1,
+      "maxHp": 250,
+      "power": 0,
+      "sight": 1
+    }
+  }
+}

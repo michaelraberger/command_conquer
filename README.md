@@ -34,6 +34,22 @@ npm run typecheck
 (ws://localhost:8787). Spieler 1 klickt „Mehrspieler-Partie eröffnen" und gibt
 den Code weiter, Spieler 2 tritt mit dem Code bei.
 
+## Balance anpassen
+
+[packages/client/public/balance.json](packages/client/public/balance.json)
+enthält alle Stellschrauben und wird beim Spielstart geladen — Zahlen ändern,
+Seite neu laden, fertig (kein Rebuild nötig):
+
+- `economy`: Startgeld, Abbaurate/-kapazität, Edelstein-Wert, Nachwachsen
+- `units`: pro Einheit `cost`, `buildTime`, `maxHp`, `speed` (Subzellen/Tick,
+  256 = 1 Zelle), `sight` sowie `damage`/`rangeCells`/`cooldown` der Waffe
+- `buildings`: dasselbe plus `power` (+ erzeugt, − verbraucht)
+
+Unbekannte Schlüssel und kaputte Werte werden ignoriert (Standard greift);
+alle Werte werden auf Ganzzahlen gestutzt (Determinismus). Die Konfig ist
+Teil der Spieloptionen: Replays speichern sie mit, im Multiplayer gilt die
+Konfig des Hosts für beide Spieler. Fehlt die Datei, gelten die Standardwerte.
+
 ## Steuerung
 
 - Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot** (Einheiten,
