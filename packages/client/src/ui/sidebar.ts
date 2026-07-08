@@ -58,6 +58,9 @@ export class Sidebar {
   private itemsEl = document.getElementById('items')!;
   private binfoEl = document.getElementById('binfo')!;
   private lastBinfoKey = '';
+  /** In-place refreshers for fast-changing panel bits (progress bars, button
+   *  states). Running these instead of rebuilding keeps buttons clickable. */
+  private binfoUpdaters: Array<() => void> = [];
   private swEl = document.getElementById('superweapon')!;
   private swFill = document.getElementById('sw-fill')!;
   private swLabel = document.getElementById('sw-label')!;
@@ -294,13 +297,20 @@ export class Sidebar {
       return;
     }
     const p = this.player();
+    // The key must only change on STRUCTURAL changes. Fast-changing values
+    // (credits, research progress) are updated in place via binfoUpdaters —
+    // rebuilding the panel every tick would destroy buttons mid-click.
     const researchKey =
       building.type === 'TECHCENTER'
-        ? `:${p.researched.join(',')}:${p.research ? `${p.research.tech}${p.research.progress}` : '-'}`
+        ? `:${p.researched.join(',')}:${p.research ? p.research.tech : '-'}`
         : '';
-    const key = `${building.id}:${building.hp}:${building.level}:${p.credits}${researchKey}`;
-    if (key === this.lastBinfoKey) return;
+    const key = `${building.id}:${building.hp}:${building.level}${researchKey}`;
+    if (key === this.lastBinfoKey) {
+      for (const update of this.binfoUpdaters) update();
+      return;
+    }
     this.lastBinfoKey = key;
+    this.binfoUpdaters = [];
 
     const rule = buildingRule(building.type);
     this.binfoEl.style.display = 'block';
@@ -319,7 +329,11 @@ export class Sidebar {
       const btn = document.createElement('button');
       btn.className = 'bupgrade';
       btn.textContent = `Ausbauen → Stufe ${building.level + 1} ($${next.upgradeCost})`;
-      btn.disabled = this.player().credits < next.upgradeCost;
+      const affordable = (): void => {
+        btn.disabled = this.player().credits < next.upgradeCost;
+      };
+      affordable();
+      this.binfoUpdaters.push(affordable);
       btn.addEventListener('click', () => {
         this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId: building.id });
       });
@@ -344,20 +358,31 @@ export class Sidebar {
   }
 
   /** Research picker shown when a Techzentrum is selected: pick one tech to
-   *  research (cost + time), or watch/cancel the one in progress. */
+   *  research (cost + time), or watch/cancel the one in progress. The progress
+   *  bar/label update in place (binfoUpdaters) so the panel is NOT rebuilt each
+   *  tick — a rebuild would destroy the cancel button mid-click. */
   private renderResearchMenu(): void {
     const p = this.player();
     if (p.research !== null) {
-      const rule = techRule(p.research.tech);
-      const pct = Math.round((p.research.progress / rule.time) * 100);
+      const startedTech = p.research.tech;
+      const rule = techRule(startedTech);
       const label = document.createElement('div');
       label.className = 'bhint';
-      label.textContent = `Forschung: ${rule.name} — ${pct} %`;
       const bar = document.createElement('div');
       bar.style.cssText = 'height:6px;background:#232b35;border-radius:3px;overflow:hidden;margin:4px 0';
       const fill = document.createElement('div');
-      fill.style.cssText = `height:100%;width:${pct}%;background:#4da6ff`;
+      fill.style.cssText = 'height:100%;width:0%;background:#4da6ff';
       bar.append(fill);
+      const refresh = (): void => {
+        const r = this.player().research;
+        if (r === null || r.tech !== startedTech) return; // key change rebuilds next frame
+        const pct = Math.round((r.progress / rule.time) * 100);
+        const text = `Forschung: ${rule.name} — ${pct} %`;
+        if (label.textContent !== text) label.textContent = text;
+        fill.style.width = `${pct}%`;
+      };
+      refresh();
+      this.binfoUpdaters.push(refresh);
       const cancel = document.createElement('button');
       cancel.className = 'bsell';
       cancel.textContent = 'Forschung abbrechen';
@@ -380,8 +405,8 @@ export class Sidebar {
       const btn = document.createElement('button');
       btn.className = 'bupgrade';
       const mins = Math.max(1, Math.round(rule.time / (60 * 15)));
+      // No credits gate: research may start broke — the cost drains over time.
       btn.textContent = `${rule.name} ($${rule.cost}, ~${mins} min)`;
-      btn.disabled = p.credits < 1;
       btn.addEventListener('click', () =>
         this.send({ type: 'RESEARCH_START', playerId: session.localPlayer, tech: id }),
       );
@@ -417,6 +442,7 @@ export class Sidebar {
     }`;
     if (key === this.lastBinfoKey) return;
     this.lastBinfoKey = key;
+    this.binfoUpdaters = []; // stale building-panel refreshers must not run here
 
     this.binfoEl.style.display = 'block';
     this.binfoEl.replaceChildren();
