@@ -173,19 +173,25 @@ async function boot(): Promise<void> {
     driver,
   );
 
-  // Dev/test hook: lets the console and automated checks inspect the game.
-  (window as unknown as Record<string, unknown>)['__game'] = {
-    app,
-    state,
-    controls,
-    camera,
-    placement,
-    sendCommand,
-    session,
-    hotkeys,
-    alerts,
-    groups,
-  };
+  // Dev-only hook for the console and automated checks. Stripped from the
+  // production build (`import.meta.env.DEV` is false there), so a deployed game
+  // doesn't hand players a `__game.state…` handle to edit credits etc. from the
+  // console. (A client-side game can never fully prevent devtools tampering,
+  // but we don't ship an open door.)
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>)['__game'] = {
+      app,
+      state,
+      controls,
+      camera,
+      placement,
+      sendCommand,
+      session,
+      hotkeys,
+      alerts,
+      groups,
+    };
+  }
 }
 
 void boot();
