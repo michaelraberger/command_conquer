@@ -7,6 +7,7 @@ import {
   hashState,
   spawnUnit,
   tick,
+  unitRule,
   type GameState,
 } from '../src/index.js';
 
@@ -56,6 +57,45 @@ describe('repair vehicle', () => {
       if (state.events.some((e) => e.type === 'REPAIR')) sawSparkle = true;
     }
     expect(sawSparkle).toBe(true);
+  });
+
+  it('drives to a damaged own vehicle and heals it for credits', () => {
+    const state = arena();
+    const tank = spawnUnit(state, 'TANK', 0, 20, 20);
+    tank.hp = 100;
+    const repair = spawnUnit(state, 'REPAIR', 0, 14, 16);
+    const credits = state.players[0]!.credits;
+
+    tick(state, [{ type: 'REPAIR', playerId: 0, unitIds: [repair.id], targetId: tank.id }]);
+    for (let i = 0; i < 400 && tank.hp < unitRule('TANK').maxHp; i++) tick(state);
+
+    expect(tank.hp).toBe(unitRule('TANK').maxHp); // fully repaired
+    expect(state.players[0]!.credits).toBeLessThan(credits); // paid for it
+    tick(state);
+    expect(repair.order).toBeNull();
+  });
+
+  it('also heals own infantry, but never itself or enemy units', () => {
+    const state = arena();
+    const rifle = spawnUnit(state, 'RIFLEMAN', 0, 16, 16);
+    rifle.hp = 30;
+    const repair = spawnUnit(state, 'REPAIR', 0, 14, 16); // one cell away
+    tick(state, [{ type: 'REPAIR', playerId: 0, unitIds: [repair.id], targetId: rifle.id }]);
+    for (let i = 0; i < 80 && rifle.hp < unitRule('RIFLEMAN').maxHp; i++) tick(state);
+    expect(rifle.hp).toBe(unitRule('RIFLEMAN').maxHp);
+
+    // Cannot target itself.
+    repair.hp = 50;
+    tick(state, [{ type: 'REPAIR', playerId: 0, unitIds: [repair.id], targetId: repair.id }]);
+    expect(repair.order).toBeNull();
+
+    // Cannot repair an enemy unit (spawned far from the repair vehicle).
+    const enemy = spawnUnit(state, 'TANK', 1, 40, 40);
+    enemy.hp = 100;
+    tick(state, [{ type: 'REPAIR', playerId: 0, unitIds: [repair.id], targetId: enemy.id }]);
+    expect(repair.order).toBeNull();
+    runTicks(state, 20);
+    expect(enemy.hp).toBe(100);
   });
 
   it('only repair vehicles accept the order; tanks ignore it', () => {

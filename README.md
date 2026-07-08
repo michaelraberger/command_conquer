@@ -108,9 +108,10 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
   verteidigen sie die Umgebung automatisch, statt danebenzustehen
 - Werkstatt repariert eigene Fahrzeuge in der Nähe gegen Credits
 - Reparaturfahrzeug (Waffenfabrik, beide Fraktionen): mobiles Gegenstück zur
-  Werkstatt – auswählen, Rechtsklick auf ein beschädigtes eigenes Gebäude,
-  es fährt hin und repariert es gegen Credits (Werkstatt = Fahrzeuge,
-  Reparaturfahrzeug = Gebäude)
+  Werkstatt – auswählen, dann Rechtsklick auf ein beschädigtes eigenes
+  **Gebäude oder eine eigene Einheit** (Fahrzeuge, Infanterie …); es fährt hin
+  und repariert gegen Credits. Die Werkstatt (Gebäude) repariert weiterhin
+  Fahrzeuge in ihrem Umkreis
 - Einheiten (eigenständige, selbst entworfene Designs, keine Original-Assets):
   - Boden: gemeinsam Raketensoldat (Anti-Panzer-Infanterie, trifft auch
     **Luftziele** – mobile Flugabwehr im C&C-Stil); Alliierte Späher

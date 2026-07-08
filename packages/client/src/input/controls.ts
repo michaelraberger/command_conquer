@@ -177,6 +177,25 @@ export class Controls {
     return bestId;
   }
 
+  /** Nearest own DAMAGED unit under the cursor (repair target), or null. */
+  private ownDamagedUnitAt(global: { x: number; y: number }): number | null {
+    let bestId: number | null = null;
+    let bestDist = PICK_RADIUS * PICK_RADIUS;
+    for (const unit of this.state.units) {
+      if (unit.owner !== session.localPlayer) continue;
+      if (unit.hp >= unitRule(unit.type).maxHp) continue; // only damaged units
+      const p = this.unitStagePos(unit.x, unit.y);
+      const dx = p.x - global.x;
+      const dy = p.y - global.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = unit.id;
+      }
+    }
+    return bestId;
+  }
+
   /** Nearest visible enemy (unit or building) under the cursor, or null. */
   private enemyAt(global: { x: number; y: number }): number | null {
     const fog = this.state.fogs[session.localPlayer]!;
@@ -252,6 +271,29 @@ export class Controls {
         });
         if (boarders.length > 0) {
           this.send({ type: 'LOAD', playerId: session.localPlayer, unitIds: boarders, transportId });
+          return;
+        }
+      }
+    }
+
+    // Repair vehicle right-clicking a damaged own unit → repair it.
+    if (!e.ctrlKey) {
+      const targetUnitId = this.ownDamagedUnitAt(e.global);
+      if (targetUnitId !== null) {
+        const repairers = unitIds.filter(
+          (id) => byId.get(id)?.type === 'REPAIR' && id !== targetUnitId,
+        );
+        if (repairers.length > 0) {
+          this.send({
+            type: 'REPAIR',
+            playerId: session.localPlayer,
+            unitIds: repairers,
+            targetId: targetUnitId,
+          });
+          const rest = unitIds.filter((id) => byId.get(id)?.type !== 'REPAIR');
+          if (rest.length > 0) {
+            this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
+          }
           return;
         }
       }

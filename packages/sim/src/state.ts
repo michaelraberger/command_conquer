@@ -35,6 +35,7 @@ export type UnitOrder =
   | { kind: 'HARVEST'; cx: number; cy: number }
   | { kind: 'RETURN_ORE'; backCx: number; backCy: number }
   | { kind: 'REPAIR_BUILDING'; targetId: number }
+  | { kind: 'REPAIR_UNIT'; targetId: number }
   | { kind: 'BOARD'; targetId: number };
 
 export interface Unit {

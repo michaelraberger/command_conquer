@@ -105,11 +105,19 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         }
         break;
       case 'REPAIR': {
+        // The repair vehicle mends own buildings AND own units (vehicles,
+        // infantry, …). Pick whichever the target id refers to.
         const building = state.buildings.find((b) => b.id === cmd.targetId);
-        if (!building || building.owner !== cmd.playerId) break;
+        const targetUnit = state.units.find((u) => u.id === cmd.targetId);
+        const ownBuilding = building && building.owner === cmd.playerId;
+        const ownUnit = targetUnit && targetUnit.owner === cmd.playerId;
+        if (!ownBuilding && !ownUnit) break;
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
           if (unit.type !== 'REPAIR') continue; // only the repair vehicle repairs
-          unit.order = { kind: 'REPAIR_BUILDING', targetId: cmd.targetId };
+          if (ownUnit && targetUnit.id === unit.id) continue; // never repair itself
+          unit.order = ownBuilding
+            ? { kind: 'REPAIR_BUILDING', targetId: cmd.targetId }
+            : { kind: 'REPAIR_UNIT', targetId: cmd.targetId };
           unit.path = null; // repair system takes over pathing (chase)
           unit.pathIndex = 0;
         }
