@@ -5,15 +5,23 @@ import {
   TRANSPORT_CAPACITY,
   availableToFaction,
   buildingRule,
+  techFor,
+  techRule,
   unitRule,
   type AiDifficulty,
   type BuildingType,
   type Faction,
+  type TechId,
   type UnitType,
 } from '../rules.js';
 import { areEnemies, type Building, type GameState, type Player } from '../state.js';
 import { canPlaceBuilding } from '../systems/placement.js';
-import { placeQueuedBuilding, powerBalance, startProduction } from '../systems/production.js';
+import {
+  placeQueuedBuilding,
+  powerBalance,
+  startProduction,
+  startResearch,
+} from '../systems/production.js';
 
 /** Grace period: the AI never launches an offensive before this tick (10 min). */
 const FIRST_ATTACK_TICK = 10 * 60 * 15;
@@ -85,12 +93,12 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
 /** Desired base, in build order. Duplicate entries raise the target count. */
 const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   SOVIETS: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TESLA', 'POWER', 'TESLA', 'WERKSTATT',
-    'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'TESLA', 'POWER', 'TESLA',
+    'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
   ],
   ALLIES: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'PILLBOX', 'POWER', 'PILLBOX', 'WERKSTATT',
-    'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'WEATHER',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'PILLBOX', 'POWER', 'PILLBOX',
+    'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'WEATHER',
   ],
 };
 
@@ -117,7 +125,7 @@ function goalsFor(state: GameState, player: Player, params: AiParams): BuildingT
     const defense: BuildingType = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
     const superweapon: BuildingType = faction === 'SOVIETS' ? 'NUKESILO' : 'WEATHER';
     order = [
-      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'HELIPAD', 'SHIPYARD',
+      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'HELIPAD', 'SHIPYARD',
       'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'SILO', 'POWER', superweapon,
     ];
   } else {
@@ -146,6 +154,7 @@ export function aiSystem(state: GameState): void {
     if (state.tick % params.interval !== 0) continue;
     player.credits += params.incomeBonus;
     manageConstruction(state, player, params);
+    manageResearch(state, player, params);
     manageTraining(state, player, params);
     manageInvasion(state, player, params);
     manageArmy(state, player, params);
@@ -178,12 +187,41 @@ function manageConstruction(state: GameState, player: Player, params: AiParams):
   for (const type of goalsFor(state, player, params)) {
     wanted.set(type, (wanted.get(type) ?? 0) + 1);
     if (countBuildings(state, player.id, type) < wanted.get(type)!) {
+      // Tech-locked goals wait for research (manageResearch handles them) — skip
+      // to the next available goal instead of stalling the whole build order.
+      const tech = techFor(type);
+      if (tech !== undefined && !player.researched.includes(tech)) continue;
       // Emergency power first: defenses go offline on a deficit.
       const { produced, used } = powerBalance(state, player.id);
       const next = used > produced ? 'POWER' : type;
       startProduction(state, player.id, next);
       return;
     }
+  }
+}
+
+/** Preferred research order; the AI unlocks its tech tree one project at a time. */
+const AI_RESEARCH_ORDER: readonly TechId[] = [
+  'repair', 'flak', 'air', 'armor', 'artillery', 'tesla', 'navy', 'super',
+];
+
+/**
+ * Research pacing: with a Techzentrum standing, the AI researches the next
+ * technology it needs (in AI_RESEARCH_ORDER) so its advanced units/buildings
+ * unlock over the course of the match. One project at a time; spies are skipped.
+ */
+function manageResearch(state: GameState, player: Player, params: AiParams): void {
+  if (player.research !== null || state.tick < params.interval) return;
+  if (!state.buildings.some((b) => b.owner === player.id && b.type === 'TECHCENTER')) return;
+  if (player.credits < 600) return; // keep some cash for the economy
+  for (const tech of AI_RESEARCH_ORDER) {
+    if (player.researched.includes(tech)) continue;
+    const rule = techRule(tech);
+    if (!availableToFaction(rule.factions, player.faction)) continue;
+    if (tech === 'navy' && state.mapType !== 'ISLANDS') continue; // no shipyard goal on land
+    if (tech === 'super' && !params.useHighTech) continue; // easy AI stays low-tech
+    startResearch(state, player.id, tech);
+    return;
   }
 }
 
@@ -266,7 +304,7 @@ const LATE_ESCALATION = 15 * 60 * 15;
 const RAID_ESCALATION_STEP = 5 * 60 * 15;
 /** Raid targets, most-wanted first — hit the economy/production, not the HQ. */
 const RAID_PRIORITY: readonly BuildingType[] = [
-  'REFINERY', 'SILO', 'FACTORY', 'BARRACKS', 'WERKSTATT', 'HELIPAD', 'SHIPYARD',
+  'REFINERY', 'SILO', 'FACTORY', 'BARRACKS', 'TECHCENTER', 'WERKSTATT', 'HELIPAD', 'SHIPYARD',
 ];
 
 /**

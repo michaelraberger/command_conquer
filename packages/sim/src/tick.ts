@@ -7,7 +7,7 @@ import { defenseSystem } from './systems/defense.js';
 import { fogSystem } from './systems/fog.js';
 import { harvestSystem } from './systems/harvest.js';
 import { movementSystem } from './systems/movement.js';
-import { productionSystem } from './systems/production.js';
+import { productionSystem, researchSystem } from './systems/production.js';
 import { projectileSystem } from './systems/projectiles.js';
 import { repairSystem } from './systems/repair.js';
 import { repairVehicleSystem } from './systems/repairVehicle.js';
@@ -33,6 +33,7 @@ export function tick(state: GameState, commands: Command[] = []): void {
   applyCommands(state, commands);
   aiSystem(state);
   productionSystem(state);
+  researchSystem(state);
   superweaponSystem(state);
   resourceGrowthSystem(state);
   harvestSystem(state);

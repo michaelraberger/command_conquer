@@ -17,8 +17,10 @@ import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
 import {
   cancelProduction,
+  cancelResearch,
   placeQueuedBuilding,
   startProduction,
+  startResearch,
 } from './systems/production.js';
 
 /**
@@ -43,6 +45,8 @@ export type Command =
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'RESEARCH_START'; playerId: number; tech: string }
+  | { type: 'RESEARCH_CANCEL'; playerId: number }
   | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
@@ -126,6 +130,12 @@ export function applyCommands(state: GameState, commands: Command[]): void {
       }
       case 'BUILD_START':
         startProduction(state, cmd.playerId, cmd.item);
+        break;
+      case 'RESEARCH_START':
+        startResearch(state, cmd.playerId, cmd.tech);
+        break;
+      case 'RESEARCH_CANCEL':
+        cancelResearch(state, cmd.playerId);
         break;
       case 'BUILD_CANCEL':
         cancelProduction(state, cmd.playerId, cmd.category);

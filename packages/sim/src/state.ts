@@ -22,6 +22,7 @@ import {
   type Faction,
   type ProductionCategory,
   type SuperweaponKind,
+  type TechId,
   type UnitType,
 } from './rules.js';
 
@@ -139,6 +140,10 @@ export interface Player {
   mapRevealed: boolean;
   /** Cheat: flat extra power added to the balance. */
   powerBonus: number;
+  /** Completed technologies (see TECH_RULES). Plain sorted array for replay. */
+  researched: TechId[];
+  /** Tech being researched right now (drains credits over time), or null. */
+  research: { tech: TechId; progress: number } | null;
 }
 
 /** Fog states per cell: 0 = hidden, 1 = explored, 2 = visible. */
@@ -349,6 +354,8 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     aiLastAttackTick: 0,
     mapRevealed: false,
     powerBonus: 0,
+    researched: [],
+    research: null,
   });
 
   const state: GameState = {

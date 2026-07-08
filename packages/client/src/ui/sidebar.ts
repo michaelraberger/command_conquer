@@ -11,12 +11,16 @@ import {
   isBuildingType,
   powerBalance,
   storageCapacity,
+  techFor,
+  techRule,
+  TECH_RULES,
   sellRefund,
   unitRule,
   type BuildingType,
   type Command,
   type GameState,
   type ProductionCategory,
+  type TechId,
   type Unit,
   type UnitType,
 } from '@cac/sim';
@@ -228,10 +232,12 @@ export class Sidebar {
       const prereqsMet = rule.requires.every((req) =>
         this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === req),
       );
+      const tech = techFor(el.item);
+      const techLocked = tech !== undefined && !player.researched.includes(tech);
       const isThis = q.item === el.item;
       const busy = q.item !== null && !isThis;
 
-      el.root.classList.toggle('disabled', !prereqsMet || busy);
+      el.root.classList.toggle('disabled', !prereqsMet || techLocked || busy);
       el.root.classList.toggle('ready', isThis && q.ready);
       el.progress.style.width =
         isThis && !q.ready ? `${Math.round((q.progress / rule.buildTime) * 100)}%` : '0%';
@@ -242,6 +248,8 @@ export class Sidebar {
           .filter((r) => !this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === r))
           .map((r) => buildingRule(r as BuildingType).name)
           .join(', ')}`;
+      } else if (techLocked) {
+        text = `erforschen: ${techRule(tech).name}`;
       } else if (isThis && q.ready) {
         text = 'Bereit – klicken zum Platzieren';
       } else if (isThis) {
@@ -285,7 +293,12 @@ export class Sidebar {
       this.updateUnitInfo();
       return;
     }
-    const key = `${building.id}:${building.hp}:${building.level}:${this.player().credits}`;
+    const p = this.player();
+    const researchKey =
+      building.type === 'TECHCENTER'
+        ? `:${p.researched.join(',')}:${p.research ? `${p.research.tech}${p.research.progress}` : '-'}`
+        : '';
+    const key = `${building.id}:${building.hp}:${building.level}:${p.credits}${researchKey}`;
     if (key === this.lastBinfoKey) return;
     this.lastBinfoKey = key;
 
@@ -318,6 +331,7 @@ export class Sidebar {
       hint.textContent = 'Rechtsklick auf Karte: Sammelpunkt';
       this.binfoEl.append(hint);
     }
+    if (building.type === 'TECHCENTER') this.renderResearchMenu();
 
     const sell = document.createElement('button');
     sell.className = 'bsell';
@@ -327,6 +341,58 @@ export class Sidebar {
       this.controls.selectedBuilding = null;
     });
     this.binfoEl.append(sell);
+  }
+
+  /** Research picker shown when a Techzentrum is selected: pick one tech to
+   *  research (cost + time), or watch/cancel the one in progress. */
+  private renderResearchMenu(): void {
+    const p = this.player();
+    if (p.research !== null) {
+      const rule = techRule(p.research.tech);
+      const pct = Math.round((p.research.progress / rule.time) * 100);
+      const label = document.createElement('div');
+      label.className = 'bhint';
+      label.textContent = `Forschung: ${rule.name} — ${pct} %`;
+      const bar = document.createElement('div');
+      bar.style.cssText = 'height:6px;background:#232b35;border-radius:3px;overflow:hidden;margin:4px 0';
+      const fill = document.createElement('div');
+      fill.style.cssText = `height:100%;width:${pct}%;background:#4da6ff`;
+      bar.append(fill);
+      const cancel = document.createElement('button');
+      cancel.className = 'bsell';
+      cancel.textContent = 'Forschung abbrechen';
+      cancel.addEventListener('click', () =>
+        this.send({ type: 'RESEARCH_CANCEL', playerId: session.localPlayer }),
+      );
+      this.binfoEl.append(label, bar, cancel);
+      return;
+    }
+    const heading = document.createElement('div');
+    heading.className = 'bhint';
+    heading.textContent = 'Forschung wählen:';
+    this.binfoEl.append(heading);
+    let any = false;
+    for (const id of Object.keys(TECH_RULES) as TechId[]) {
+      if (p.researched.includes(id)) continue;
+      const rule = techRule(id);
+      if (!availableToFaction(rule.factions, p.faction)) continue;
+      any = true;
+      const btn = document.createElement('button');
+      btn.className = 'bupgrade';
+      const mins = Math.max(1, Math.round(rule.time / (60 * 15)));
+      btn.textContent = `${rule.name} ($${rule.cost}, ~${mins} min)`;
+      btn.disabled = p.credits < 1;
+      btn.addEventListener('click', () =>
+        this.send({ type: 'RESEARCH_START', playerId: session.localPlayer, tech: id }),
+      );
+      this.binfoEl.append(btn);
+    }
+    if (!any) {
+      const done = document.createElement('div');
+      done.className = 'bhint';
+      done.textContent = 'Alles erforscht.';
+      this.binfoEl.append(done);
+    }
   }
 
   /** Shows what the current unit selection is: a single unit's name + hp, or a

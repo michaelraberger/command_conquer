@@ -4,7 +4,9 @@ import {
   availableToFaction,
   buildingRule,
   isBuildingType,
+  isTechId,
   isUnitType,
+  techRule,
   unitRule,
   type ProductionCategory,
 } from '../rules.js';
@@ -58,8 +60,56 @@ export function startProduction(state: GameState, playerId: number, item: string
   if (isBuildingType(item) && !buildingRule(item).buildable) return;
   if (!availableToFaction(rule.factions, player.faction)) return;
   if (!prereqsMet(state, playerId, rule.requires)) return;
+  // Tech gate: advanced items need their technology researched first.
+  if (rule.tech !== undefined && !player.researched.includes(rule.tech)) return;
   queue.item = item;
   queue.progress = 0;
+}
+
+/** Begin researching a technology at a Techzentrum (one at a time per player). */
+export function startResearch(state: GameState, playerId: number, tech: string): void {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || !isTechId(tech)) return;
+  if (player.research !== null || player.researched.includes(tech)) return;
+  const rule = techRule(tech);
+  if (!availableToFaction(rule.factions, player.faction)) return;
+  if (!prereqsMet(state, playerId, rule.requires)) return; // needs a Techzentrum
+  player.research = { tech, progress: 0 };
+}
+
+/** Abort the active research and refund what was paid so far. */
+export function cancelResearch(state: GameState, playerId: number): void {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.research === null) return;
+  const rule = techRule(player.research.tech);
+  player.credits += paidUpTo(rule.cost, rule.time, player.research.progress);
+  player.research = null;
+}
+
+/**
+ * Advances the active research: credits drain gradually over the research time
+ * (same model as production), stalling when broke; on completion the tech joins
+ * the player's researched set (kept sorted for deterministic hashing).
+ */
+export function researchSystem(state: GameState): void {
+  for (const player of state.players) {
+    const r = player.research;
+    if (r === null) continue;
+    const rule = techRule(r.tech);
+    if (r.progress < rule.time) {
+      const price = paidUpTo(rule.cost, rule.time, r.progress + 1) - paidUpTo(rule.cost, rule.time, r.progress);
+      if (player.credits < price) continue; // stalled, no funds
+      player.credits -= price;
+      r.progress++;
+    }
+    if (r.progress >= rule.time) {
+      if (!player.researched.includes(r.tech)) {
+        player.researched.push(r.tech);
+        player.researched.sort();
+      }
+      player.research = null;
+    }
+  }
 }
 
 export function cancelProduction(state: GameState, playerId: number, category: ProductionCategory): void {

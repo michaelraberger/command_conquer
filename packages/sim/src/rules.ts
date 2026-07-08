@@ -19,6 +19,19 @@ export type Faction = 'ALLIES' | 'SOVIETS';
 export type SuperweaponKind = 'NUKE' | 'STORM';
 export type AiDifficulty = 'easy' | 'normal' | 'hard';
 
+/** Researchable technologies. A unit/building with a `tech` is only buildable
+ *  once that tech has been researched at a Techzentrum. */
+export type TechId =
+  | 'armor'
+  | 'artillery'
+  | 'air'
+  | 'navy'
+  | 'flak'
+  | 'repair'
+  | 'tesla'
+  | 'super'
+  | 'spy';
+
 export const FACTIONS: readonly Faction[] = ['ALLIES', 'SOVIETS'];
 export const FACTION_NAMES: Record<Faction, string> = {
   ALLIES: 'Alliierte',
@@ -83,6 +96,8 @@ export interface UnitRule {
   /** Spy: walks into an enemy storage building (INFILTRATE) to steal its stored
    *  ore, then is consumed. Has no weapon. */
   infiltrator?: boolean;
+  /** Only buildable once this technology is researched (undefined = immediate). */
+  tech?: TechId;
 }
 
 function weapon(
@@ -124,9 +139,10 @@ export const UNIT_RULES = {
     cost: 1800,
     buildTime: 150,
     category: 'vehicle',
-    requires: ['FACTORY', 'WERKSTATT'],
+    requires: ['FACTORY'],
     factions: ['SOVIETS'],
     sight: 6,
+    tech: 'armor',
   },
   ARTILLERY: {
     name: 'Artillerie',
@@ -141,6 +157,7 @@ export const UNIT_RULES = {
     requires: ['FACTORY'],
     factions: ['ALLIES'],
     sight: 7,
+    tech: 'artillery',
   },
   RIFLEMAN: {
     name: 'Schütze',
@@ -183,6 +200,7 @@ export const UNIT_RULES = {
     requires: ['FACTORY'],
     factions: null,
     sight: 6,
+    tech: 'repair',
   },
   ROCKETEER: {
     name: 'Raketensoldat',
@@ -269,9 +287,10 @@ export const UNIT_RULES = {
     cost: 1300,
     buildTime: 110,
     category: 'vehicle',
-    requires: ['FACTORY', 'WERKSTATT'],
+    requires: ['FACTORY'],
     factions: ['SOVIETS'],
     sight: 6,
+    tech: 'tesla',
   },
   FLAK: {
     name: 'Flak-Panzer',
@@ -287,6 +306,7 @@ export const UNIT_RULES = {
     requires: ['FACTORY'],
     factions: null,
     sight: 7,
+    tech: 'flak',
   },
   HELI: {
     name: 'Kampfhubschrauber',
@@ -415,6 +435,7 @@ export const UNIT_RULES = {
     factions: ['ALLIES'],
     sight: 5,
     infiltrator: true,
+    tech: 'spy',
   },
 } as const satisfies Record<string, UnitRule>;
 
@@ -452,6 +473,8 @@ export interface BuildingRule {
   storage?: number;
   /** Footprint must sit on open water instead of buildable land (shipyard). */
   onWater?: boolean;
+  /** Only buildable once this technology is researched (undefined = immediate). */
+  tech?: TechId;
 }
 
 export const BUILDING_RULES = {
@@ -576,6 +599,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 4,
+    tech: 'repair',
   },
   TESLA: {
     name: 'Tesla-Spule',
@@ -593,6 +617,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: ['SOVIETS'],
     sight: 7,
+    tech: 'tesla',
   },
   PILLBOX: {
     name: 'MG-Stellung',
@@ -627,6 +652,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 5,
+    tech: 'air',
   },
   FLAKTOWER: {
     name: 'Flak-Turm',
@@ -645,6 +671,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 7,
+    tech: 'flak',
   },
   SHIPYARD: {
     name: 'Werft',
@@ -663,6 +690,7 @@ export const BUILDING_RULES = {
     factions: null,
     sight: 5,
     onWater: true,
+    tech: 'navy',
   },
   NUKESILO: {
     name: 'Raketensilo',
@@ -680,6 +708,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: ['SOVIETS'],
     sight: 4,
+    tech: 'super',
   },
   WEATHER: {
     name: 'Wetterkontrolle',
@@ -696,6 +725,24 @@ export const BUILDING_RULES = {
     requires: ['FACTORY'],
     buildable: true,
     factions: ['ALLIES'],
+    sight: 4,
+    tech: 'super',
+  },
+  TECHCENTER: {
+    name: 'Techzentrum',
+    maxHp: 800,
+    cost: 1500,
+    buildTime: 120,
+    power: -60,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: ['FACTORY'],
+    buildable: true,
+    factions: null,
     sight: 4,
   },
   WALL: {
@@ -729,6 +776,50 @@ export function isBuildingType(item: string): item is BuildingType {
 
 export function isUnitType(item: string): item is UnitType {
   return item in UNIT_RULES;
+}
+
+export interface TechRule {
+  name: string;
+  cost: number;
+  /** Research time in ticks (cost drains gradually over it, like production). */
+  time: number;
+  /** Buildings that must stand to research this (always a Techzentrum). */
+  requires: readonly string[];
+  /** null = both factions may research it. */
+  factions: readonly Faction[] | null;
+}
+
+const MIN = 60 * 15; // ticks per minute (15 tps)
+/**
+ * Researchable technologies. Default research time scales with how advanced the
+ * unlock is (the more powerful, the longer). All costs/times are tunable in
+ * balance.json under "research".
+ */
+export const TECH_RULES = {
+  repair: { name: 'Feldreparatur', cost: 800, time: 6 * MIN, requires: ['TECHCENTER'], factions: null },
+  flak: { name: 'Flugabwehr', cost: 800, time: 6 * MIN, requires: ['TECHCENTER'], factions: null },
+  spy: { name: 'Spionage', cost: 1000, time: 8 * MIN, requires: ['TECHCENTER'], factions: ['ALLIES'] },
+  artillery: { name: 'Artillerie-Doktrin', cost: 1200, time: 10 * MIN, requires: ['TECHCENTER'], factions: ['ALLIES'] },
+  armor: { name: 'Schwere Panzerung', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: ['SOVIETS'] },
+  air: { name: 'Luftwaffentechnik', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
+  navy: { name: 'Marine-Doktrin', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
+  tesla: { name: 'Tesla-Technologie', cost: 1800, time: 12 * MIN, requires: ['TECHCENTER'], factions: ['SOVIETS'] },
+  super: { name: 'Superwaffen-Programm', cost: 2500, time: 15 * MIN, requires: ['TECHCENTER'], factions: null },
+} as const satisfies Record<TechId, TechRule>;
+
+export function techRule(id: TechId): TechRule {
+  return TECH_RULES[id];
+}
+
+export function isTechId(item: string): item is TechId {
+  return item in TECH_RULES;
+}
+
+/** The tech that unlocks an item, if any (undefined = always buildable). */
+export function techFor(item: string): TechId | undefined {
+  if (isBuildingType(item)) return buildingRule(item).tech;
+  if (isUnitType(item)) return unitRule(item).tech;
+  return undefined;
 }
 
 export function availableToFaction(
@@ -882,6 +973,8 @@ export interface BalanceConfig {
   economy?: EconomyBalance;
   units?: Partial<Record<UnitType, UnitBalance>>;
   buildings?: Partial<Record<BuildingType, BuildingBalance>>;
+  /** Per-tech research cost/time overrides. */
+  research?: Partial<Record<TechId, { cost?: number; time?: number }>>;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -892,6 +985,7 @@ const BUILDING_DEFAULTS = JSON.parse(JSON.stringify(BUILDING_RULES)) as Record<
   BuildingType,
   BuildingRule
 >;
+const TECH_DEFAULTS = JSON.parse(JSON.stringify(TECH_RULES)) as Record<TechId, TechRule>;
 
 /** Truncated integer clamped to `min`, or null when the value is unusable. */
 function intOr(v: number | undefined, min: number): number | null {
@@ -925,6 +1019,9 @@ export function applyBalance(config?: BalanceConfig): void {
   }
   for (const type of Object.keys(BUILDING_RULES) as BuildingType[]) {
     Object.assign(BUILDING_RULES[type], JSON.parse(JSON.stringify(BUILDING_DEFAULTS[type])));
+  }
+  for (const id of Object.keys(TECH_RULES) as TechId[]) {
+    Object.assign(TECH_RULES[id], JSON.parse(JSON.stringify(TECH_DEFAULTS[id])));
   }
   STARTING_CREDITS = ECONOMY_DEFAULTS.startCredits;
   HARVEST_CAPACITY = ECONOMY_DEFAULTS.harvestCapacity;
@@ -967,5 +1064,12 @@ export function applyBalance(config?: BalanceConfig): void {
     rule.sight = intOr(o.sight, 0) ?? rule.sight;
     rule.storage = intOr(o.storage, 0) ?? rule.storage ?? 0;
     applyWeapon(rule.weapon, o);
+  }
+
+  for (const [id, o] of Object.entries(config.research ?? {})) {
+    if (!o || !isTechId(id)) continue;
+    const rule = TECH_RULES[id] as unknown as Mutable<TechRule>;
+    rule.cost = intOr(o.cost, 0) ?? rule.cost;
+    rule.time = intOr(o.time, 1) ?? rule.time;
   }
 }

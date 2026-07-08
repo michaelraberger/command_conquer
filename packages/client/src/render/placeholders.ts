@@ -282,6 +282,21 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 0.7, 1.7, 12),
   },
+  TECHCENTER: {
+    frameTop: 48,
+    fx: 0x7fd4ff, // tech blue
+    body: (g, w, h) => {
+      concretePlate(g, w, h);
+      const c = iso(w / 2, h / 2);
+      g.roundRect(c.x - 16, c.y - 26, 32, 26, 4).fill(0xb5ac99).stroke({ width: 1.2, color: OUTLINE });
+      g.rect(c.x - 16, c.y - 26, 32, 6).fill(0xc4bba8); // roof highlight
+      g.circle(c.x, c.y - 26, 11).fill(0xcfd6dc).stroke({ width: 1, color: 0x5a6068 }); // observation dome
+      g.circle(c.x - 3, c.y - 29, 4).fill(0xe8edf2); // dome glint
+      g.rect(c.x + 8, c.y - 46, 2, 20).fill(0x8f8775); // antenna mast
+      g.circle(c.x + 9, c.y - 47, 3).fill(0x7fd4ff); // signal node (fx)
+    },
+    team: (g) => teamMark(g, 1, 1, 22),
+  },
   TESLA: {
     frameTop: 52,
     fx: 0x7fd4ff,

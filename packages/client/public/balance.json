@@ -320,6 +320,24 @@
       "maxHp": 250,
       "power": 0,
       "sight": 1
+    },
+    "TECHCENTER": {
+      "cost": 1500,
+      "buildTime": 120,
+      "maxHp": 800,
+      "power": -60,
+      "sight": 4
     }
+  },
+  "research": {
+    "repair": { "cost": 800, "time": 5400 },
+    "flak": { "cost": 800, "time": 5400 },
+    "spy": { "cost": 1000, "time": 7200 },
+    "artillery": { "cost": 1200, "time": 9000 },
+    "armor": { "cost": 1500, "time": 9000 },
+    "air": { "cost": 1500, "time": 9000 },
+    "navy": { "cost": 1500, "time": 9000 },
+    "tesla": { "cost": 1800, "time": 10800 },
+    "super": { "cost": 2500, "time": 13500 }
   }
 }

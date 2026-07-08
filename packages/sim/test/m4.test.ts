@@ -136,8 +136,9 @@ describe('factions', () => {
     // Allies cannot queue soviet tech.
     tick(state, [{ type: 'BUILD_START', playerId: 0, item: 'TESLA' }]);
     expect(state.players[0]!.queues.building.item).toBeNull();
-    // Soviets can (prereqs aside — give them one).
+    // Soviets can (prereqs + tech aside — give them both).
     constructBuilding(state, 'REFINERY', 1, 42, 42);
+    state.players[1]!.researched = ['tesla'];
     tick(state, [{ type: 'BUILD_START', playerId: 1, item: 'TESLA' }]);
     expect(state.players[1]!.queues.building.item).toBe('TESLA');
   });

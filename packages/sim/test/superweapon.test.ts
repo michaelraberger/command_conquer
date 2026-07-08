@@ -162,8 +162,18 @@ describe('ai difficulty', () => {
   }, 30000);
 
   it('easy AI skips high tech, hard AI builds a superweapon silo eventually', () => {
-    const state = createGame(1337, { ai: true, aiDifficulty: 'hard' });
-    for (let t = 0; t < 8000 && state.winner === -1; t++) {
+    // The silo is gated behind the 'super' tech now; make research fast so the
+    // hard AI reaches it within the test budget.
+    const fastResearch = {
+      research: Object.fromEntries(
+        ['repair', 'flak', 'spy', 'artillery', 'armor', 'air', 'navy', 'tesla', 'super'].map((t) => [
+          t,
+          { time: 60, cost: 200 },
+        ]),
+      ),
+    };
+    const state = createGame(1337, { ai: true, aiDifficulty: 'hard', balance: fastResearch });
+    for (let t = 0; t < 13000 && state.winner === -1; t++) {
       tick(state);
       if (state.buildings.some((b) => b.owner === 1 && b.type === 'NUKESILO')) break;
     }
