@@ -159,12 +159,12 @@ export class Controls {
     }
   }
 
-  /** Own transport ship under the cursor, or null. */
+  /** Own carrier (transport ship or air transport) under the cursor, or null. */
   private ownTransportAt(global: { x: number; y: number }): number | null {
     let bestId: number | null = null;
     let bestDist = PICK_RADIUS * PICK_RADIUS;
     for (const unit of this.state.units) {
-      if (unit.owner !== session.localPlayer || unit.type !== 'TRANSPORT') continue;
+      if (unit.owner !== session.localPlayer || unitRule(unit.type).carrier !== true) continue;
       const p = this.unitStagePos(unit.x, unit.y);
       const dx = p.x - global.x;
       const dy = p.y - global.y;

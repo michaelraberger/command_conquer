@@ -1,4 +1,4 @@
-import { WALL_LEVELS, type Command, type GameState } from '@cac/sim';
+import { WALL_LEVELS, unitRule, type Command, type GameState } from '@cac/sim';
 import { worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { Camera } from './camera.js';
@@ -139,11 +139,15 @@ export class Hotkeys {
     this.closeCheatConsole();
   }
 
-  /** Unload the selected transport ships at their current shore position. */
+  /** Unload the selected carriers (transport ships / air transports) where they
+   *  currently sit — ships at a shore, air transports over any land. */
   private tryUnload(): void {
     const transports = [...this.controls.selected]
       .sort((a, b) => a - b)
-      .filter((id) => this.state.units.find((u) => u.id === id)?.type === 'TRANSPORT');
+      .filter((id) => {
+        const u = this.state.units.find((x) => x.id === id);
+        return u !== undefined && unitRule(u.type).carrier === true;
+      });
     if (transports.length === 0) return;
     this.send({ type: 'UNLOAD', playerId: session.localPlayer, unitIds: transports });
   }

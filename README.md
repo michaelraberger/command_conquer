@@ -3,7 +3,10 @@
 Echtzeitstrategie im Browser: Basisbau, Erz-Wirtschaft, Alliierte vs. Sowjets,
 Tesla-Spulen, Mammutpanzer, aufrüstbare Mauern, Nebel des Krieges, KI-Gegner
 in drei Schwierigkeitsgraden und Superwaffen (Atomrakete/Wettersturm).
-Einzelspieler gegen die KI. Eigene prozedurale Grafiken (keine Original-Assets).
+Einzelspieler gegen **1–5 KI-Gegner** (im Startbildschirm wählbar); die Gegner
+bilden ein Team und konzentrieren sich gemeinsam auf dich. Jede Seite hat eine
+eigene Farbe (du in deiner Fraktionsfarbe, die KIs in klar unterscheidbaren
+Tönen). Eigene prozedurale Grafiken (keine Original-Assets).
 
 **Karten:** Beim Start wählbar – **Ödland** (klassisch, viel Land),
 **Flusstal** (ein Fluss mit einer einzigen Landbrücke als Engpass) und
@@ -11,10 +14,15 @@ Einzelspieler gegen die KI. Eigene prozedurale Grafiken (keine Original-Assets).
 Luft- und Marineeinheiten). Die Inselküsten sind von **Klippen** gesäumt; nur an
 wenigen freien **Strandbuchten** kann ein Transportschiff anlanden – Landungen
 gehen also nicht überall, sondern nur an den Buchten. Karten sind deterministisch
-aus Seed + Kartentyp erzeugt. Die KI (normal/schwer) baut Luftwaffe (Flugplatz + Helis/Jets)
-und auf Inselkarten eine Werft mit Kampfschiffen und einem Transportschiff –
-sie landet über die Buchten an und greift so auch über Wasser an; die leichte
-KI bleibt bodengebunden.
+aus Seed + Kartentyp erzeugt. Der Startbildschirm zeigt die gewählte Karte als
+großflächig **geblurrten Hintergrund** (inkl. der farbigen Basen je nach
+Gegnerzahl) – so sieht man vorab, was einen erwartet. **Jede** KI-Stufe baut Luftwaffe (Flugplatz +
+Helis/Jets) und auf Inselkarten eine Werft mit Kampfschiffen und einem
+Transportschiff – sie landet über die Buchten an und greift so auch über Wasser
+an. Auf Inseln rücken Flugplatz und Werft im Bauplan nach vorne (gleich nach der
+Fabrik), damit die KI früh übersetzen kann. Die leichte KI hält kleinere Armeen
+und weniger Luft/Marine als normal/schwer – so bleibt es auf jeder Karte ein
+Kampf auf Augenhöhe, aber die Stufe macht weiterhin einen Unterschied.
 
 **Marine:** Die **Werft** wird auf offenem Wasser im Bauradius der Basis
 platziert und baut Schiffe (Tab „See"): **Kanonenboot** (beide Fraktionen),
@@ -120,11 +128,17 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
     **Luftziele** – mobile Flugabwehr im C&C-Stil); Alliierte Späher
     (schnelle Aufklärung) + Leichter Panzer; Sowjets Flammenwerfer + Kampfhund
     (nur gegen Infanterie) + Tesla-Panzer. Waffeneffekte Flamme und Rakete.
-  - Luft: Flugplatz baut Kampfhubschrauber (beide) und Kampfjet (Sowjets).
-    Flugeinheiten fliegen geradlinig über jedes Gelände (mit Schatten, über
-    dem Boden gerendert) und greifen Boden an. Nur Anti-Luft trifft sie:
-    Flak-Panzer (mobil) und Flak-Turm (Basisverteidigung). Bodenwaffen können
-    Flugzeuge nicht treffen.
+  - Luft: Flugplatz baut Kampfhubschrauber (beide), Kampfjet (Sowjets) und
+    **Transporthubschrauber** (Alliierte, unbewaffnet): lädt bis zu 5
+    Bodeneinheiten (Rechtsklick mit ausgewählten Einheiten auf den Transporter)
+    und fliegt sie über **jedes** Gelände – auch über Wasser oder hinter die
+    feindlichen Linien. Taste **E** setzt die Fracht an Land ab (überall auf
+    Land, nicht nur an Küsten), ideal um eine Insel oder Basis direkt zu
+    stürmen. Flugeinheiten fliegen geradlinig (mit Schatten, über dem Boden
+    gerendert). Nur Anti-Luft trifft sie: Flak-Panzer (mobil) und Flak-Turm
+    (Basisverteidigung) – der unbewaffnete Transporter braucht also eine freie
+    Anflugschneise oder Begleitschutz. Bodenwaffen können Flugzeuge nicht
+    treffen.
   - See ist der geplante nächste Meilenstein.
 - Mauern erweitern den Baubereich gar nicht – sie sind nur innerhalb des von
   echten Gebäuden geöffneten Bauradius platzierbar (kein „Sandsack-Marsch")
@@ -134,7 +148,9 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
   Strombalken und die betroffenen eigenen Verbraucher-Gebäude verdunkeln
   sichtbar. Abhilfe: Kraftwerk bauen
 - Die KI greift frühestens nach 10 Minuten an (Schonfrist zum Aufbauen);
-  verteidigt wird ihre Basis aber von Anfang an
+  verteidigt wird ihre Basis aber von Anfang an. Danach baut sie auf jeder
+  Karte eine schlagkräftige Armee inkl. Luftwaffe – auf Inseln zusätzlich
+  Marine + Transporter – und greift auch über Wasser an (alle Stufen)
 - Ressourcen wachsen nach: Erz- und Edelsteinfelder bleiben dauerhaft
   „fruchtbar" und regenerieren sehr langsam (ein Schub pro Minute, ~2 h bis
   ein leergebaggertes Feld voll ist; überbaute Zellen wachsen nicht). Beim

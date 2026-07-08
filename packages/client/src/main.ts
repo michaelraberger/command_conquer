@@ -82,10 +82,10 @@ async function loadCheatCodes(): Promise<CheatCodes> {
 
 async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
   const seed = (Math.random() * 0xffffffff) >>> 0;
-  const enemy: Faction = choice.faction === 'ALLIES' ? 'SOVIETS' : 'ALLIES';
   session.localPlayer = 0;
   const options = {
-    factions: [choice.faction, enemy] as [Faction, Faction],
+    factions: [choice.faction] as Faction[], // AI factions are assigned per player
+    opponents: choice.opponents,
     ai: true,
     aiDifficulty: choice.difficulty,
     mapType: choice.mapType,

@@ -92,6 +92,7 @@ export {
   dockCell,
   serialize,
   deserialize,
+  areEnemies,
   PLAYER_SPAWNS,
   FOG_HIDDEN,
   FOG_EXPLORED,

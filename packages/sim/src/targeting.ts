@@ -1,6 +1,6 @@
 import { SUBCELL, distSq } from './fixed.js';
 import { WALL_LEVELS, buildingRule, unitRule, type WeaponRule } from './rules.js';
-import type { Building, GameState, Unit } from './state.js';
+import { areEnemies, type Building, type GameState, type Unit } from './state.js';
 
 /** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
 export function isAir(unit: Unit): boolean {
@@ -110,7 +110,7 @@ export function nearestEnemyUnit(
   let best: Unit | null = null;
   let bestD = -1;
   for (const other of state.units) {
-    if (other.owner === owner || other.hp <= 0) continue;
+    if (other.hp <= 0 || !areEnemies(state, owner, other.owner)) continue;
     if (accept && !accept(other)) continue;
     const d2 = distSq(other.x - x, other.y - y);
     if (d2 <= rangeSq && (best === null || d2 < bestD)) {
@@ -133,7 +133,7 @@ export function nearestEnemyBuilding(
   let best: Building | null = null;
   let bestD = -1;
   for (const b of state.buildings) {
-    if (b.owner === owner || b.hp <= 0) continue;
+    if (b.hp <= 0 || !areEnemies(state, owner, b.owner)) continue;
     if (!includeWalls && b.type === 'WALL') continue;
     const d2 = targetDistSq({ kind: 'building', building: b }, x, y);
     if (d2 <= rangeSq && (best === null || d2 < bestD)) {

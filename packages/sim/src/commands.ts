@@ -195,9 +195,13 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       }
       case 'LOAD': {
-        // Ground units walk to the shore next to an own transport and board.
+        // Ground units walk up to an own carrier (transport ship or air
+        // transport) and board.
         const transport = state.units.find(
-          (u) => u.id === cmd.transportId && u.owner === cmd.playerId && u.type === 'TRANSPORT',
+          (u) =>
+            u.id === cmd.transportId &&
+            u.owner === cmd.playerId &&
+            unitRule(u.type).carrier === true,
         );
         if (!transport) break;
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
@@ -210,7 +214,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
       }
       case 'UNLOAD':
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
-          if (unit.type !== 'TRANSPORT') continue;
+          if (unitRule(unit.type).carrier !== true) continue;
           unloadTransport(state, unit);
         }
         break;

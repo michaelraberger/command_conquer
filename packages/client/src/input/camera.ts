@@ -44,7 +44,7 @@ export class Camera {
     this.maxX = (state.mapWidth * TILE_W) / 2;
     this.minY = 0;
     this.maxY = ((state.mapWidth + state.mapHeight) * TILE_H) / 2;
-    const [sx, sy] = PLAYER_SPAWNS[session.localPlayer] ?? PLAYER_SPAWNS[0]!;
+    const [sx, sy] = state.spawns[session.localPlayer] ?? PLAYER_SPAWNS[0]!;
     const spawn = cellToScreen(sx, sy);
     this.x = spawn.x;
     this.y = spawn.y;

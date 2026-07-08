@@ -77,6 +77,9 @@ export interface UnitRule {
   navalOnly?: boolean;
   /** Submerged (submarine): only weapons with antiSub can hit it. */
   submerged?: boolean;
+  /** Carries ground units as cargo (LOAD/UNLOAD): the sea transport and the
+   *  air transport. Up to TRANSPORT_CAPACITY passengers ride inside. */
+  carrier?: boolean;
 }
 
 function weapon(
@@ -372,6 +375,26 @@ export const UNIT_RULES = {
     requires: ['SHIPYARD'],
     factions: null,
     sight: 5,
+    carrier: true,
+  },
+  AIRLIFT: {
+    name: 'Transporthubschrauber',
+    maxHp: 200,
+    speed: 46,
+    radius: 110,
+    armor: 'light',
+    // Unarmed troop lifter: flies squads straight over any terrain and drops
+    // them anywhere on land — behind lines or onto a defended island. Only
+    // anti-air can bring it down, so escort or a clear approach matters.
+    weapon: null,
+    cost: 1000,
+    buildTime: 90,
+    category: 'air',
+    requires: ['HELIPAD'],
+    factions: ['ALLIES'],
+    sight: 7,
+    air: true,
+    carrier: true,
   },
 } as const satisfies Record<string, UnitRule>;
 

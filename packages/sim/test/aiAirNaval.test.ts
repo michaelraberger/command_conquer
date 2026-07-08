@@ -29,11 +29,13 @@ describe('ai air power', () => {
     expect(air > 0 || state.winner === 1).toBe(true);
   });
 
-  it('the easy AI stays ground-only (no helipad, no air)', () => {
+  it('even the easy AI builds a (small) air wing so it can fight on every map', () => {
+    // Easy used to stay ground-only, which made island maps a no-op. It now
+    // fields a modest helipad + air wing; its lower caps keep it weaker than
+    // normal/hard.
     const state = createGame(1337, { ai: true, aiDifficulty: 'easy', mapType: 'BADLANDS' });
-    for (let t = 0; t < 6000 && state.winner === -1; t++) tick(state);
-    expect(owns(state, 'HELIPAD')).toBe(false);
-    expect(countAiUnits(state, 'HELI') + countAiUnits(state, 'JET')).toBe(0);
+    for (let t = 0; t < 10000 && state.winner === -1; t++) tick(state);
+    expect(owns(state, 'HELIPAD') || state.winner === 1).toBe(true);
   });
 });
 
@@ -62,6 +64,20 @@ describe('ai navy on islands', () => {
     const hurt = state.winner === 1 || humanBuildings.length === 0 || humanHp < humanHpAtStart;
     expect(hurt).toBe(true);
   }, 30000);
+
+  it('even the easy AI crosses the water and reaches the human island', () => {
+    // The whole point of giving easy a small air/naval force: island maps must
+    // still be a fight, not a stalemate the AI can never win.
+    const state = createGame(2024, { ai: true, aiDifficulty: 'easy', mapType: 'ISLANDS' });
+    const humanHpAtStart = state.buildings
+      .filter((b) => b.owner === 0)
+      .reduce((s, b) => s + b.hp, 0);
+    for (let t = 0; t < 16000 && state.winner === -1; t++) tick(state);
+    const humanBuildings = state.buildings.filter((b) => b.owner === 0);
+    const humanHp = humanBuildings.reduce((s, b) => s + b.hp, 0);
+    const hurt = state.winner === 1 || humanBuildings.length === 0 || humanHp < humanHpAtStart;
+    expect(hurt).toBe(true);
+  }, 40000);
 });
 
 describe('ai air/naval determinism', () => {

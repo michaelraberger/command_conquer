@@ -6,6 +6,7 @@ import {
   cellIndex,
   clearArea,
   generateTerrain,
+  spawnCenters,
   stampResourcePatch,
   type MapType,
 } from './map.js';
@@ -124,6 +125,9 @@ export interface Player {
   /** Command generator runs for this player inside the sim (see ai/). */
   isAi: boolean;
   difficulty: AiDifficulty;
+  /** Alliance: players on the same team never target each other. The human is
+   *  team 0, every AI opponent shares team 1 (they gang up, not free-for-all). */
+  team: number;
   /** Render tint; lives in state so replays carry identical player setups. */
   color: number;
   credits: number;
@@ -164,6 +168,8 @@ export interface GameState {
   structures: Int32Array;
   /** Per-player fog grids (see FOG_* constants). */
   fogs: Uint8Array[];
+  /** Base/island centre cell per player id (camera home, victory context). */
+  spawns: ReadonlyArray<readonly [number, number]>;
   players: Player[];
   units: Unit[];
   buildings: Building[];
@@ -252,14 +258,18 @@ export function dockCell(building: Building): PathCell {
   return { cx: building.cx + 1, cy: building.cy + rule.height };
 }
 
-export const PLAYER_SPAWNS: ReadonlyArray<readonly [number, number]> = [
-  [16, 16],
-  [46, 46],
-];
+/** Classic two-player spawn centres; the actual game uses state.spawns. */
+export const PLAYER_SPAWNS: ReadonlyArray<readonly [number, number]> = spawnCenters(2);
+
+/** Distinct AI tints (never blue/red, so they don't clash with a faction). */
+const AI_COLORS: readonly number[] = [0x5fd873, 0xff8a3a, 0xb98cff, 0x35c4c4, 0xf2d33c];
 
 export interface GameOptions {
-  factions?: [Faction, Faction];
-  /** Player 1 is controlled by the built-in AI. */
+  /** Per-player factions; index 0 is the human. Missing entries alternate. */
+  factions?: Faction[];
+  /** Number of AI opponents (1–5). Total players = 1 + opponents. */
+  opponents?: number;
+  /** Players 1..N are controlled by the built-in AI. */
   ai?: boolean;
   aiDifficulty?: AiDifficulty;
   /** Map layout (default BADLANDS). */
@@ -270,20 +280,39 @@ export interface GameOptions {
   balance?: BalanceConfig | undefined;
 }
 
+/** Two owners are enemies unless they share a team (self is never an enemy). */
+export function areEnemies(state: GameState, a: number, b: number): boolean {
+  if (a === b) return false;
+  const pa = state.players[a];
+  const pb = state.players[b];
+  if (!pa || !pb) return true;
+  return pa.team !== pb.team;
+}
+
+const otherFaction = (f: Faction): Faction => (f === 'ALLIES' ? 'SOVIETS' : 'ALLIES');
+
 export function createGame(seed: number, options: GameOptions = {}): GameState {
   applyBalance(options.balance); // resets to defaults when no config is given
   const mapWidth = options.mapWidth ?? 64;
   const mapHeight = options.mapHeight ?? 64;
-  const factions = options.factions ?? ['ALLIES', 'SOVIETS'];
   const size = mapWidth * mapHeight;
+  const mapType = options.mapType ?? 'BADLANDS';
 
-  const makePlayer = (id: number, name: string, color: number): Player => ({
+  const playerCount = Math.max(2, Math.min(6, 1 + (options.opponents ?? 1)));
+  const spawns = spawnCenters(playerCount);
+  const humanFaction = options.factions?.[0] ?? 'ALLIES';
+  // AIs alternate factions for variety; team 1 gangs up on the human (team 0).
+  const factionFor = (id: number): Faction =>
+    options.factions?.[id] ?? (id === 0 ? humanFaction : id % 2 === 1 ? otherFaction(humanFaction) : humanFaction);
+
+  const makePlayer = (id: number): Player => ({
     id,
-    name,
-    faction: factions[id as 0 | 1],
-    isAi: id === 1 && options.ai === true,
+    name: id === 0 ? 'Spieler' : playerCount > 2 ? `Gegner ${id}` : 'Gegner',
+    faction: factionFor(id),
+    isAi: id !== 0 && options.ai === true,
     difficulty: options.aiDifficulty ?? 'normal',
-    color,
+    team: id === 0 ? 0 : 1,
+    color: id === 0 ? FACTION_COLORS[humanFaction] : AI_COLORS[(id - 1) % AI_COLORS.length]!,
     credits: STARTING_CREDITS,
     queues: {
       building: emptyQueue(),
@@ -305,17 +334,15 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     winner: -1,
     mapWidth,
     mapHeight,
-    mapType: options.mapType ?? 'BADLANDS',
+    mapType,
     terrain: new Uint8Array(0),
     ore: new Uint16Array(size),
     resourceKind: new Uint8Array(size),
     occupancy: new Int32Array(size),
     structures: new Int32Array(size),
-    fogs: [new Uint8Array(size), new Uint8Array(size)],
-    players: [
-      makePlayer(0, 'Spieler', FACTION_COLORS[factions[0]]),
-      makePlayer(1, 'Gegner', FACTION_COLORS[factions[1]]),
-    ],
+    fogs: Array.from({ length: playerCount }, () => new Uint8Array(size)),
+    spawns,
+    players: Array.from({ length: playerCount }, (_, id) => makePlayer(id)),
     units: [],
     buildings: [],
     projectiles: [],
@@ -323,43 +350,63 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     events: [],
   };
 
-  const mapType = state.mapType;
-  state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType);
-  for (const [sx, sy] of PLAYER_SPAWNS) {
-    clearArea(state.terrain, mapWidth, sx, sy, 4);
-  }
-  if (mapType === 'ISLANDS') {
-    // Everything a player can reach by ground must sit on their home island;
-    // the center islet holds a contested prize for air (and later naval) play.
-    stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
-    stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
-    stampResourcePatch(state, state, 32, 32, 2, RESOURCE_ORE);
-    stampResourcePatch(state, state, 22, 10, 1, RESOURCE_GEMS);
-    stampResourcePatch(state, state, 40, 52, 1, RESOURCE_GEMS);
-  } else {
-    // Ore fields: one per spawn plus a rich contested one in the middle.
-    stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
-    stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
-    stampResourcePatch(state, state, 32, 32, 3, RESOURCE_ORE);
-    // Gem fields ("Edelsteine", double value): mirrored off-center prizes.
-    stampResourcePatch(state, state, 20, 44, 1, RESOURCE_GEMS);
-    stampResourcePatch(state, state, 44, 20, 1, RESOURCE_GEMS);
+  state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType, spawns);
+  for (const [sx, sy] of spawns) clearArea(state.terrain, mapWidth, sx, sy, 4);
+
+  if (playerCount === 2) {
+    // Classic hand-tuned 1v1 setup (kept byte-for-byte so existing maps/tests
+    // are unchanged); the N-player generator below only runs for 3+ players.
+    if (mapType === 'ISLANDS') {
+      stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
+      stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
+      stampResourcePatch(state, state, 32, 32, 2, RESOURCE_ORE);
+      stampResourcePatch(state, state, 22, 10, 1, RESOURCE_GEMS);
+      stampResourcePatch(state, state, 40, 52, 1, RESOURCE_GEMS);
+    } else {
+      stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
+      stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
+      stampResourcePatch(state, state, 32, 32, 3, RESOURCE_ORE);
+      stampResourcePatch(state, state, 20, 44, 1, RESOURCE_GEMS);
+      stampResourcePatch(state, state, 44, 20, 1, RESOURCE_GEMS);
+    }
+    constructBuilding(state, 'CONYARD', 0, 13, 13);
+    spawnUnit(state, 'TANK', 0, 17, 13);
+    spawnUnit(state, 'TANK', 0, 18, 13);
+    spawnUnit(state, 'RIFLEMAN', 0, 13, 18);
+    spawnUnit(state, 'RIFLEMAN', 0, 14, 18);
+    spawnUnit(state, 'HARVESTER', 0, 19, 17);
+    constructBuilding(state, 'CONYARD', 1, 45, 44);
+    spawnUnit(state, 'TANK', 1, 44, 43);
+    spawnUnit(state, 'TANK', 1, 44, 44);
+    spawnUnit(state, 'RIFLEMAN', 1, 48, 48);
+    spawnUnit(state, 'RIFLEMAN', 1, 49, 48);
+    spawnUnit(state, 'HARVESTER', 1, 43, 47);
+    return state;
   }
 
-  // Symmetric starts: construction yard, harvester, small guard force.
-  constructBuilding(state, 'CONYARD', 0, 13, 13);
-  spawnUnit(state, 'TANK', 0, 17, 13);
-  spawnUnit(state, 'TANK', 0, 18, 13);
-  spawnUnit(state, 'RIFLEMAN', 0, 13, 18);
-  spawnUnit(state, 'RIFLEMAN', 0, 14, 18);
-  spawnUnit(state, 'HARVESTER', 0, 19, 17);
+  // 3+ players: one ore field beside each base, biased toward the contested
+  // middle, plus a central prize and two gem fields.
+  const toward = (v: number): number => (v === 32 ? 5 : Math.sign(32 - v) * 5);
+  for (const [cx, cy] of spawns) {
+    stampResourcePatch(state, state, cx + toward(cx), cy + toward(cy), 2, RESOURCE_ORE);
+  }
+  const centreTaken = spawns.some(([x, y]) => Math.abs(x - 32) <= 8 && Math.abs(y - 32) <= 8);
+  stampResourcePatch(state, state, 32, 32, mapType === 'ISLANDS' ? 2 : 3, RESOURCE_ORE);
+  if (!centreTaken || mapType !== 'ISLANDS') {
+    stampResourcePatch(state, state, 29, 35, 1, RESOURCE_GEMS);
+    stampResourcePatch(state, state, 35, 29, 1, RESOURCE_GEMS);
+  }
 
-  constructBuilding(state, 'CONYARD', 1, 45, 44);
-  spawnUnit(state, 'TANK', 1, 44, 43);
-  spawnUnit(state, 'TANK', 1, 44, 44);
-  spawnUnit(state, 'RIFLEMAN', 1, 48, 48);
-  spawnUnit(state, 'RIFLEMAN', 1, 49, 48);
-  spawnUnit(state, 'HARVESTER', 1, 43, 47);
+  // Construction yard, harvester and a small guard force at each base.
+  for (let id = 0; id < playerCount; id++) {
+    const [cx, cy] = spawns[id]!;
+    constructBuilding(state, 'CONYARD', id, cx - 1, cy - 1);
+    spawnUnit(state, 'TANK', id, cx + 3, cy - 1);
+    spawnUnit(state, 'TANK', id, cx + 3, cy);
+    spawnUnit(state, 'RIFLEMAN', id, cx - 1, cy + 3);
+    spawnUnit(state, 'RIFLEMAN', id, cx, cy + 3);
+    spawnUnit(state, 'HARVESTER', id, cx + 3, cy + 2);
+  }
 
   return state;
 }

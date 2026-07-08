@@ -448,23 +448,53 @@
       }
       #tabs {
         display: flex;
-        flex-wrap: wrap;
-        border-bottom: 1px solid #2c3a4a;
+        gap: 3px;
+        padding: 5px 5px 0;
+        background: #10161f;
+        border-bottom: 2px solid #4da6ff;
       }
       #tabs button {
-        flex: 1 1 33%;
-        background: none;
-        border: none;
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: #1b2735;
+        border: 1px solid #2b3a4c;
+        border-bottom: none;
+        border-radius: 7px 7px 0 0;
         color: #8fa1b3;
         font: inherit;
-        font-size: 11px;
-        padding: 7px 0;
+        font-size: 10px;
+        min-width: 0;
+        padding: 6px 0 6px;
         cursor: pointer;
-        border-bottom: 2px solid transparent;
+        transition: background 0.1s, color 0.1s, transform 0.05s;
+      }
+      #tabs button .tab-lbl {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #tabs button .tab-ico {
+        font-size: 17px;
+        line-height: 1;
+        filter: grayscale(0.4) opacity(0.85);
+      }
+      #tabs button:hover {
+        background: #26374a;
+        color: #d6e4f2;
       }
       #tabs button.active {
+        background: #23405e;
         color: #fff;
-        border-bottom-color: #4da6ff;
+        border-color: #4da6ff;
+        box-shadow: inset 0 -3px 0 #4da6ff;
+        transform: translateY(-1px);
+      }
+      #tabs button.active .tab-ico {
+        filter: none;
       }
       #items {
         flex: 1;
@@ -637,12 +667,28 @@
         color: #d7e0ea;
         z-index: 10;
       }
+      #start-bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        /* Blur + darken the preview so it reads as an atmospheric backdrop and
+           keeps the panel legible. Scale up a touch to hide the blurred edges. */
+        filter: blur(4px) brightness(0.55) saturate(1.15);
+        transform: scale(1.05);
+        z-index: 0;
+        pointer-events: none;
+      }
       .panel {
-        background: rgba(16, 20, 26, 0.95);
-        border: 1px solid #2c3a4a;
+        position: relative;
+        z-index: 1;
+        background: rgba(16, 20, 26, 0.92);
+        border: 1px solid #3a4a5c;
         border-radius: 8px;
         padding: 26px 30px;
         width: 320px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
       }
       .panel h1 {
         margin: 0 0 4px;
@@ -821,6 +867,7 @@
     </div>
 
     <div id="start" class="fullscreen" style="display: flex">
+      <canvas id="start-bg"></canvas>
       <div class="panel">
         <h1>CAC</h1>
         <div class="sub">Echtzeitstrategie im Browser</div>
@@ -834,6 +881,14 @@
           <label><input type="radio" name="difficulty" value="easy" /> Leicht</label>
           <label><input type="radio" name="difficulty" value="normal" checked /> Normal</label>
           <label><input type="radio" name="difficulty" value="hard" /> Schwer</label>
+        </fieldset>
+        <fieldset>
+          <legend>Gegner</legend>
+          <label><input type="radio" name="opponents" value="1" checked /> 1</label>
+          <label><input type="radio" name="opponents" value="2" /> 2</label>
+          <label><input type="radio" name="opponents" value="3" /> 3</label>
+          <label><input type="radio" name="opponents" value="4" /> 4</label>
+          <label><input type="radio" name="opponents" value="5" /> 5</label>
         </fieldset>
         <fieldset>
           <legend>Karte</legend>

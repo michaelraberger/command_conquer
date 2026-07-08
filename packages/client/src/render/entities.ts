@@ -223,6 +223,7 @@ export class EntityRenderer {
       FLAK: this.tex.flak,
       HELI: this.tex.heli,
       JET: this.tex.jet,
+      AIRLIFT: this.tex.airlift,
       GUNBOAT: this.tex.gunboat,
       DESTROYER: this.tex.destroyer,
       SUB: this.tex.sub,

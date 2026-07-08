@@ -22,12 +22,12 @@ import type { Controls } from '../input/controls.js';
 import { session } from '../session.js';
 import type { PlacementMode } from './placement.js';
 
-const TABS: Array<{ key: ProductionCategory; label: string }> = [
-  { key: 'building', label: 'Gebäude' },
-  { key: 'infantry', label: 'Infanterie' },
-  { key: 'vehicle', label: 'Fahrzeuge' },
-  { key: 'air', label: 'Luft' },
-  { key: 'naval', label: 'See' },
+const TABS: Array<{ key: ProductionCategory; label: string; short: string; icon: string }> = [
+  { key: 'building', label: 'Gebäude', short: 'Bau', icon: '🏭' },
+  { key: 'infantry', label: 'Infanterie', short: 'Inf.', icon: '👥' },
+  { key: 'vehicle', label: 'Fahrzeuge', short: 'Fahr.', icon: '🚙' },
+  { key: 'air', label: 'Luft', short: 'Luft', icon: '🚁' },
+  { key: 'naval', label: 'See', short: 'See', icon: '⚓' },
 ];
 
 interface ItemEl {
@@ -65,7 +65,14 @@ export class Sidebar {
   ) {
     for (const tab of TABS) {
       const btn = document.createElement('button');
-      btn.textContent = tab.label;
+      btn.title = tab.label;
+      const ico = document.createElement('span');
+      ico.className = 'tab-ico';
+      ico.textContent = tab.icon;
+      const lbl = document.createElement('span');
+      lbl.className = 'tab-lbl';
+      lbl.textContent = tab.short;
+      btn.append(ico, lbl);
       btn.addEventListener('click', () => {
         this.activeTab = tab.key;
         this.renderTabs();

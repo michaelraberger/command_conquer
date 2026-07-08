@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TERRAIN_ROCK,
+  TRANSPORT_CAPACITY,
   cellCenter,
   cellIndex,
   constructBuilding,
@@ -127,6 +128,56 @@ describe('air production', () => {
     const made = state.units[state.units.length - 1];
     expect(made?.type).toBe('HELI');
     expect(unitRule('HELI').air).toBe(true);
+  });
+});
+
+describe('air transport', () => {
+  it('lifts a squad, flies it over a barrier and drops it inland', () => {
+    const state = arena();
+    // Rock wall down column 30: no ground path from the near to the far side.
+    for (let y = 0; y < state.mapHeight; y++) state.terrain[cellIndex(state, 30, y)] = TERRAIN_ROCK;
+    const lift = spawnUnit(state, 'AIRLIFT', 0, 12, 20);
+    const r1 = spawnUnit(state, 'RIFLEMAN', 0, 13, 20);
+    const r2 = spawnUnit(state, 'RIFLEMAN', 0, 13, 21);
+    r2.hp = 40; // damaged passenger keeps its hp through the airlift
+
+    tick(state, [{ type: 'LOAD', playerId: 0, unitIds: [r1.id, r2.id], transportId: lift.id }]);
+    for (let i = 0; i < 200 && lift.passengers.length < 2; i++) tick(state);
+    expect(lift.passengers.length).toBe(2);
+    // Aboard units have left the battlefield.
+    expect(state.units.some((u) => u.id === r1.id)).toBe(false);
+
+    // Fly straight across the wall to the far side — a ship or ground unit never
+    // could. The transport ignores the rock.
+    tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [lift.id], cx: 40, cy: 20 }]);
+    for (let i = 0; i < 300 && lift.path; i++) tick(state);
+    expect(lift.cell % state.mapWidth).toBeGreaterThan(30);
+
+    // Drop the squad on the far side; passengers reappear on open land nearby.
+    tick(state, [{ type: 'UNLOAD', playerId: 0, unitIds: [lift.id] }]);
+    expect(lift.passengers.length).toBe(0);
+    const dropped = state.units.filter((u) => u.id === r1.id || u.id === r2.id);
+    expect(dropped.length).toBe(2);
+    for (const u of dropped) expect(u.cell % state.mapWidth).toBeGreaterThan(30);
+    expect(state.units.find((u) => u.id === r2.id)!.hp).toBe(40);
+  });
+
+  it('shares the transport capacity (max 5 aboard)', () => {
+    const state = arena();
+    const lift = spawnUnit(state, 'AIRLIFT', 0, 12, 20);
+    const ids: number[] = [];
+    for (let i = 0; i < TRANSPORT_CAPACITY + 1; i++) {
+      ids.push(spawnUnit(state, 'RIFLEMAN', 0, 14, 16 + i).id);
+    }
+    tick(state, [{ type: 'LOAD', playerId: 0, unitIds: ids, transportId: lift.id }]);
+    for (let i = 0; i < 300 && lift.passengers.length < TRANSPORT_CAPACITY; i++) tick(state);
+    expect(lift.passengers.length).toBe(TRANSPORT_CAPACITY);
+  });
+
+  it('is an unarmed aircraft only anti-air can touch', () => {
+    expect(unitRule('AIRLIFT').air).toBe(true);
+    expect(unitRule('AIRLIFT').carrier).toBe(true);
+    expect(unitRule('AIRLIFT').weapon).toBeNull();
   });
 });
 

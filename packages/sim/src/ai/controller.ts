@@ -11,7 +11,7 @@ import {
   type Faction,
   type UnitType,
 } from '../rules.js';
-import type { Building, GameState, Player } from '../state.js';
+import { areEnemies, type Building, type GameState, type Player } from '../state.js';
 import { canPlaceBuilding } from '../systems/placement.js';
 import { placeQueuedBuilding, powerBalance, startProduction } from '../systems/production.js';
 
@@ -49,10 +49,12 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
     attackCooldown: 1800,
     riflemenCap: 4,
     vehicleCap: 4,
-    airCap: 0,
-    navalCap: 0,
+    // Even the easy AI needs a way across the water, or island maps become a
+    // no-op: a small air wing plus one transport keeps it in the fight.
+    airCap: 2,
+    navalCap: 1,
     useHighTech: false,
-    incomeBonus: 0,
+    incomeBonus: 8,
   },
   normal: {
     interval: 15,
@@ -64,7 +66,7 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
     airCap: 3,
     navalCap: 2,
     useHighTech: true,
-    incomeBonus: 0,
+    incomeBonus: 12,
   },
   hard: {
     interval: 10,
@@ -92,23 +94,41 @@ const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   ],
 };
 
-/** High-tech goals the easy AI skips. */
+/**
+ * High-tech goals the easy AI skips. Air (helipad) and the shipyard are
+ * deliberately NOT here: every difficulty must be able to build them, otherwise
+ * the easy AI is helpless on water maps. Only the repair depot and the
+ * superweapons stay reserved for normal/hard.
+ */
 const HIGH_TECH: ReadonlySet<BuildingType> = new Set([
-  'WERKSTATT', 'HELIPAD', 'FLAKTOWER', 'SHIPYARD', 'NUKESILO', 'WEATHER',
+  'WERKSTATT', 'NUKESILO', 'WEATHER',
 ]);
 
 /**
- * The build order for a player: high-tech goals dropped on easy, and a shipyard
- * injected right after the helipad when the map splits the players by water.
+ * The build order for a player: high-tech goals dropped on easy. On island maps
+ * the helipad and shipyard jump to the front (right after the factory) so the
+ * AI gains a way across the water early instead of after a long land build-up —
+ * every difficulty needs that reach, so it isn't gated behind high-tech.
  */
 function goalsFor(state: GameState, player: Player, params: AiParams): BuildingType[] {
+  const faction = player.faction;
+  let order: readonly BuildingType[];
+  if (state.mapType === 'ISLANDS') {
+    const defense: BuildingType = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
+    const superweapon: BuildingType = faction === 'SOVIETS' ? 'NUKESILO' : 'WEATHER';
+    order = [
+      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'HELIPAD', 'SHIPYARD',
+      'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'POWER', superweapon,
+    ];
+  } else {
+    order = BUILD_GOALS[faction];
+  }
   const goals: BuildingType[] = [];
-  for (const type of BUILD_GOALS[player.faction]) {
+  for (const type of order) {
     if (!params.useHighTech && HIGH_TECH.has(type)) continue;
+    if (type === 'HELIPAD' && params.airCap <= 0) continue;
+    if (type === 'SHIPYARD' && params.navalCap <= 0) continue;
     goals.push(type);
-    if (type === 'HELIPAD' && state.mapType === 'ISLANDS' && params.navalCap > 0) {
-      goals.push('SHIPYARD');
-    }
   }
   return goals;
 }
@@ -283,8 +303,8 @@ function manageArmy(state: GameState, player: Player, params: AiParams): void {
     combatIds.length >= params.attackStrength &&
     state.tick - player.aiLastAttackTick >= params.attackCooldown
   ) {
-    const target = state.buildings.find((b) => b.owner !== player.id && b.type === 'CONYARD')
-      ?? state.buildings.find((b) => b.owner !== player.id);
+    const target = state.buildings.find((b) => areEnemies(state, player.id, b.owner) && b.type === 'CONYARD')
+      ?? state.buildings.find((b) => areEnemies(state, player.id, b.owner));
     if (target) {
       player.aiLastAttackTick = state.tick;
       commands.push({
@@ -312,8 +332,8 @@ function manageInvasion(state: GameState, player: Player, params: AiParams): voi
   const transport = state.units.find((u) => u.owner === player.id && u.type === 'TRANSPORT');
   if (!transport) return;
   const enemyHome =
-    state.buildings.find((b) => b.owner !== player.id && b.type === 'CONYARD') ??
-    state.buildings.find((b) => b.owner !== player.id);
+    state.buildings.find((b) => areEnemies(state, player.id, b.owner) && b.type === 'CONYARD') ??
+    state.buildings.find((b) => areEnemies(state, player.id, b.owner));
   if (!enemyHome) return;
 
   const w = state.mapWidth;
@@ -386,8 +406,8 @@ function manageSuperweapon(state: GameState, player: Player, params: AiParams): 
   );
   if (!charged) return;
   const target =
-    state.buildings.find((b) => b.owner !== player.id && b.type === 'CONYARD') ??
-    state.buildings.find((b) => b.owner !== player.id && b.type !== 'WALL');
+    state.buildings.find((b) => areEnemies(state, player.id, b.owner) && b.type === 'CONYARD') ??
+    state.buildings.find((b) => areEnemies(state, player.id, b.owner) && b.type !== 'WALL');
   if (!target) return;
   applyCommands(state, [
     { type: 'FIRE_SUPERWEAPON', playerId: player.id, cx: target.cx + 1, cy: target.cy + 1 },

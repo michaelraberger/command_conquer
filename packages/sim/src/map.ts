@@ -59,17 +59,46 @@ export const MAP_NAMES: Record<MapType, string> = {
 };
 
 /**
+ * Base/island centre per player, keyed by total player count (2–6). Positions
+ * are spread out and, on ISLANDS, chosen so one home island per player fits the
+ * ocean. Player id `i` uses entry `i`.
+ */
+const SPAWN_LAYOUTS: Record<number, ReadonlyArray<readonly [number, number]>> = {
+  2: [[16, 16], [46, 46]],
+  3: [[32, 15], [15, 48], [49, 48]],
+  4: [[16, 16], [48, 16], [16, 48], [48, 48]],
+  5: [[16, 16], [48, 16], [16, 48], [48, 48], [32, 32]],
+  6: [[51, 32], [42, 48], [22, 48], [13, 32], [22, 16], [42, 16]],
+};
+
+/** Spawn centres for a game with `playerCount` players (clamped to 2–6). */
+export function spawnCenters(playerCount: number): ReadonlyArray<readonly [number, number]> {
+  return SPAWN_LAYOUTS[Math.max(2, Math.min(6, playerCount))]!;
+}
+
+/** Home-island radius shrinks as more islands must share the ocean. */
+function islandRadius(playerCount: number): number {
+  return playerCount <= 2 ? 12 : playerCount <= 4 ? 10 : playerCount === 5 ? 9 : 8;
+}
+
+/** True when a home island sits close enough to the centre to skip the islet. */
+function centreTakenBy(spawns: ReadonlyArray<readonly [number, number]>): boolean {
+  return spawns.some(([x, y]) => Math.abs(x - 32) <= 8 && Math.abs(y - 32) <= 8);
+}
+
+/**
  * Deterministic map generation. Uses the sim RNG, so the terrain is part of
- * the seeded game state; (seed, mapType) fully determines the map.
+ * the seeded game state; (seed, mapType, playerCount) fully determines the map.
  */
 export function generateTerrain(
   width: number,
   height: number,
   rng: RngCarrier,
   mapType: MapType = 'BADLANDS',
+  spawns: ReadonlyArray<readonly [number, number]> = SPAWN_LAYOUTS[2]!,
 ): Uint8Array {
   if (mapType === 'RIVER') return generateRiver(width, height, rng);
-  if (mapType === 'ISLANDS') return generateIslands(width, height, rng);
+  if (mapType === 'ISLANDS') return generateIslands(width, height, rng, spawns);
   return generateBadlands(width, height, rng);
 }
 
@@ -153,26 +182,33 @@ function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Arr
 }
 
 /** Player islands in an ocean — ground armies cannot reach each other. */
-function generateIslands(width: number, height: number, rng: RngCarrier): Uint8Array {
+function generateIslands(
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  spawns: ReadonlyArray<readonly [number, number]>,
+): Uint8Array {
   const terrain = new Uint8Array(width * height).fill(TERRAIN_WATER);
+  const r = islandRadius(spawns.length);
+  const centreTaken = centreTakenBy(spawns);
 
-  const island = (bx: number, by: number, r: number): void => {
-    for (let cy = by - r - 1; cy <= by + r + 1; cy++) {
-      for (let cx = bx - r - 1; cx <= bx + r + 1; cx++) {
+  const island = (bx: number, by: number, rad: number): void => {
+    for (let cy = by - rad - 1; cy <= by + rad + 1; cy++) {
+      for (let cx = bx - rad - 1; cx <= bx + rad + 1; cx++) {
         if (cx < 1 || cy < 1 || cx >= width - 1 || cy >= height - 1) continue;
         const dx = cx - bx;
         const dy = cy - by;
         // Jittered edge so coastlines don't look like perfect circles.
-        const edge = r * r + nextInt(rng, 2 * r + 1) - r;
+        const edge = rad * rad + nextInt(rng, 2 * rad + 1) - rad;
         if (dx * dx + dy * dy <= edge) terrain[cy * width + cx] = TERRAIN_DIRT;
       }
     }
   };
 
-  // One home island per spawn, a contested center islet, a few scenic ones.
-  island(16, 16, 12);
-  island(46, 46, 12);
-  island(32, 32, 6);
+  // One home island per spawn, a contested center islet (unless a player sits
+  // there), a few scenic ones.
+  for (const [sx, sy] of spawns) island(sx, sy, r);
+  if (!centreTaken) island(32, 32, 6);
   for (let i = 0; i < 4; i++) {
     island(6 + nextInt(rng, width - 12), 6 + nextInt(rng, height - 12), 2 + nextInt(rng, 2));
   }
@@ -191,7 +227,7 @@ function generateIslands(width: number, height: number, rng: RngCarrier): Uint8A
   }
   scatterTrees(terrain, width, height, rng, 8);
   // Cliff the whole shoreline, then cut a few landable beach bays into it.
-  treatCoasts(terrain, width, height, rng);
+  treatCoasts(terrain, width, height, rng, spawns, r, centreTaken);
   return terrain;
 }
 
@@ -202,7 +238,15 @@ function generateIslands(width: number, height: number, rng: RngCarrier): Uint8A
  * Deterministic (runs in the seeded RNG stream) and only ever turns land into
  * other land — never water — so island separation and water share are kept.
  */
-function treatCoasts(terrain: Uint8Array, width: number, height: number, rng: RngCarrier): void {
+function treatCoasts(
+  terrain: Uint8Array,
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  spawns: ReadonlyArray<readonly [number, number]>,
+  radius: number,
+  centreTaken: boolean,
+): void {
   const isWater = (cx: number, cy: number): boolean =>
     cx >= 0 && cy >= 0 && cx < width && cy < height && terrain[cy * width + cx] === TERRAIN_WATER;
 
@@ -257,9 +301,8 @@ function treatCoasts(terrain: Uint8Array, width: number, height: number, rng: Rn
     }
   };
   // Home islands get three bays each; the contested center islet gets two.
-  beachIsland(16, 16, 12, 3);
-  beachIsland(46, 46, 12, 3);
-  beachIsland(32, 32, 6, 2);
+  for (const [sx, sy] of spawns) beachIsland(sx, sy, radius, 3);
+  if (!centreTaken) beachIsland(32, 32, 6, 2);
 }
 
 /** Tree clusters on walkable land (block movement, read as forest). */
