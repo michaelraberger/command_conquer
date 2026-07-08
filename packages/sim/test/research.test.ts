@@ -74,6 +74,33 @@ describe('tech research', () => {
     expect(state.players[0]!.credits).toBeGreaterThan(mid); // got some back
   });
 
+  it('pauses while the Techzentrum is destroyed and resumes after rebuilding', () => {
+    const state = labGame();
+    tick(state, [{ type: 'RESEARCH_START', playerId: 0, tech: 'armor' }]);
+    for (let i = 0; i < 4; i++) tick(state);
+    const tc = state.buildings.find((b) => b.type === 'TECHCENTER')!;
+    tc.hp = 0;
+    tick(state); // deathSystem removes the lab
+    const frozen = state.players[0]!.research!.progress;
+    for (let i = 0; i < 10; i++) tick(state);
+    expect(state.players[0]!.research!.progress).toBe(frozen); // paused, not lost
+    constructBuilding(state, 'TECHCENTER', 0, 26, 18); // rebuild the lab
+    for (let i = 0; i < 15 && state.players[0]!.research !== null; i++) tick(state);
+    expect(state.players[0]!.researched).toContain('armor'); // resumed + finished
+  });
+
+  it('stalls without credits and pays exactly the configured cost overall', () => {
+    const state = labGame();
+    state.players[0]!.credits = 0;
+    tick(state, [{ type: 'RESEARCH_START', playerId: 0, tech: 'armor' }]);
+    for (let i = 0; i < 20; i++) tick(state);
+    expect(state.players[0]!.research!.progress).toBe(0); // broke → frozen
+    state.players[0]!.credits = 100;
+    for (let i = 0; i < 15 && state.players[0]!.research !== null; i++) tick(state);
+    expect(state.players[0]!.researched).toContain('armor');
+    expect(state.players[0]!.credits).toBe(0); // exactly the configured 100 paid
+  });
+
   it('research state round-trips through serialization', () => {
     const state = labGame();
     tick(state, [{ type: 'RESEARCH_START', playerId: 0, tech: 'armor' }]);

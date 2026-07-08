@@ -51,6 +51,39 @@ describe('MCV (Baufahrzeug)', () => {
     expect(state.winner).toBe(-1); // not defeated — the MCV counts as alive
   });
 
+  it('deploy at the map edge neither crashes nor deploys', () => {
+    const state = arena(4);
+    const mcv = spawnUnit(state, 'MCV', 0, 0, 0); // 3×3 footprint leaves the map
+    tick(state, [{ type: 'DEPLOY', playerId: 0, unitIds: [mcv.id] }]);
+    expect(state.units.some((u) => u.id === mcv.id)).toBe(true);
+    expect(state.buildings.length).toBe(0);
+  });
+
+  it('an MCV riding a transport also keeps the player alive', () => {
+    const state = createGame(11, { ai: true, opponents: 1, mapType: 'ISLANDS' });
+    const [hx, hy] = state.spawns[0]!;
+    const mcv = spawnUnit(state, 'MCV', 0, hx + 3, hy + 3);
+    const transport = spawnUnit(state, 'TRANSPORT', 0, 22, 10);
+    // Put the MCV aboard (the classic ferry-to-a-new-island move).
+    if (state.occupancy[mcv.cell] === mcv.id) state.occupancy[mcv.cell] = 0;
+    transport.passengers.push(mcv);
+    state.units = state.units.filter((u) => u.id !== mcv.id);
+    state.buildings = state.buildings.filter((b) => b.owner !== 0); // base wiped
+    tick(state);
+    expect(state.winner).toBe(-1); // still in the game
+  });
+
+  it('the AI redeploys its reserve MCV after losing the construction yard', () => {
+    const state = createGame(7, { ai: true, opponents: 1 });
+    const mcv = spawnUnit(state, 'MCV', 1, 40, 40);
+    state.buildings = state.buildings.filter((b) => !(b.owner === 1 && b.type === 'CONYARD'));
+    for (let t = 0; t < 60 && !state.buildings.some((b) => b.owner === 1 && b.type === 'CONYARD'); t++) {
+      tick(state);
+    }
+    expect(state.buildings.some((b) => b.owner === 1 && b.type === 'CONYARD')).toBe(true);
+    expect(state.units.some((u) => u.id === mcv.id)).toBe(false); // consumed by redeploy
+  });
+
   it('stays deterministic through a deploy', () => {
     const run = (): string => {
       const state = arena(9);

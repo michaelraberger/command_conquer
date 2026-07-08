@@ -90,11 +90,14 @@ export function cancelResearch(state: GameState, playerId: number): void {
  * Advances the active research: credits drain gradually over the research time
  * (same model as production), stalling when broke; on completion the tech joins
  * the player's researched set (kept sorted for deterministic hashing).
+ * Research PAUSES while no Techzentrum stands (progress and money already spent
+ * are kept) — so raiding the enemy's tech center actually sets them back.
  */
 export function researchSystem(state: GameState): void {
   for (const player of state.players) {
     const r = player.research;
     if (r === null) continue;
+    if (!prereqsMet(state, player.id, techRule(r.tech).requires)) continue; // lab destroyed → paused
     const rule = techRule(r.tech);
     if (r.progress < rule.time) {
       const price = paidUpTo(rule.cost, rule.time, r.progress + 1) - paidUpTo(rule.cost, rule.time, r.progress);
