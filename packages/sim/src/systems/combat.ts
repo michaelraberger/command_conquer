@@ -1,4 +1,4 @@
-import { facingFromDelta } from '../fixed.js';
+import { SUBCELL, facingFromDelta } from '../fixed.js';
 import { findPath } from '../path/astar.js';
 import { unitRule, type UnitRule, type WeaponRule } from '../rules.js';
 import {
@@ -19,6 +19,9 @@ import type { GameState, Unit } from '../state.js';
 
 /** Chasing units recompute their pursuit path every N ticks (staggered by id). */
 const CHASE_REPATH_INTERVAL = 10;
+/** Idle units auto-defend: they step toward an enemy within this radius (cells). */
+const GUARD_RADIUS = 8;
+const GUARD_RANGE_SQ = (GUARD_RADIUS * SUBCELL) ** 2;
 
 /**
  * Targeting, chasing and firing for units. Runs BEFORE movement each tick so
@@ -72,16 +75,25 @@ export function combatSystem(state: GameState): void {
         }
       }
     } else if (!unit.path) {
-      // Guard stance: idle units return fire at enemy units without moving.
-      const target = nearestEnemyUnit(
-        state,
-        unit.owner,
-        unit.x,
-        unit.y,
-        weapon.rangeSq,
-        unitAccept(weapon, rule),
-      );
-      if (target) tryFire(state, unit, { kind: 'unit', unit: target }, weapon);
+      // Guard stance: idle units fire at any enemy in range, and otherwise
+      // step toward a nearby attacker just out of range — so units near a
+      // fight automatically move in to defend instead of standing idle.
+      const accept = unitAccept(weapon, rule);
+      const inRange = nearestEnemyUnit(state, unit.owner, unit.x, unit.y, weapon.rangeSq, accept);
+      if (inRange) {
+        tryFire(state, unit, { kind: 'unit', unit: inRange }, weapon);
+      } else {
+        const near = nearestEnemyUnit(state, unit.owner, unit.x, unit.y, GUARD_RANGE_SQ, accept);
+        if (near) {
+          // Attack-move toward the attacker's cell; self-limiting because the
+          // unit re-evaluates once it arrives (no endless cross-map chase).
+          unit.order = {
+            kind: 'ATTACK_MOVE',
+            cx: near.cell % state.mapWidth,
+            cy: Math.floor(near.cell / state.mapWidth),
+          };
+        }
+      }
     }
   }
 }

@@ -78,6 +78,29 @@ describe('combat', () => {
     expect(tank.cooldown).toBe(0);
   });
 
+  it('idle units auto-defend: step toward a nearby attacker out of range', () => {
+    const state = emptyBattlefield();
+    const tank = spawnUnit(state, 'TANK', 0, 13, 13);
+    const enemy = spawnUnit(state, 'RIFLEMAN', 1, 13, 20); // 7 cells: in guard, out of range
+    const startCell = tank.cell;
+
+    runTicks(state, 120);
+    const enemyGone = !state.units.some((u) => u.id === enemy.id);
+    expect(enemyGone || enemy.hp < unitRule('RIFLEMAN').maxHp).toBe(true); // engaged it
+    expect(state.units.find((u) => u.id === tank.id)!.cell).not.toBe(startCell); // moved to defend
+  });
+
+  it('idle units stay put for enemies beyond the guard radius', () => {
+    const state = emptyBattlefield();
+    const tank = spawnUnit(state, 'TANK', 0, 13, 13);
+    const startCell = tank.cell;
+    spawnUnit(state, 'RIFLEMAN', 1, 13, 30); // 17 cells away — well beyond guard
+
+    runTicks(state, 40);
+    expect(tank.cell).toBe(startCell); // held its post
+    expect(tank.order).toBeNull();
+  });
+
   it('ATTACK_MOVE halts to fight, then resumes and clears the order', () => {
     const state = emptyBattlefield();
     const tank = spawnUnit(state, 'TANK', 0, 13, 14);

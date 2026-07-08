@@ -109,6 +109,9 @@ Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
   → „Ausbauen"-Button **oder U** für Stufe 2/3 (mehr HP, volle Reparatur)
 - Verkaufen: Gebäude anklicken → „Verkaufen" erstattet 50 % der Investition
   (bei Mauern inklusive bezahlter Ausbaustufen)
+- Auto-Verteidigung: Untätige Einheiten greifen einen Gegner in der Nähe
+  (bis ~8 Zellen) selbstständig an und rücken dafür ein Stück vor – so
+  verteidigen sie die Umgebung automatisch, statt danebenzustehen
 - Werkstatt repariert eigene Fahrzeuge in der Nähe gegen Credits
 - Reparaturfahrzeug (Waffenfabrik, beide Fraktionen): mobiles Gegenstück zur
   Werkstatt – auswählen, Rechtsklick auf ein beschädigtes eigenes Gebäude,
