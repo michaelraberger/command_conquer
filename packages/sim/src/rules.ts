@@ -437,6 +437,22 @@ export const UNIT_RULES = {
     infiltrator: true,
     tech: 'spy',
   },
+  MCV: {
+    name: 'Baufahrzeug',
+    maxHp: 800,
+    speed: 16,
+    radius: 130,
+    armor: 'heavy',
+    // Mobile construction vehicle: unarmed, deploys (DEPLOY) into a new
+    // construction yard — your insurance against losing your base.
+    weapon: null,
+    cost: 2500,
+    buildTime: 150,
+    category: 'vehicle',
+    requires: ['FACTORY'],
+    factions: null,
+    sight: 5,
+  },
 } as const satisfies Record<string, UnitRule>;
 
 export type UnitType = keyof typeof UNIT_RULES;

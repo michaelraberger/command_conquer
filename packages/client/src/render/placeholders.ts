@@ -53,6 +53,7 @@ export interface GameTextures {
   repair: UnitSprite[];
   rocketeer: UnitSprite[];
   spion: UnitSprite[];
+  mcv: UnitSprite[];
   scout: UnitSprite[];
   lighttank: UnitSprite[];
   flamer: UnitSprite[];
@@ -680,6 +681,20 @@ function teamDog(g: Graphics): void {
   g.rect(1, -2.4, 3, 4.8).fill(0xffffff); // collar/harness across the neck
 }
 
+// ── MCV: bulky construction rig with a folded frame on the flatbed ──
+function drawMcv(g: Graphics): void {
+  g.rect(-16, -14, 32, 5).fill(TREAD);
+  g.rect(-16, 9, 32, 5).fill(TREAD);
+  g.roundRect(-16, -10, 32, 20, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-16, -10, 32, 4).fill(HULL_HI);
+  g.roundRect(-11, -7, 18, 14, 2).fill(HULL_LO); // flatbed with the folded structure
+  for (const oy of [-5, -1, 3]) g.rect(-9, oy, 15, 2).fill(METAL);
+  g.roundRect(9, -6, 6, 12, 2).fill(GLASS); // cab
+}
+function teamMcv(g: Graphics): void {
+  g.roundRect(-7, -4, 8, 8, 2).fill(0xffffff); // frame panel
+}
+
 // ── Spy: dark trench coat + fedora + briefcase of loot, no weapon ──
 function drawSpion(body: Graphics): void {
   body.circle(0, 0, 5).fill(0x3b414a).stroke({ width: 1, color: 0x22252b }); // trench coat
@@ -951,6 +966,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const repair: UnitSprite[] = [];
   const rocketeer: UnitSprite[] = [];
   const spion: UnitSprite[] = [];
+  const mcv: UnitSprite[] = [];
   const scout: UnitSprite[] = [];
   const lighttank: UnitSprite[] = [];
   const flamer: UnitSprite[] = [];
@@ -984,6 +1000,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
     spion.push(bakeInfantry(renderer, f, drawSpion, teamHelmet));
+    mcv.push(bakeVehicle(renderer, f, 30, drawMcv, teamMcv));
     flamer.push(bakeInfantry(renderer, f, drawFlamer, teamHelmet));
     dog.push(bakeInfantry(renderer, f, drawDog, teamDog));
   }
@@ -1062,6 +1079,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     artillery,
     rifleman,
     spion,
+    mcv,
     harvester,
     repair,
     rocketeer,

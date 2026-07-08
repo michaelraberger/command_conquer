@@ -70,6 +70,9 @@ export class Hotkeys {
       case 'e':
         this.tryUnload();
         break;
+      case 'd':
+        this.tryDeploy();
+        break;
       case 'c':
         // preventDefault so this very keystroke isn't typed into the field.
         e.preventDefault();
@@ -150,6 +153,15 @@ export class Hotkeys {
       });
     if (transports.length === 0) return;
     this.send({ type: 'UNLOAD', playerId: session.localPlayer, unitIds: transports });
+  }
+
+  /** Deploy any selected MCV(s) into a new construction yard (key D). */
+  private tryDeploy(): void {
+    const mcvs = [...this.controls.selected]
+      .sort((a, b) => a - b)
+      .filter((id) => this.state.units.find((x) => x.id === id)?.type === 'MCV');
+    if (mcvs.length === 0) return;
+    this.send({ type: 'DEPLOY', playerId: session.localPlayer, unitIds: mcvs });
   }
 
   private togglePause(): void {

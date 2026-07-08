@@ -441,5 +441,17 @@ export class Sidebar {
       list.textContent = [...counts].map(([t, n]) => `${unitRule(t).name} ×${n}`).join(', ');
       this.binfoEl.append(list);
     }
+
+    // MCV(s) selected → offer to deploy into a construction yard.
+    const mcvIds = units.filter((u) => u.type === 'MCV').map((u) => u.id);
+    if (mcvIds.length > 0) {
+      const btn = document.createElement('button');
+      btn.className = 'bupgrade';
+      btn.textContent = 'Entfalten → Bauhof (D)';
+      btn.addEventListener('click', () =>
+        this.send({ type: 'DEPLOY', playerId: session.localPlayer, unitIds: mcvIds }),
+      );
+      this.binfoEl.append(btn);
+    }
   }
 }

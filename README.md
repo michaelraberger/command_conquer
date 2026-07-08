@@ -153,6 +153,23 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
   verteidigt wird ihre Basis aber von Anfang an. Danach baut sie auf jeder
   Karte eine schlagkräftige Armee inkl. Luftwaffe – auf Inseln zusätzlich
   Marine + Transporter – und greift auch über Wasser an (alle Stufen)
+- **Längere Partien**: Die KI **raidet** statt sofort zu vernichten – sie
+  schickt nur einen Teil ihrer Armee gegen deine **Wirtschaft/Produktion**
+  (Sammler, Raffinerie, Fabrik), hält eine Basisreserve, zieht beschädigte
+  Einheiten zurück und geht erst auf den **letzten Bauhof** los, wenn sie klar
+  überlegen oder das Spiel sehr spät ist. Erz wächst langsam nach (mit dem
+  Lager-Cap bremst das Horten), sodass Kartenkontrolle zählt
+- **Forschung (Techzentrum)**: Fortgeschrittene Einheiten/Gebäude (Mammut,
+  Artillerie, Luftwaffe/Flugplatz, Marine/Werft, Flak, Werkstatt/Reparatur,
+  Tesla, Superwaffen, Spion) sind **erst nach Forschung** baubar. Bau ein
+  **Techzentrum**, wähl dort eine Forschung (immer nur eine gleichzeitig; die
+  Kosten laufen über die Forschungszeit ab). Gesperrte Bau-Kacheln zeigen
+  „erforschen: …". **Forschungszeit steigt mit dem Fortschritt** (~6 Min bis
+  ~15 Min) und ist pro Tech in `balance.json` unter `research` einstellbar
+- **Baufahrzeug (MCV)**: mobiles Baufahrzeug (Waffenfabrik). Auswählen und
+  **Entfalten (Taste D** oder Button im Info-Panel**)** baut daraus einen neuen
+  Bauhof, wenn die 3×3-Fläche frei ist. Solange du ein MCV besitzt, bist du
+  **nicht sofort raus**, wenn deine Basis fällt – du kannst dich zurückkämpfen
 - Erz-Lager ist **begrenzt**: Die Gesamtkapazität ist die Summe der Lager
   der eigenen Gebäude – **Bauhof 2000**, **Raffinerie 2000**, **Erzsilo 1200**
   (alle über `balance.json` einstellbar). Über dem Limit geerntetes Erz

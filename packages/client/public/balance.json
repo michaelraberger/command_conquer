@@ -61,6 +61,13 @@
       "speed": 20,
       "sight": 5
     },
+    "MCV": {
+      "cost": 2500,
+      "buildTime": 150,
+      "maxHp": 800,
+      "speed": 16,
+      "sight": 5
+    },
     "HARVESTER": {
       "cost": 1400,
       "buildTime": 100,

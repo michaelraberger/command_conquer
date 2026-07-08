@@ -155,6 +155,7 @@ export function aiSystem(state: GameState): void {
     player.credits += params.incomeBonus;
     manageConstruction(state, player, params);
     manageResearch(state, player, params);
+    manageMcv(state, player);
     manageTraining(state, player, params);
     manageInvasion(state, player, params);
     manageArmy(state, player, params);
@@ -222,6 +223,28 @@ function manageResearch(state: GameState, player: Player, params: AiParams): voi
     if (tech === 'super' && !params.useHighTech) continue; // easy AI stays low-tech
     startResearch(state, player.id, tech);
     return;
+  }
+}
+
+/**
+ * MCV insurance: keep one Baufahrzeug in reserve once the economy can spare it,
+ * and — crucially — redeploy it into a new base if the construction yard falls,
+ * so the AI isn't instantly knocked out either.
+ */
+function manageMcv(state: GameState, player: Player): void {
+  const hasConyard = state.buildings.some((b) => b.owner === player.id && b.type === 'CONYARD');
+  const mcv = state.units.find((u) => u.owner === player.id && u.type === 'MCV');
+  if (!hasConyard) {
+    if (mcv) applyCommands(state, [{ type: 'DEPLOY', playerId: player.id, unitIds: [mcv.id] }]);
+    return;
+  }
+  if (
+    !mcv &&
+    player.queues.vehicle.item === null &&
+    player.credits > 3500 &&
+    state.buildings.some((b) => b.owner === player.id && b.type === 'FACTORY')
+  ) {
+    startProduction(state, player.id, 'MCV');
   }
 }
 

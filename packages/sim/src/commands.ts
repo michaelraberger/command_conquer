@@ -45,6 +45,7 @@ export type Command =
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'DEPLOY'; playerId: number; unitIds: number[] }
   | { type: 'RESEARCH_START'; playerId: number; tech: string }
   | { type: 'RESEARCH_CANCEL'; playerId: number }
   | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' };
@@ -131,6 +132,31 @@ export function applyCommands(state: GameState, commands: Command[]): void {
       case 'BUILD_START':
         startProduction(state, cmd.playerId, cmd.item);
         break;
+      case 'DEPLOY': {
+        // A Baufahrzeug (MCV) unfolds in place into a fresh construction yard,
+        // so long as its 3×3 footprint (centred on the MCV) is clear.
+        const deployed = new Set<number>();
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unit.type !== 'MCV' || deployed.has(unit.id)) continue;
+          const bx = (unit.cell % state.mapWidth) - 1;
+          const by = Math.floor(unit.cell / state.mapWidth) - 1;
+          let clear = true;
+          for (let y = by; y < by + 3 && clear; y++) {
+            for (let x = bx; x < bx + 3; x++) {
+              if (!inBounds(state, x, y) || !isPassableTerrain(state, x, y)) { clear = false; break; }
+              const idx = cellIndex(state, x, y);
+              const occ = state.occupancy[idx];
+              if (state.structures[idx] !== 0 || (occ !== 0 && occ !== unit.id)) { clear = false; break; }
+            }
+          }
+          if (!clear) continue;
+          if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+          deployed.add(unit.id);
+          constructBuilding(state, 'CONYARD', cmd.playerId, bx, by);
+        }
+        if (deployed.size > 0) state.units = state.units.filter((u) => !deployed.has(u.id));
+        break;
+      }
       case 'RESEARCH_START':
         startResearch(state, cmd.playerId, cmd.tech);
         break;
