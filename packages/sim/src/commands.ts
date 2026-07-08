@@ -12,7 +12,7 @@ import {
   unitRule,
   type ProductionCategory,
 } from './rules.js';
-import { constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
+import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
 import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
 import {
@@ -42,6 +42,7 @@ export type Command =
   | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number }
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
+  | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
@@ -218,6 +219,24 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           unloadTransport(state, unit);
         }
         break;
+      case 'INFILTRATE': {
+        // A spy targets an ENEMY storage building (refinery/silo) to rob it.
+        const target = state.buildings.find((b) => b.id === cmd.targetId);
+        if (
+          !target ||
+          !areEnemies(state, cmd.playerId, target.owner) ||
+          (buildingRule(target.type).storage ?? 0) <= 0
+        ) {
+          break;
+        }
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unitRule(unit.type).infiltrator !== true) continue;
+          unit.order = { kind: 'INFILTRATE', targetId: cmd.targetId };
+          unit.path = null; // the spy system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
       case 'CHEAT': {
         // Cheats are ordinary commands so replays reproduce them faithfully;
         // the client only offers the hotkeys in solo games.

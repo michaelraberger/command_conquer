@@ -37,7 +37,8 @@ export type UnitOrder =
   | { kind: 'RETURN_ORE'; backCx: number; backCy: number }
   | { kind: 'REPAIR_BUILDING'; targetId: number }
   | { kind: 'REPAIR_UNIT'; targetId: number }
-  | { kind: 'BOARD'; targetId: number };
+  | { kind: 'BOARD'; targetId: number }
+  | { kind: 'INFILTRATE'; targetId: number };
 
 export interface Unit {
   id: number;
@@ -290,6 +291,30 @@ export function areEnemies(state: GameState, a: number, b: number): boolean {
 }
 
 const otherFaction = (f: Faction): Faction => (f === 'ALLIES' ? 'SOVIETS' : 'ALLIES');
+
+/** Total ore-storage capacity of a player = sum of their buildings' storage. */
+export function storageCapacity(state: GameState, owner: number): number {
+  let cap = 0;
+  for (const b of state.buildings) {
+    if (b.owner === owner) cap += buildingRule(b.type).storage ?? 0;
+  }
+  return cap;
+}
+
+/**
+ * Credits "held" in one storage building — its share of the owner's stored ore,
+ * i.e. `min(credits, capacity) * thisStorage / capacity`. This is the amount
+ * forfeited when the building is destroyed, or stolen when it is infiltrated.
+ */
+export function storedInBuilding(state: GameState, building: Building): number {
+  const bStorage = buildingRule(building.type).storage ?? 0;
+  if (bStorage <= 0) return 0;
+  const cap = storageCapacity(state, building.owner);
+  const player = state.players[building.owner];
+  if (cap <= 0 || !player) return 0;
+  const effective = Math.min(player.credits, cap);
+  return Math.floor((effective * bStorage) / cap);
+}
 
 export function createGame(seed: number, options: GameOptions = {}): GameState {
   applyBalance(options.balance); // resets to defaults when no config is given

@@ -12,6 +12,7 @@ import { projectileSystem } from './systems/projectiles.js';
 import { repairSystem } from './systems/repair.js';
 import { repairVehicleSystem } from './systems/repairVehicle.js';
 import { resourceGrowthSystem } from './systems/resources.js';
+import { spySystem } from './systems/spy.js';
 import { superweaponSystem } from './systems/superweapon.js';
 import { transportSystem } from './systems/transport.js';
 import { victorySystem } from './systems/victory.js';
@@ -37,6 +38,7 @@ export function tick(state: GameState, commands: Command[] = []): void {
   harvestSystem(state);
   repairVehicleSystem(state);
   transportSystem(state);
+  spySystem(state);
   combatSystem(state);
   defenseSystem(state);
   movementSystem(state);

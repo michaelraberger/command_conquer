@@ -248,6 +248,34 @@ export class Controls {
     }
     const unitIds = [...this.selected].sort((x, y) => x - y);
 
+    // Spy right-clicking an enemy storage building (refinery/silo) → infiltrate
+    // it. Must come before ATTACK, since the weaponless spy can't fire.
+    if (!e.ctrlKey && inBounds(this.state, cx, cy)) {
+      const structId = this.state.structures[cellIndex(this.state, cx, cy)]!;
+      const building = structId !== 0 ? this.state.buildings.find((b) => b.id === structId) : undefined;
+      if (
+        building &&
+        building.owner !== session.localPlayer &&
+        (buildingRule(building.type).storage ?? 0) > 0
+      ) {
+        const unitById = new Map(this.state.units.map((u) => [u.id, u]));
+        const spies = unitIds.filter((id) => unitById.get(id)?.type === 'SPION');
+        if (spies.length > 0) {
+          this.send({
+            type: 'INFILTRATE',
+            playerId: session.localPlayer,
+            unitIds: spies,
+            targetId: building.id,
+          });
+          const rest = unitIds.filter((id) => unitById.get(id)?.type !== 'SPION');
+          if (rest.length > 0) {
+            this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
+          }
+          return;
+        }
+      }
+    }
+
     if (!e.ctrlKey) {
       const targetId = this.enemyAt(e.global);
       if (targetId !== null) {

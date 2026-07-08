@@ -78,6 +78,7 @@ describe('gems', () => {
 
     // …and the refinery pays out the full 500.
     constructBuilding(state, 'REFINERY', 0, 17, 19);
+    state.players[0]!.credits = 0; // room below the storage cap
     const credits = state.players[0]!.credits;
     for (let i = 0; i < 600 && harvester.cargo > 0; i++) tick(state);
     expect(state.players[0]!.credits).toBe(credits + HARVEST_CAPACITY);

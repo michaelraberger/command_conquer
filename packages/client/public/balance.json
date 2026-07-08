@@ -54,6 +54,13 @@
       "rangeCells": 3.5,
       "cooldown": 8
     },
+    "SPION": {
+      "cost": 1000,
+      "buildTime": 60,
+      "maxHp": 100,
+      "speed": 20,
+      "sight": 5
+    },
     "HARVESTER": {
       "cost": 1400,
       "buildTime": 100,
@@ -202,7 +209,8 @@
       "buildTime": 300,
       "maxHp": 1500,
       "power": 0,
-      "sight": 6
+      "sight": 6,
+      "storage": 2000
     },
     "POWER": {
       "cost": 300,
@@ -216,7 +224,16 @@
       "buildTime": 150,
       "maxHp": 1000,
       "power": -50,
-      "sight": 4
+      "sight": 4,
+      "storage": 2000
+    },
+    "SILO": {
+      "cost": 600,
+      "buildTime": 60,
+      "maxHp": 600,
+      "power": 0,
+      "sight": 3,
+      "storage": 1200
     },
     "BARRACKS": {
       "cost": 500,

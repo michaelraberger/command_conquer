@@ -52,6 +52,7 @@ export interface GameTextures {
   harvester: UnitSprite[];
   repair: UnitSprite[];
   rocketeer: UnitSprite[];
+  spion: UnitSprite[];
   scout: UnitSprite[];
   lighttank: UnitSprite[];
   flamer: UnitSprite[];
@@ -219,6 +220,19 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
         .fill(0x857c68);
     },
     team: (g) => teamMark(g, 0.95, 0.95, 18),
+  },
+  SILO: {
+    frameTop: 38,
+    fx: 0xdba832, // ore amber
+    body: (g, w, h) => {
+      concretePlate(g, w, h);
+      const a = iso(0.7, 0.95);
+      const b = iso(1.45, 1.2);
+      cylinder(g, a.x, a.y - 4, 13, 30, 0xc9b06a); // main ore tank
+      cylinder(g, b.x, b.y - 2, 8, 20, 0xb8a05e); // small tank
+      g.ellipse(a.x, a.y - 34, 10, 4.5).fill(0xdba832); // ore heap on top (fx)
+    },
+    team: (g) => teamMark(g, 1, 1, 20),
   },
   BARRACKS: {
     frameTop: 30,
@@ -642,6 +656,13 @@ function teamDog(g: Graphics): void {
   g.rect(1, -2.4, 3, 4.8).fill(0xffffff); // collar/harness across the neck
 }
 
+// ── Spy: dark trench coat + fedora + briefcase of loot, no weapon ──
+function drawSpion(body: Graphics): void {
+  body.circle(0, 0, 5).fill(0x3b414a).stroke({ width: 1, color: 0x22252b }); // trench coat
+  body.circle(0, 0, 4.2).fill(0x2b3038); // fedora crown (dark, no weapon rod)
+  body.roundRect(4, 1.6, 5, 3.4, 1).fill(0xcaa64a).stroke({ width: 1, color: 0x22252b }); // briefcase
+}
+
 // ── Scout: light wheeled recon car (visible wheels), open-top MG ──
 function drawScout(g: Graphics): void {
   for (const ox of [-8, 0, 8]) {
@@ -905,6 +926,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const harvester: UnitSprite[] = [];
   const repair: UnitSprite[] = [];
   const rocketeer: UnitSprite[] = [];
+  const spion: UnitSprite[] = [];
   const scout: UnitSprite[] = [];
   const lighttank: UnitSprite[] = [];
   const flamer: UnitSprite[] = [];
@@ -937,6 +959,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     transport.push(bakeVehicle(renderer, f, 28, drawTransportShip, teamTransportShip));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
+    spion.push(bakeInfantry(renderer, f, drawSpion, teamHelmet));
     flamer.push(bakeInfantry(renderer, f, drawFlamer, teamHelmet));
     dog.push(bakeInfantry(renderer, f, drawDog, teamDog));
   }
@@ -1014,6 +1037,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     mammoth,
     artillery,
     rifleman,
+    spion,
     harvester,
     repair,
     rocketeer,

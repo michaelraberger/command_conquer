@@ -85,12 +85,12 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
 /** Desired base, in build order. Duplicate entries raise the target count. */
 const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   SOVIETS: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'TESLA', 'POWER', 'TESLA', 'WERKSTATT',
-    'HELIPAD', 'FLAKTOWER', 'POWER', 'NUKESILO',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TESLA', 'POWER', 'TESLA', 'WERKSTATT',
+    'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
   ],
   ALLIES: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'PILLBOX', 'POWER', 'PILLBOX', 'WERKSTATT',
-    'HELIPAD', 'FLAKTOWER', 'POWER', 'WEATHER',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'PILLBOX', 'POWER', 'PILLBOX', 'WERKSTATT',
+    'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'WEATHER',
   ],
 };
 
@@ -117,8 +117,8 @@ function goalsFor(state: GameState, player: Player, params: AiParams): BuildingT
     const defense: BuildingType = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
     const superweapon: BuildingType = faction === 'SOVIETS' ? 'NUKESILO' : 'WEATHER';
     order = [
-      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'HELIPAD', 'SHIPYARD',
-      'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'POWER', superweapon,
+      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'HELIPAD', 'SHIPYARD',
+      'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'SILO', 'POWER', superweapon,
     ];
   } else {
     order = BUILD_GOALS[faction];

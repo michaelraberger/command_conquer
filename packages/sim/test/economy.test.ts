@@ -124,6 +124,7 @@ describe('harvesting', () => {
   it('full cycle: dig ore, dock at the refinery, earn credits, repeat', () => {
     const state = createGame(7);
     constructBuilding(state, 'REFINERY', 0, 17, 19);
+    p0(state).credits = 0; // make room below the storage cap so earnings show
     const startCredits = p0(state).credits;
     const oreBefore = state.ore.reduce((a, b) => a + b, 0);
 

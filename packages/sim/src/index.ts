@@ -93,6 +93,8 @@ export {
   serialize,
   deserialize,
   areEnemies,
+  storageCapacity,
+  storedInBuilding,
   PLAYER_SPAWNS,
   FOG_HIDDEN,
   FOG_EXPLORED,

@@ -10,6 +10,7 @@ import {
   buildingRule,
   isBuildingType,
   powerBalance,
+  storageCapacity,
   sellRefund,
   unitRule,
   type BuildingType,
@@ -194,7 +195,8 @@ export class Sidebar {
   /** Called every frame; touches the DOM sparingly. */
   update(): void {
     const player = this.player();
-    const credits = `$ ${player.credits}`;
+    const cap = storageCapacity(this.state, session.localPlayer);
+    const credits = `$ ${player.credits} / ${cap}`;
     if (this.creditsEl.textContent !== credits) this.creditsEl.textContent = credits;
 
     const { produced, used } = powerBalance(this.state, session.localPlayer);

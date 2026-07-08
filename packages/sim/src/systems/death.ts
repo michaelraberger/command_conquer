@@ -1,5 +1,5 @@
 import { buildingRule } from '../rules.js';
-import type { Building, GameState, Unit } from '../state.js';
+import { storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
 
 /**
  * Removes units and buildings at 0 hp, frees their grid reservations and
@@ -26,6 +26,13 @@ export function deathSystem(state: GameState): void {
       if (building.hp > 0) {
         standing.push(building);
         continue;
+      }
+      // A destroyed storage building forfeits the ore held in it (computed
+      // against the still-full building list, before removal).
+      const stored = storedInBuilding(state, building);
+      if (stored > 0) {
+        const player = state.players[building.owner];
+        if (player) player.credits = Math.max(0, player.credits - stored);
       }
       const rule = buildingRule(building.type);
       for (let y = building.cy; y < building.cy + rule.height; y++) {

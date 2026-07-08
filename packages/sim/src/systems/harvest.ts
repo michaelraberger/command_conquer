@@ -1,7 +1,7 @@
 import { RESOURCE_GEMS, cellIndex, inBounds } from '../map.js';
 import { findPath } from '../path/astar.js';
 import { GEM_VALUE, HARVEST_CAPACITY, HARVEST_RATE } from '../rules.js';
-import { dockCell, type Building, type GameState, type Unit } from '../state.js';
+import { dockCell, storageCapacity, type Building, type GameState, type Unit } from '../state.js';
 
 /**
  * Harvester state machine: drive to ore → extract while parked → return to
@@ -91,9 +91,14 @@ function handleReturn(state: GameState, unit: Unit, backCx: number, backCy: numb
   const dockIdx = cellIndex(state, dock.cx, dock.cy);
 
   if (unit.cell === dockIdx && unit.path === null) {
-    // Unload and head back to where we were digging.
+    // Unload into credits, but only up to the owner's storage capacity — ore
+    // beyond the cap is wasted (build silos to store more). Never lowers an
+    // already-over-cap balance (starting funds sit above storage until spent).
     const player = state.players.find((p) => p.id === unit.owner);
-    if (player) player.credits += unit.cargo;
+    if (player) {
+      const room = Math.max(0, storageCapacity(state, unit.owner) - player.credits);
+      player.credits += Math.min(unit.cargo, room);
+    }
     unit.cargo = 0;
     const back =
       state.ore[cellIndex(state, backCx, backCy)]! > 0

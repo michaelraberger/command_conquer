@@ -80,6 +80,9 @@ export interface UnitRule {
   /** Carries ground units as cargo (LOAD/UNLOAD): the sea transport and the
    *  air transport. Up to TRANSPORT_CAPACITY passengers ride inside. */
   carrier?: boolean;
+  /** Spy: walks into an enemy storage building (INFILTRATE) to steal its stored
+   *  ore, then is consumed. Has no weapon. */
+  infiltrator?: boolean;
 }
 
 function weapon(
@@ -396,6 +399,23 @@ export const UNIT_RULES = {
     air: true,
     carrier: true,
   },
+  SPION: {
+    name: 'Spion',
+    maxHp: 100,
+    speed: 20,
+    radius: 60,
+    armor: 'none',
+    // Unarmed infiltrator: sneaks into an enemy refinery/silo, steals the ore
+    // stored there and is spent doing so. Defenceless — needs cover to get in.
+    weapon: null,
+    cost: 1000,
+    buildTime: 60,
+    category: 'infantry',
+    requires: ['BARRACKS'],
+    factions: ['ALLIES'],
+    sight: 5,
+    infiltrator: true,
+  },
 } as const satisfies Record<string, UnitRule>;
 
 export type UnitType = keyof typeof UNIT_RULES;
@@ -426,6 +446,10 @@ export interface BuildingRule {
   buildable: boolean;
   factions: readonly Faction[] | null;
   sight: number;
+  /** Ore storage capacity this building adds to its owner (undefined/0 = none).
+   *  Credits cannot be harvested past the sum of a player's storage; a destroyed
+   *  or infiltrated storage building forfeits the ore held in it. */
+  storage?: number;
   /** Footprint must sit on open water instead of buildable land (shipyard). */
   onWater?: boolean;
 }
@@ -447,6 +471,7 @@ export const BUILDING_RULES = {
     buildable: false,
     factions: null,
     sight: 6,
+    storage: 2000,
   },
   POWER: {
     name: 'Kraftwerk',
@@ -481,6 +506,25 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 4,
+    storage: 2000,
+  },
+  SILO: {
+    name: 'Erzsilo',
+    maxHp: 600,
+    cost: 600,
+    buildTime: 60,
+    power: 0,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: ['REFINERY'],
+    buildable: true,
+    factions: null,
+    sight: 3,
+    storage: 1200,
   },
   BARRACKS: {
     name: 'Kaserne',
@@ -827,6 +871,8 @@ export interface BuildingBalance {
   maxHp?: number;
   power?: number;
   sight?: number;
+  /** Ore storage capacity (refinery/silo/conyard). */
+  storage?: number;
   /** Defense-weapon tuning — ignored for unarmed buildings. */
   damage?: number;
   rangeCells?: number;
@@ -919,6 +965,7 @@ export function applyBalance(config?: BalanceConfig): void {
     rule.maxHp = intOr(o.maxHp, 1) ?? rule.maxHp;
     rule.power = intOr(o.power, -100000) ?? rule.power;
     rule.sight = intOr(o.sight, 0) ?? rule.sight;
+    rule.storage = intOr(o.storage, 0) ?? rule.storage ?? 0;
     applyWeapon(rule.weapon, o);
   }
 }

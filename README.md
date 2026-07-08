@@ -153,6 +153,17 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
   verteidigt wird ihre Basis aber von Anfang an. Danach baut sie auf jeder
   Karte eine schlagkräftige Armee inkl. Luftwaffe – auf Inseln zusätzlich
   Marine + Transporter – und greift auch über Wasser an (alle Stufen)
+- Erz-Lager ist **begrenzt**: Die Gesamtkapazität ist die Summe der Lager
+  der eigenen Gebäude – **Bauhof 2000**, **Raffinerie 2000**, **Erzsilo 1200**
+  (alle über `balance.json` einstellbar). Über dem Limit geerntetes Erz
+  **verpufft** – für mehr Vorrat Silos bauen. Die Credits-Anzeige zeigt
+  `Konto / Kapazität`. Wird ein Lager-Gebäude **zerstört** (oder von einem
+  Spion **infiltriert**), geht der dort gelagerte Anteil verloren
+- **Spion** (Infanterie, nur Alliierte, Kaserne): schleicht sich in eine
+  **gegnerische Raffinerie oder ein Silo** (Rechtsklick darauf), stiehlt das
+  dort gelagerte Erz auf das eigene Konto (bis zur eigenen Kapazität) und wird
+  dabei verbraucht – das Gebäude bleibt stehen. Unbewaffnet, braucht also
+  Deckung, um hineinzukommen
 - Ressourcen wachsen nach: Erz- und Edelsteinfelder bleiben dauerhaft
   „fruchtbar" und regenerieren sehr langsam (ein Schub pro Minute, ~2 h bis
   ein leergebaggertes Feld voll ist; überbaute Zellen wachsen nicht). Beim
