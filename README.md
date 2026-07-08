@@ -75,11 +75,11 @@ jederzeit über „?" → „Kurzeinführung starten" erneut aufrufbar). Alle
 Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
 öffnet es (Esc/Klick daneben schließt).
 
-- Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot**. Einheiten haben
-  einen **neutralen, detaillierten Körper** mit eigener Silhouette; die
-  Fraktion zeigt sich nur als **farbiger Akzent** (Turmluke/Streifen bzw.
-  Helm) – so sind Einheitentypen an der Form und Fraktionen an der Farbe
-  klar unterscheidbar. Gebäude und Minimap weiterhin vollflächig teamgefärbt
+- Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot**. Einheiten **und
+  Gebäude** haben einen **neutralen, detaillierten Körper**; die Fraktion zeigt
+  sich nur als **farbiger Akzent** (Turmluke/Streifen bzw. Helm bei Einheiten,
+  Dach-Diamant bei Gebäuden) – so sind Typen an der Form und Fraktionen an der
+  Farbe klar unterscheidbar. Die Minimap bleibt vollflächig teamgefärbt
 - Linksklick/Ziehen: Auswählen (Einheiten oder eigenes Gebäude); ein
   ausgewähltes Gebäude zeigt seinen eigenen Bauradius (heller roter Kreis)
   UND den gesamten möglichen Baubereich aller eigenen Gebäude (blasser Kreis).

@@ -35,14 +35,17 @@ interface UnitView {
 
 interface BuildingView {
   root: Container;
+  /** Neutral structure. */
   body: Sprite;
+  /** White faction accent, tinted to the owner's colour. */
+  team: Sprite;
   bar: Graphics;
   lastHp: number;
   lastLevel: number;
-  /** Normal faction tint, restored when the building has power. */
-  baseTint: number;
-  /** Currently applied tint — avoids redundant per-frame writes. */
-  lastTint: number;
+  /** The owner's faction colour (applied to the team accent). */
+  teamColor: number;
+  /** Whether the building currently renders as power-starved (avoids redundant writes). */
+  lastStarved: boolean;
 }
 
 interface ProjectileView {
@@ -251,6 +254,8 @@ export class EntityRenderer {
         const def = this.tex.walls[building.level - 1]!;
         view.body.texture = def.texture;
         view.body.anchor.set(def.anchorX, def.anchorY);
+        view.team.texture = def.team;
+        view.team.anchor.set(def.anchorX, def.anchorY);
         view.lastLevel = building.level;
       }
       // Own power-consuming buildings darken while starved of power.
@@ -258,10 +263,10 @@ export class EntityRenderer {
         building.owner === session.localPlayer &&
         localDeficit &&
         buildingRule(building.type).power < 0;
-      const tint = starved ? OFFLINE_TINT : view.baseTint;
-      if (tint !== view.lastTint) {
-        view.body.tint = tint;
-        view.lastTint = tint;
+      if (starved !== view.lastStarved) {
+        view.body.tint = starved ? OFFLINE_TINT : 0xffffff;
+        view.team.tint = starved ? OFFLINE_TINT : view.teamColor;
+        view.lastStarved = starved;
       }
       this.updateBuildingBar(building, view);
     }
@@ -279,10 +284,13 @@ export class EntityRenderer {
         ? this.tex.walls[building.level - 1]!
         : this.tex.buildings[building.type];
     const root = new Container();
+    // Neutral structure stays untinted; the team accent carries the faction.
     const body = new Sprite(def.texture);
     body.anchor.set(def.anchorX, def.anchorY);
-    const baseTint = mixWithWhite(this.playerColors.get(building.owner) ?? 0xffffff, 0.5);
-    body.tint = baseTint;
+    const teamColor = this.playerColors.get(building.owner) ?? 0xffffff;
+    const team = new Sprite(def.team);
+    team.anchor.set(def.anchorX, def.anchorY);
+    team.tint = teamColor;
     const rule = buildingRule(building.type);
     const bar = new Graphics();
     const roof = worldToScreen(
@@ -292,12 +300,12 @@ export class EntityRenderer {
     const corner = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     bar.position.set(roof.x - corner.x, -18);
     bar.visible = false;
-    root.addChild(body, bar);
+    root.addChild(body, team, bar);
     const { x, y } = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     root.position.set(x, y);
     root.zIndex = depthOf((building.cx + rule.width) * SUBCELL, (building.cy + rule.height) * SUBCELL);
     this.layer.addChild(root);
-    return { root, body, bar, lastHp: -1, lastLevel: building.level, baseTint, lastTint: baseTint };
+    return { root, body, team, bar, lastHp: -1, lastLevel: building.level, teamColor, lastStarved: false };
   }
 
   private updateBuildingBar(building: Building, view: BuildingView): void {
@@ -384,13 +392,4 @@ function drawBar(bar: Graphics, width: number, pct: number): void {
   for (let x = 4; x < width; x += 4) {
     bar.rect(-width / 2 + x, 0, 1, BAR_HEIGHT).fill({ color: 0x101010, alpha: 0.4 });
   }
-}
-
-/** Softens a player color so large building faces don't oversaturate. */
-function mixWithWhite(color: number, amount = 0.45): number {
-  const mix = (c: number) => Math.round(c + (255 - c) * amount);
-  const r = mix((color >> 16) & 0xff);
-  const g = mix((color >> 8) & 0xff);
-  const b = mix(color & 0xff);
-  return (r << 16) | (g << 8) | b;
 }

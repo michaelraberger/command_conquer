@@ -15,7 +15,10 @@ import { TILE_H, TILE_W } from './iso.js';
  * later — game code only ever consumes Texture objects from this registry.
  */
 export interface BuildingSprite {
+  /** Neutral, faction-independent structure. */
   texture: Texture;
+  /** White faction accent, tinted to the owner's colour at render time. */
+  team: Texture;
   /** Normalized anchor so the sprite sits on its footprint's top-left corner. */
   anchorX: number;
   anchorY: number;
@@ -161,45 +164,50 @@ function concretePlate(g: Graphics, w: number, h: number): void {
 
 interface BuildingArt {
   frameTop: number;
-  accent: number;
-  draw: (g: Graphics, w: number, h: number, accent: number) => void;
+  /** Fixed detail / effect colour (never faction-tinted). */
+  fx: number;
+  /** Neutral structure + fx details. */
+  body: (g: Graphics, w: number, h: number, fx: number) => void;
+  /** Faction accent, drawn in white and tinted per owner at render time. */
+  team: (g: Graphics, w: number, h: number) => void;
 }
 
-function roofAccent(g: Graphics, w: number, h: number, e: number, accent: number): void {
+/** Faction accent diamond on the roof, at pixel height `e` above roof centre. */
+function teamMark(g: Graphics, w: number, h: number, e: number): void {
   const c = iso(w / 2, h / 2);
-  g.poly([c.x, c.y - e - 5, c.x + 11, c.y - e, c.x, c.y - e + 5, c.x - 11, c.y - e]).fill(accent);
+  g.poly([c.x, c.y - e - 6, c.x + 13, c.y - e, c.x, c.y - e + 6, c.x - 13, c.y - e]).fill(0xffffff);
 }
 
 const BUILDING_ART: Record<BuildingType, BuildingArt> = {
   CONYARD: {
     frameTop: 52,
-    accent: 0xf2f2f2,
-    draw: (g, w, h, accent) => {
+    fx: 0xf2f2f2,
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.25, 0.25, 2.5, 2.5, 24, 0xb5ac99);
       prismAt(g, 1.7, 0.35, 0.85, 0.85, 44, 0xc4bba8); // crane tower
       const tip = iso(2.1, 0.8);
       g.rect(tip.x - 26, tip.y - 50, 28, 4).fill(0xd8b13c); // crane arm
-      roofAccent(g, 1.4, 1.4, 24, accent);
     },
+    team: (g) => teamMark(g, 1.4, 1.4, 24),
   },
   POWER: {
     frameTop: 46,
-    accent: 0xffd94d,
-    draw: (g, w, h, accent) => {
+    fx: 0xffd94d,
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.7, 1.7, 14, 0xb0a794);
       const t1 = iso(0.65, 1.0);
       const t2 = iso(1.45, 1.0);
       cylinder(g, t1.x, t1.y - 8, 9, 26, 0xc9c0ad);
       cylinder(g, t2.x, t2.y - 8, 9, 26, 0xc9c0ad);
-      roofAccent(g, 1, 1.75, 10, accent);
     },
+    team: (g) => teamMark(g, 1, 1.75, 12),
   },
   REFINERY: {
     frameTop: 40,
-    accent: 0xffb02e,
-    draw: (g, w, h, accent) => {
+    fx: 0xffb02e,
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.2, 0.2, 1.5, 1.5, 18, 0xb0a794);
       const silo = iso(2.3, 0.8);
@@ -208,23 +216,23 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       const r0 = iso(1, h);
       g.poly([r0.x - 18, r0.y - 4, r0.x + 18, r0.y - 4, r0.x + 26, r0.y + 10, r0.x - 26, r0.y + 10])
         .fill(0x857c68);
-      roofAccent(g, 0.95, 0.95, 18, accent);
     },
+    team: (g) => teamMark(g, 0.95, 0.95, 18),
   },
   BARRACKS: {
     frameTop: 30,
-    accent: 0x9fd66b,
-    draw: (g, w, h, accent) => {
+    fx: 0x9fd66b,
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.7, 1.1, 13, 0xb0a794);
       prismAt(g, 0.35, 1.25, 1.3, 0.55, 8, 0xa39a87); // annex
-      roofAccent(g, 1, 0.7, 13, accent);
     },
+    team: (g) => teamMark(g, 1, 0.7, 13),
   },
   FACTORY: {
     frameTop: 50,
-    accent: 0xff8c42,
-    draw: (g, w, h, accent) => {
+    fx: 0xff8c42,
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.2, 0.2, 2.6, 2.0, 28, 0xb5ac99);
       // Big vehicle door on the SE face.
@@ -233,13 +241,13 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       prismAt(g, 0.4, 2.25, 2.0, 0.55, 8, 0xa39a87); // apron
       const v1 = iso(0.9, 0.8);
       cylinder(g, v1.x, v1.y - 26, 4, 10, 0x8f8775);
-      roofAccent(g, 1.5, 1.2, 28, accent);
     },
+    team: (g) => teamMark(g, 1.5, 1.2, 28),
   },
   WERKSTATT: {
     frameTop: 42,
-    accent: 0x6db4d6,
-    draw: (g, w, h, accent) => {
+    fx: 0x6db4d6,
+    body: (g, w, h, fx) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.4, 1.7, 10, 0xb0a794);
       // Open repair platform with a gantry crane.
@@ -250,14 +258,15 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.rect(Math.min(a.x, b.x) - 2, Math.min(a.y, b.y) - 36, Math.abs(b.x - a.x) + 4, 5).fill(0xd8b13c);
       // Wrench glyph on the flat roof.
       const c = iso(0.85, 1.0);
-      g.circle(c.x - 5, c.y - 14, 4).stroke({ width: 2.5, color: accent });
-      g.rect(c.x - 3, c.y - 13, 12, 3).fill(accent);
+      g.circle(c.x - 5, c.y - 14, 4).stroke({ width: 2.5, color: fx });
+      g.rect(c.x - 3, c.y - 13, 12, 3).fill(fx);
     },
+    team: (g) => teamMark(g, 0.7, 1.7, 12),
   },
   TESLA: {
     frameTop: 52,
-    accent: 0x7fd4ff,
-    draw: (g, _w, _h, accent) => {
+    fx: 0x7fd4ff,
+    body: (g, _w, _h, fx) => {
       concretePlate(g, 1, 1);
       const c = iso(0.5, 0.5);
       prismAt(g, 0.3, 0.3, 0.4, 0.4, 6, 0x8f8775);
@@ -265,40 +274,42 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.rect(c.x - 6, c.y - 26, 12, 3).fill(0x6f675a);
       g.rect(c.x - 5, c.y - 34, 10, 3).fill(0x6f675a);
       g.circle(c.x, c.y - 44, 7).fill(0x4a5560).stroke({ width: 1, color: 0x2b333c });
-      g.circle(c.x, c.y - 44, 3.5).fill(accent);
-      g.circle(c.x, c.y - 44, 9).stroke({ width: 1, color: accent, alpha: 0.5 });
+      g.circle(c.x, c.y - 44, 3.5).fill(fx);
+      g.circle(c.x, c.y - 44, 9).stroke({ width: 1, color: fx, alpha: 0.5 });
     },
+    team: (g) => teamMark(g, 0.5, 0.5, 7),
   },
   PILLBOX: {
     frameTop: 26,
-    accent: 0xcfd6dc,
-    draw: (g, _w, _h, accent) => {
+    fx: 0xcfd6dc,
+    body: (g, _w, _h) => {
       concretePlate(g, 1, 1);
       const c = iso(0.5, 0.5);
       g.ellipse(c.x, c.y - 6, 19, 12).fill(0xa8a08c).stroke({ width: 1, color: 0x4a443a });
       g.ellipse(c.x, c.y - 10, 13, 8).fill(0xbdb5a4);
       g.rect(c.x - 9, c.y - 9, 18, 3.5).fill(0x3a352c); // firing slit
-      g.circle(c.x, c.y - 15, 2).fill(accent);
     },
+    team: (g) => teamMark(g, 0.5, 0.5, 15),
   },
   HELIPAD: {
     frameTop: 22,
-    accent: 0x6db4d6,
-    draw: (g, w, h, accent) => {
+    fx: 0xcfd6dc,
+    body: (g, w, h, fx) => {
       concretePlate(g, w, h);
       const c = iso(1.5, 1.5);
       // Tarmac landing circle with a yellow rim and an "H" marking.
       g.ellipse(c.x, c.y, 46, 24).fill(0x4a463d).stroke({ width: 2, color: 0xd8b13c });
-      g.rect(c.x - 11, c.y - 8, 3.5, 16).fill(accent);
-      g.rect(c.x + 7.5, c.y - 8, 3.5, 16).fill(accent);
-      g.rect(c.x - 11, c.y - 2, 22, 3.5).fill(accent);
+      g.rect(c.x - 11, c.y - 8, 3.5, 16).fill(fx);
+      g.rect(c.x + 7.5, c.y - 8, 3.5, 16).fill(fx);
+      g.rect(c.x - 11, c.y - 2, 22, 3.5).fill(fx);
       prismAt(g, 0.1, 0.1, 0.7, 0.7, 14, 0xb0a794); // control shack
     },
+    team: (g) => teamMark(g, 0.4, 0.4, 16),
   },
   FLAKTOWER: {
     frameTop: 28,
-    accent: 0xcfd6dc,
-    draw: (g, _w, _h, accent) => {
+    fx: 0xcfd6dc,
+    body: (g, _w, _h, fx) => {
       concretePlate(g, 1, 1);
       const c = iso(0.5, 0.5);
       prismAt(g, 0.28, 0.28, 0.44, 0.44, 8, 0x8f8775); // turret base
@@ -306,42 +317,45 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       for (const ox of [-6, -2, 2, 6]) {
         g.rect(c.x + ox, c.y - 23, 1.8, 12).fill(0x6f6f6f); // AA barrels pointing up
       }
-      g.circle(c.x, c.y - 12, 2).fill(accent);
+      g.circle(c.x, c.y - 12, 2).fill(fx);
     },
+    team: (g) => teamMark(g, 0.5, 0.5, 5),
   },
   NUKESILO: {
     frameTop: 34,
-    accent: 0xff4d4d,
-    draw: (g, w, h, accent) => {
+    fx: 0xff4d4d,
+    body: (g, w, h, fx) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.7, 1.7, 14, 0xa8a08c);
       const c = iso(1, 1);
       // Silo hatch with warning ring and peeking warhead tip.
-      g.ellipse(c.x, c.y - 14, 13, 7).fill(0x3a352c).stroke({ width: 2, color: accent });
+      g.ellipse(c.x, c.y - 14, 13, 7).fill(0x3a352c).stroke({ width: 2, color: fx });
       g.ellipse(c.x, c.y - 15, 6, 3.5).fill(0x55534c);
       g.poly([c.x, c.y - 24, c.x + 4, c.y - 16, c.x - 4, c.y - 16]).fill(0xd6d6d6);
-      g.circle(c.x + 10, c.y - 20, 1.5).fill(accent); // warning light
+      g.circle(c.x + 10, c.y - 20, 1.5).fill(fx); // warning light
     },
+    team: (g) => teamMark(g, 1, 1, 18),
   },
   WEATHER: {
     frameTop: 44,
-    accent: 0x7fd4ff,
-    draw: (g, w, h, accent) => {
+    fx: 0x7fd4ff,
+    body: (g, w, h, fx) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.7, 1.7, 12, 0xa8a08c);
       const c = iso(1, 1);
       // Storm dome with orbiting ring and antenna.
       g.ellipse(c.x, c.y - 18, 14, 11).fill(0x4a6a7d).stroke({ width: 1, color: 0x2b3f4c });
       g.ellipse(c.x - 4, c.y - 22, 5, 3.5).fill({ color: 0xbfeaff, alpha: 0.8 });
-      g.ellipse(c.x, c.y - 16, 18, 5).stroke({ width: 1.5, color: accent, alpha: 0.7 });
+      g.ellipse(c.x, c.y - 16, 18, 5).stroke({ width: 1.5, color: fx, alpha: 0.7 });
       g.rect(c.x + 10, c.y - 38, 2, 18).fill(0x6f675a);
-      g.circle(c.x + 11, c.y - 39, 2.5).fill(accent);
+      g.circle(c.x + 11, c.y - 39, 2.5).fill(fx);
     },
+    team: (g) => teamMark(g, 1, 1, 20),
   },
   SHIPYARD: {
     frameTop: 30,
-    accent: 0x6db4d6,
-    draw: (g, w, h, accent) => {
+    fx: 0x6db4d6,
+    body: (g, w, h) => {
       // Dock platform floating on the water with a slipway and a crane.
       const p00 = iso(0.1, 0.1);
       const pw0 = iso(w - 0.1, 0.1);
@@ -367,18 +381,22 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.rect(cb.x - 2, cb.y - 34, 4, 32).fill(0x6f675a);
       g.rect(cb.x - 26, cb.y - 34, 30, 3).fill(0x6f675a);
       g.moveTo(cb.x - 24, cb.y - 31).lineTo(cb.x - 24, cb.y - 16).stroke({ width: 1, color: 0x4a443a });
-      g.circle(cb.x, cb.y - 36, 2.5).fill(accent);
     },
+    team: (g) => teamMark(g, 0.55, 0.55, 18),
   },
   WALL: {
     // Level 1 sandbags — levels 2/3 get their own bake below.
     frameTop: 18,
-    accent: 0xc9b06a,
-    draw: (g) => {
+    fx: 0xc9b06a,
+    body: (g) => {
       const c = iso(0.5, 0.5);
       for (const [dx, dy] of [[-9, 2], [0, 6], [9, 2], [-4.5, -2], [4.5, -2], [0, -6]] as const) {
         g.ellipse(c.x + dx, c.y - 4 + dy * 0.5, 7, 4).fill(0xc2a368).stroke({ width: 1, color: 0x8a743f });
       }
+    },
+    team: (g) => {
+      const c = iso(0.5, 0.5);
+      g.rect(c.x - 3, c.y - 9, 6, 3).fill(0xffffff); // small faction chip
     },
   },
 };
@@ -386,28 +404,35 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
 function bakeBuilding(renderer: Renderer, type: BuildingType): BuildingSprite {
   const rule = buildingRule(type);
   const art = BUILDING_ART[type];
-  const g = new Graphics();
-  art.draw(g, rule.width, rule.height, art.accent);
-  return bakeFootprint(renderer, g, rule.width, rule.height, art.frameTop);
+  const gb = new Graphics();
+  art.body(gb, rule.width, rule.height, art.fx);
+  const gt = new Graphics();
+  art.team(gt, rule.width, rule.height);
+  return bakeFootprint(renderer, gb, gt, rule.width, rule.height, art.frameTop);
 }
 
 function bakeFootprint(
   renderer: Renderer,
-  g: Graphics,
+  gBody: Graphics,
+  gTeam: Graphics,
   w: number,
   h: number,
   frameTop: number,
 ): BuildingSprite {
   const frame = new Rectangle(-h * 32 - 4, -frameTop, (w + h) * 32 + 8, (w + h) * 16 + frameTop + 6);
-  const texture = renderer.generateTexture({ target: g, frame, resolution: 2 });
-  return { texture, anchorX: (h * 32 + 4) / frame.width, anchorY: frameTop / frame.height };
+  return {
+    texture: renderer.generateTexture({ target: gBody, frame, resolution: 2 }),
+    team: renderer.generateTexture({ target: gTeam, frame, resolution: 2 }),
+    anchorX: (h * 32 + 4) / frame.width,
+    anchorY: frameTop / frame.height,
+  };
 }
 
 function bakeWallLevel(renderer: Renderer, level: number): BuildingSprite {
   const g = new Graphics();
   const c = iso(0.5, 0.5);
   if (level === 1) {
-    BUILDING_ART.WALL.draw(g, 1, 1, BUILDING_ART.WALL.accent);
+    BUILDING_ART.WALL.body(g, 1, 1, BUILDING_ART.WALL.fx);
   } else if (level === 2) {
     prismAt(g, 0.12, 0.12, 0.76, 0.76, 12, 0xaaa398); // concrete block
     g.rect(c.x - 12, c.y - 14, 24, 2).fill({ color: 0x6e675c, alpha: 0.8 });
@@ -416,7 +441,9 @@ function bakeWallLevel(renderer: Renderer, level: number): BuildingSprite {
     for (const dx of [-10, 0, 10]) g.circle(c.x + dx, c.y - 17, 1.5).fill(0xcfd6dc);
     g.rect(c.x - 13, c.y - 12, 26, 2).fill(0x59636d);
   }
-  return bakeFootprint(renderer, g, 1, 1, 22);
+  const team = new Graphics();
+  BUILDING_ART.WALL.team(team, 1, 1);
+  return bakeFootprint(renderer, g, team, 1, 1, 22);
 }
 
 /* -------------------------------- units --------------------------------- */
