@@ -64,10 +64,16 @@ function renderMapPreviews(): void {
  * so the bases hint at what's coming) upscaled to fill the screen. It's blurred
  * and darkened in CSS, so a chunky source is fine.
  */
-function renderStartBackground(mapType: MapType, opponents: number): void {
+function renderStartBackground(mapType: MapType, opponents: number, mapSize: number): void {
   const bg = document.getElementById('start-bg') as HTMLCanvasElement | null;
   if (!bg) return;
-  const state = createGame(PREVIEW_SEED, { mapType, opponents, ai: true });
+  const state = createGame(PREVIEW_SEED, {
+    mapType,
+    opponents,
+    ai: true,
+    mapWidth: mapSize,
+    mapHeight: mapSize,
+  });
   const small = document.createElement('canvas');
   small.width = state.mapWidth;
   small.height = state.mapHeight;
@@ -91,6 +97,8 @@ export interface StartChoice {
   mapType: MapType;
   /** Number of AI opponents (1–5). */
   opponents: number;
+  /** Map side length in cells (48 klein / 64 normal / 96 groß). */
+  mapSize: number;
 }
 
 /** Blocking start screen; resolves once the player starts a skirmish. */
@@ -108,11 +116,15 @@ export function showStartScreen(): Promise<StartChoice> {
     (document.querySelector('input[name="maptype"]:checked') as HTMLInputElement).value as MapType;
   const opponents = (): number =>
     Number((document.querySelector('input[name="opponents"]:checked') as HTMLInputElement).value);
+  const mapSize = (): number =>
+    Number((document.querySelector('input[name="mapsize"]:checked') as HTMLInputElement).value);
 
-  // Blurred full-map backdrop that follows the map/opponent choice.
-  const paintBackdrop = (): void => renderStartBackground(mapType(), opponents());
+  // Blurred full-map backdrop that follows the map/opponent/size choice.
+  const paintBackdrop = (): void => renderStartBackground(mapType(), opponents(), mapSize());
   paintBackdrop();
-  for (const input of document.querySelectorAll('input[name="maptype"], input[name="opponents"]')) {
+  for (const input of document.querySelectorAll(
+    'input[name="maptype"], input[name="opponents"], input[name="mapsize"]',
+  )) {
     input.addEventListener('change', paintBackdrop);
   }
   window.addEventListener('resize', paintBackdrop);
@@ -120,7 +132,13 @@ export function showStartScreen(): Promise<StartChoice> {
   return new Promise((resolve) => {
     document.getElementById('start-ai')!.addEventListener('click', () => {
       root.style.display = 'none';
-      resolve({ faction: faction(), difficulty: difficulty(), mapType: mapType(), opponents: opponents() });
+      resolve({
+        faction: faction(),
+        difficulty: difficulty(),
+        mapType: mapType(),
+        opponents: opponents(),
+        mapSize: mapSize(),
+      });
     });
   });
 }

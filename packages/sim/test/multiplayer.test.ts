@@ -50,6 +50,38 @@ describe('multiple opponents', () => {
     expect(run()).toBe(run());
   }, 20000);
 
+  for (const sz of [48, 96]) {
+    for (const map of MAPS) {
+      it(`scales a ${sz}² ${map} map with bases in bounds`, () => {
+        const state = createGame(2024, {
+          ai: true,
+          opponents: 3,
+          mapType: map,
+          mapWidth: sz,
+          mapHeight: sz,
+        });
+        expect(state.mapWidth).toBe(sz);
+        expect(state.terrain.length).toBe(sz * sz);
+        for (let id = 0; id < 4; id++) expect(conyards(state, id)).toBe(1);
+        // Every spawn centre sits inside the (smaller/larger) map.
+        for (const [x, y] of state.spawns) {
+          expect(x).toBeGreaterThanOrEqual(0);
+          expect(x).toBeLessThan(sz);
+          expect(y).toBeLessThan(sz);
+        }
+      });
+    }
+  }
+
+  it('a big-map game runs deterministically', () => {
+    const run = (): string => {
+      const s = createGame(5, { ai: true, opponents: 2, mapWidth: 96, mapHeight: 96 });
+      for (let t = 0; t < 300 && s.winner === -1; t++) tick(s);
+      return hashState(s);
+    };
+    expect(run()).toBe(run());
+  }, 20000);
+
   it('the AI team wins when the human is wiped out', () => {
     const state = createGame(3, { ai: true, opponents: 2 });
     // Delete all of the human player's buildings — the AI team should win.

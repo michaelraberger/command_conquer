@@ -71,9 +71,19 @@ const SPAWN_LAYOUTS: Record<number, ReadonlyArray<readonly [number, number]>> = 
   6: [[51, 32], [42, 48], [22, 48], [13, 32], [22, 16], [42, 16]],
 };
 
-/** Spawn centres for a game with `playerCount` players (clamped to 2–6). */
-export function spawnCenters(playerCount: number): ReadonlyArray<readonly [number, number]> {
-  return SPAWN_LAYOUTS[Math.max(2, Math.min(6, playerCount))]!;
+/**
+ * Spawn centres for a game with `playerCount` players (clamped to 2–6), scaled
+ * from the 64² reference layout to the actual map size (so map size just spreads
+ * the same arrangement out or in).
+ */
+export function spawnCenters(
+  playerCount: number,
+  width = 64,
+  height = 64,
+): ReadonlyArray<readonly [number, number]> {
+  const base = SPAWN_LAYOUTS[Math.max(2, Math.min(6, playerCount))]!;
+  if (width === 64 && height === 64) return base;
+  return base.map(([x, y]) => [Math.round((x / 64) * width), Math.round((y / 64) * height)] as const);
 }
 
 /** Home-island radius shrinks as more islands must share the ocean. */
@@ -82,8 +92,12 @@ function islandRadius(playerCount: number): number {
 }
 
 /** True when a home island sits close enough to the centre to skip the islet. */
-function centreTakenBy(spawns: ReadonlyArray<readonly [number, number]>): boolean {
-  return spawns.some(([x, y]) => Math.abs(x - 32) <= 8 && Math.abs(y - 32) <= 8);
+function centreTakenBy(
+  spawns: ReadonlyArray<readonly [number, number]>,
+  cx: number,
+  cy: number,
+): boolean {
+  return spawns.some(([x, y]) => Math.abs(x - cx) <= 8 && Math.abs(y - cy) <= 8);
 }
 
 /**
@@ -190,7 +204,9 @@ function generateIslands(
 ): Uint8Array {
   const terrain = new Uint8Array(width * height).fill(TERRAIN_WATER);
   const r = islandRadius(spawns.length);
-  const centreTaken = centreTakenBy(spawns);
+  const midX = Math.round(width / 2);
+  const midY = Math.round(height / 2);
+  const centreTaken = centreTakenBy(spawns, midX, midY);
 
   const island = (bx: number, by: number, rad: number): void => {
     for (let cy = by - rad - 1; cy <= by + rad + 1; cy++) {
@@ -208,7 +224,7 @@ function generateIslands(
   // One home island per spawn, a contested center islet (unless a player sits
   // there), a few scenic ones.
   for (const [sx, sy] of spawns) island(sx, sy, r);
-  if (!centreTaken) island(32, 32, 6);
+  if (!centreTaken) island(midX, midY, 6);
   for (let i = 0; i < 4; i++) {
     island(6 + nextInt(rng, width - 12), 6 + nextInt(rng, height - 12), 2 + nextInt(rng, 2));
   }
@@ -302,7 +318,7 @@ function treatCoasts(
   };
   // Home islands get three bays each; the contested center islet gets two.
   for (const [sx, sy] of spawns) beachIsland(sx, sy, radius, 3);
-  if (!centreTaken) beachIsland(32, 32, 6, 2);
+  if (!centreTaken) beachIsland(Math.round(width / 2), Math.round(height / 2), 6, 2);
 }
 
 /** Tree clusters on walkable land (block movement, read as forest). */

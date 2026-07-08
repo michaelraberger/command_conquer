@@ -299,7 +299,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
   const mapType = options.mapType ?? 'BADLANDS';
 
   const playerCount = Math.max(2, Math.min(6, 1 + (options.opponents ?? 1)));
-  const spawns = spawnCenters(playerCount);
+  const spawns = spawnCenters(playerCount, mapWidth, mapHeight);
   const humanFaction = options.factions?.[0] ?? 'ALLIES';
   // AIs alternate factions for variety; team 1 gangs up on the human (team 0).
   const factionFor = (id: number): Faction =>
@@ -353,9 +353,10 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
   state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType, spawns);
   for (const [sx, sy] of spawns) clearArea(state.terrain, mapWidth, sx, sy, 4);
 
-  if (playerCount === 2) {
+  if (playerCount === 2 && mapWidth === 64 && mapHeight === 64) {
     // Classic hand-tuned 1v1 setup (kept byte-for-byte so existing maps/tests
-    // are unchanged); the N-player generator below only runs for 3+ players.
+    // are unchanged); the N-player generator below runs for 3+ players or any
+    // non-default map size.
     if (mapType === 'ISLANDS') {
       stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
       stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
@@ -384,17 +385,23 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     return state;
   }
 
-  // 3+ players: one ore field beside each base, biased toward the contested
-  // middle, plus a central prize and two gem fields.
-  const toward = (v: number): number => (v === 32 ? 5 : Math.sign(32 - v) * 5);
+  // 3+ players (or any non-default map size): one ore field beside each base,
+  // biased toward the contested middle, plus a central prize and two gem fields.
+  // All anchors scale with the map size (64² reference).
+  const midX = Math.round(mapWidth / 2);
+  const midY = Math.round(mapHeight / 2);
+  const offX = Math.max(3, Math.round((mapWidth * 5) / 64));
+  const offY = Math.max(3, Math.round((mapHeight * 5) / 64));
+  const toward = (v: number, mid: number, off: number): number =>
+    v === mid ? off : Math.sign(mid - v) * off;
   for (const [cx, cy] of spawns) {
-    stampResourcePatch(state, state, cx + toward(cx), cy + toward(cy), 2, RESOURCE_ORE);
+    stampResourcePatch(state, state, cx + toward(cx, midX, offX), cy + toward(cy, midY, offY), 2, RESOURCE_ORE);
   }
-  const centreTaken = spawns.some(([x, y]) => Math.abs(x - 32) <= 8 && Math.abs(y - 32) <= 8);
-  stampResourcePatch(state, state, 32, 32, mapType === 'ISLANDS' ? 2 : 3, RESOURCE_ORE);
+  const centreTaken = spawns.some(([x, y]) => Math.abs(x - midX) <= 8 && Math.abs(y - midY) <= 8);
+  stampResourcePatch(state, state, midX, midY, mapType === 'ISLANDS' ? 2 : 3, RESOURCE_ORE);
   if (!centreTaken || mapType !== 'ISLANDS') {
-    stampResourcePatch(state, state, 29, 35, 1, RESOURCE_GEMS);
-    stampResourcePatch(state, state, 35, 29, 1, RESOURCE_GEMS);
+    stampResourcePatch(state, state, Math.round((mapWidth * 29) / 64), Math.round((mapHeight * 35) / 64), 1, RESOURCE_GEMS);
+    stampResourcePatch(state, state, Math.round((mapWidth * 35) / 64), Math.round((mapHeight * 29) / 64), 1, RESOURCE_GEMS);
   }
 
   // Construction yard, harvester and a small guard force at each base.

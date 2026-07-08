@@ -14,9 +14,11 @@ Tönen). Eigene prozedurale Grafiken (keine Original-Assets).
 Luft- und Marineeinheiten). Die Inselküsten sind von **Klippen** gesäumt; nur an
 wenigen freien **Strandbuchten** kann ein Transportschiff anlanden – Landungen
 gehen also nicht überall, sondern nur an den Buchten. Karten sind deterministisch
-aus Seed + Kartentyp erzeugt. Der Startbildschirm zeigt die gewählte Karte als
+aus Seed + Kartentyp erzeugt. Die **Kartengröße** ist im Startbildschirm wählbar
+(**Klein 48²**, **Normal 64²**, **Groß 96²**); Startpositionen, Ressourcen und
+Inseln skalieren mit. Der Startbildschirm zeigt die gewählte Karte als
 großflächig **geblurrten Hintergrund** (inkl. der farbigen Basen je nach
-Gegnerzahl) – so sieht man vorab, was einen erwartet. **Jede** KI-Stufe baut Luftwaffe (Flugplatz +
+Gegnerzahl und der gewählten Größe) – so sieht man vorab, was einen erwartet. **Jede** KI-Stufe baut Luftwaffe (Flugplatz +
 Helis/Jets) und auf Inselkarten eine Werft mit Kampfschiffen und einem
 Transportschiff – sie landet über die Buchten an und greift so auch über Wasser
 an. Auf Inseln rücken Flugplatz und Werft im Bauplan nach vorne (gleich nach der

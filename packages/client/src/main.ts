@@ -89,6 +89,8 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
     ai: true,
     aiDifficulty: choice.difficulty,
     mapType: choice.mapType,
+    mapWidth: choice.mapSize,
+    mapHeight: choice.mapSize,
     balance: await loadBalance(),
   };
   return { state: createGame(seed, options), driver: new LocalDriver() };
