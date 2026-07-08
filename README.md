@@ -78,6 +78,9 @@ ist die Konsole deaktiviert.
 
 ## Steuerung
 
+Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
+**F1** öffnet es (Esc/Klick daneben schließt).
+
 - Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot** (Einheiten,
   Gebäude und Minimap)
 - Linksklick/Ziehen: Auswählen (Einheiten oder eigenes Gebäude); ein

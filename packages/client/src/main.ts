@@ -29,6 +29,7 @@ import {
   type StartChoice,
 } from './ui/screens.js';
 import { GroupBar } from './ui/groupBar.js';
+import { HelpMenu } from './ui/help.js';
 import { Sidebar } from './ui/sidebar.js';
 
 interface GameSetup {
@@ -208,6 +209,7 @@ async function boot(): Promise<void> {
     groups,
   );
   const alerts = new Alerts();
+  new HelpMenu();
 
   ore.sync(state);
   fog.sync(state, session.localPlayer);

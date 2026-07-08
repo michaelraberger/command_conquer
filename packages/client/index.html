@@ -34,13 +34,97 @@
         border-radius: 4px;
         display: none;
       }
+      /* "?" toggle button (top-left) — below the start screen (z 10). */
+      #help-btn {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(16, 20, 26, 0.9);
+        border: 1px solid #2c3a4a;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #help-btn:hover {
+        border-color: #4da6ff;
+      }
+      /* Shortcut menu: hidden modal, shown when #help gets .open. */
       #help {
-        bottom: 10px;
-        left: 12px;
-        max-width: calc(100% - 220px);
-        background: rgba(10, 14, 18, 0.6);
-        padding: 6px 12px;
-        border-radius: 4px;
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 9, 12, 0.55);
+        z-index: 9;
+      }
+      #help.open {
+        display: flex;
+      }
+      #help .help-card {
+        position: relative;
+        background: rgba(16, 20, 26, 0.97);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 20px 24px;
+        width: 470px;
+        max-width: 90vw;
+        max-height: 82vh;
+        overflow-y: auto;
+        color: #d7e0ea;
+        font-size: 13px;
+      }
+      #help h2 {
+        margin: 0 0 14px;
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+      #help .help-group {
+        margin-bottom: 14px;
+      }
+      #help .help-group h3 {
+        margin: 0 0 6px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #8fa1b3;
+      }
+      #help dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 5px 14px;
+        margin: 0;
+      }
+      #help dt {
+        color: #ffd94d;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        white-space: nowrap;
+      }
+      #help dd {
+        margin: 0;
+      }
+      #help .help-close {
+        margin-top: 8px;
+        width: 100%;
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        padding: 8px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #help .help-close:hover {
+        background: #2d5175;
       }
       #pause {
         position: fixed;
@@ -626,13 +710,47 @@
     </div>
     <div id="attack"><strong>⚠ EINHEITEN WERDEN ANGEGRIFFEN</strong></div>
     <div id="groups"></div>
-    <div id="help" class="overlay">
-      Linksklick/Ziehen: Auswählen · Rechtsklick: Bewegen / Angriff / Ernten /
-      Sammelpunkt · Strg+Rechtsklick: Angriffsbewegung · WASD/Pfeile oder
-      Leertaste+Ziehen: Kamera ·
-      P: Pause · U: Ausbauen · R: Bauradius · H: Basis zentrieren · E: Transporter entladen ·
-      Strg+1–9: Gruppe zuweisen · 1–9: Gruppe abrufen (Chips links anklickbar,
-      Mehrfachauswahl) · Rechtsklick auf Transportschiff: Einheiten verladen · ^/`: Debug
+    <button id="help-btn" title="Tastenkürzel (F1)">?</button>
+    <div id="help">
+      <div class="help-card">
+        <h2>Steuerung</h2>
+        <div class="help-group">
+          <h3>Maus</h3>
+          <dl>
+            <dt>Linksklick / Ziehen</dt><dd>Auswählen</dd>
+            <dt>Rechtsklick</dt><dd>Bewegen / Angriff / Ernten / Sammelpunkt</dd>
+            <dt>Strg + Rechtsklick</dt><dd>Angriffsbewegung</dd>
+            <dt>Rechtsklick auf Transportschiff</dt><dd>Einheiten verladen</dd>
+          </dl>
+        </div>
+        <div class="help-group">
+          <h3>Kamera</h3>
+          <dl>
+            <dt>WASD / Pfeiltasten</dt><dd>Verschieben</dd>
+            <dt>Leertaste + Ziehen</dt><dd>Karte greifen (Hand-Tool)</dd>
+            <dt>Bildschirmrand</dt><dd>Randscrollen</dd>
+            <dt>H</dt><dd>Auf eigene Basis zentrieren</dd>
+          </dl>
+        </div>
+        <div class="help-group">
+          <h3>Einheiten &amp; Bauen</h3>
+          <dl>
+            <dt>U</dt><dd>Ausgewähltes Gebäude ausbauen</dd>
+            <dt>R</dt><dd>Baubereich ein-/ausblenden</dd>
+            <dt>E</dt><dd>Transportschiff entladen</dd>
+            <dt>Strg + 1–9</dt><dd>Kontrollgruppe zuweisen</dd>
+            <dt>1–9</dt><dd>Gruppe abrufen (Chips links, Mehrfachauswahl)</dd>
+          </dl>
+        </div>
+        <div class="help-group">
+          <h3>Spiel</h3>
+          <dl>
+            <dt>P</dt><dd>Pause (nur Einzelspieler / Replay)</dd>
+            <dt>F1</dt><dd>Dieses Menü öffnen / schließen</dd>
+          </dl>
+        </div>
+        <button id="help-close" class="help-close">Schließen (Esc)</button>
+      </div>
     </div>
 
     <div id="start" class="fullscreen" style="display: flex">
