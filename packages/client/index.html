@@ -14,9 +14,17 @@
         width: 100%;
         height: 100%;
         font-family: 'SF Mono', Menlo, Consolas, monospace;
+        /* The game owns all pointer/touch gestures — stop the browser from
+           hijacking them (scroll/zoom/select), which broke clicks + drag-select
+           on touch/trackpad devices in deployed (non-localhost) builds. */
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
+      #app,
       #app canvas {
         display: block;
+        touch-action: none;
       }
       .overlay {
         position: fixed;
