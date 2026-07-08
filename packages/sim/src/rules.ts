@@ -184,8 +184,9 @@ export const UNIT_RULES = {
     speed: 18,
     radius: 60,
     armor: 'none',
-    // Anti-armor: homing rocket, strong vs heavy, weak vs infantry.
-    weapon: weapon(30, 5, 30, 160, { none: 40, light: 90, heavy: 110 }, 'ROCKET'),
+    // Anti-armor homing rocket (strong vs heavy, weak vs infantry) that also
+    // engages aircraft — the mobile jack-of-all-trades anti-air, C&C-style.
+    weapon: weapon(30, 5, 30, 160, { none: 40, light: 90, heavy: 110 }, 'ROCKET', 'both'),
     cost: 400,
     buildTime: 45,
     category: 'infantry',

@@ -94,6 +94,25 @@ describe('air vs ground targeting', () => {
     runTicks(state, 20);
     expect(heli.hp).toBeLessThan(unitRule('HELI').maxHp);
   });
+
+  it('rocket infantry hit both aircraft and the ground (targets: both)', () => {
+    expect(unitRule('ROCKETEER').weapon!.targets).toBe('both');
+
+    // Anti-air: an idle rocketeer auto-fires at a passing enemy helicopter.
+    const air = arena();
+    spawnUnit(air, 'ROCKETEER', 0, 18, 18);
+    const heli = spawnUnit(air, 'HELI', 1, 20, 18); // enemy, within range 5
+    heli.path = null;
+    runTicks(air, 60);
+    expect(heli.hp).toBeLessThan(unitRule('HELI').maxHp);
+
+    // Still anti-ground: it also engages an enemy tank as before.
+    const ground = arena();
+    spawnUnit(ground, 'ROCKETEER', 0, 18, 18);
+    const tank = spawnUnit(ground, 'TANK', 1, 20, 18);
+    runTicks(ground, 60);
+    expect(tank.hp).toBeLessThan(unitRule('TANK').maxHp);
+  });
 });
 
 describe('air production', () => {

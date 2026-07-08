@@ -115,7 +115,8 @@ Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
   es fährt hin und repariert es gegen Credits (Werkstatt = Fahrzeuge,
   Reparaturfahrzeug = Gebäude)
 - Einheiten (eigenständige, selbst entworfene Designs, keine Original-Assets):
-  - Boden: gemeinsam Raketensoldat (Anti-Panzer-Infanterie); Alliierte Späher
+  - Boden: gemeinsam Raketensoldat (Anti-Panzer-Infanterie, trifft auch
+    **Luftziele** – mobile Flugabwehr im C&C-Stil); Alliierte Späher
     (schnelle Aufklärung) + Leichter Panzer; Sowjets Flammenwerfer + Kampfhund
     (nur gegen Infanterie) + Tesla-Panzer. Waffeneffekte Flamme und Rakete.
   - Luft: Flugplatz baut Kampfhubschrauber (beide) und Kampfjet (Sowjets).
