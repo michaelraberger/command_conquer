@@ -3,6 +3,7 @@ import type { Application, Container } from 'pixi.js';
 import { drainCommands } from './commandQueue.js';
 import type { Camera } from './input/camera.js';
 import type { Controls } from './input/controls.js';
+import type { ControlGroups } from './input/groups.js';
 import type { Hotkeys } from './input/hotkeys.js';
 import type { BuildRadiusOverlay } from './render/buildRadius.js';
 import type { Effects } from './render/effects.js';
@@ -12,6 +13,7 @@ import type { OreRenderer } from './render/ore.js';
 import { session } from './session.js';
 import type { Alerts } from './ui/alerts.js';
 import type { DebugOverlay } from './ui/debug.js';
+import type { GroupBar } from './ui/groupBar.js';
 import type { Minimap } from './ui/minimap.js';
 import type { Sidebar } from './ui/sidebar.js';
 
@@ -50,6 +52,8 @@ export interface LoopDeps {
   debug: DebugOverlay;
   hotkeys: Hotkeys;
   alerts: Alerts;
+  groups: ControlGroups;
+  groupBar: GroupBar;
   onGameOver: (winner: number) => void;
 }
 
@@ -110,9 +114,10 @@ export function startLoop(
     const { width, height } = app.screen;
     deps.camera.update(app.ticker.deltaMS, width, height);
     deps.camera.apply(deps.world, width, height);
-    deps.entities.render(state, accumulator / TICK_MS, deps.controls.selected);
+    deps.entities.render(state, accumulator / TICK_MS, deps.controls.selected, deps.groups.tags());
     deps.effects.update(app.ticker.deltaMS);
     deps.buildRadius.update(state, deps.controls.selectedBuilding, deps.hotkeys.showAllRadius);
+    deps.groupBar.sync();
     deps.sidebar.update();
     deps.debug.update(state, app.ticker.FPS, deps.controls.selected.size);
   });

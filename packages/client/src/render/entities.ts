@@ -21,6 +21,8 @@ interface UnitView {
   body: Sprite;
   sel: Sprite;
   bar: Graphics;
+  /** Control-group number badge above the unit (hidden unless in a marked group). */
+  groupLabel: Sprite;
   lastHp: number;
   prevX: number;
   prevY: number;
@@ -47,6 +49,8 @@ interface ProjectileView {
 }
 
 const BAR_HEIGHT = 3;
+/** Shared empty map so render() has a default when no groups are marked. */
+const EMPTY_TAGS: ReadonlyMap<number, number> = new Map();
 /** Dark cold tint for own power-consuming buildings during a power deficit. */
 const OFFLINE_TINT = 0x424a55;
 /** Screen-pixel lift for aircraft (body drawn this far above its ground shadow). */
@@ -92,7 +96,12 @@ export class EntityRenderer {
     }
   }
 
-  render(state: GameState, alpha: number, selected: ReadonlySet<number>): void {
+  render(
+    state: GameState,
+    alpha: number,
+    selected: ReadonlySet<number>,
+    groupTags: ReadonlyMap<number, number> = EMPTY_TAGS,
+  ): void {
     const fog = state.fogs[session.localPlayer]!;
     this.syncBuildings(state, fog);
 
@@ -116,6 +125,15 @@ export class EntityRenderer {
       view.body.texture = this.textureFor(unit);
       view.sel.visible = selected.has(unit.id);
       this.updateUnitBar(unit, view, selected.has(unit.id));
+
+      // Control-group number badge above units of a marked group.
+      const tag = groupTags.get(unit.id) ?? 0;
+      if (tag > 0) {
+        view.groupLabel.texture = this.tex.digits[tag]!;
+        view.groupLabel.visible = true;
+      } else {
+        view.groupLabel.visible = false;
+      }
     }
     for (const [id, view] of this.views) {
       if (!seen.has(id)) {
@@ -315,14 +333,29 @@ export class EntityRenderer {
     const bar = new Graphics();
     bar.position.set(0, (big ? -24 : -17) - lift);
     bar.visible = false;
+    // Control-group number badge, floating just above the health bar.
+    const groupLabel = new Sprite();
+    groupLabel.anchor.set(0.5);
+    groupLabel.position.set(0, (big ? -31 : -24) - lift);
+    groupLabel.visible = false;
     if (air) {
       // Ground shadow directly under the aircraft.
       const shadow = new Graphics().ellipse(0, 0, 11, 6).fill({ color: 0x000000, alpha: 0.28 });
       root.addChild(shadow);
     }
-    root.addChild(sel, body, bar);
+    root.addChild(sel, body, bar, groupLabel);
     this.layer.addChild(root);
-    const view: UnitView = { root, body, sel, bar, lastHp: -1, prevX: unit.x, prevY: unit.y, air };
+    const view: UnitView = {
+      root,
+      body,
+      sel,
+      bar,
+      groupLabel,
+      lastHp: -1,
+      prevX: unit.x,
+      prevY: unit.y,
+      air,
+    };
     this.views.set(unit.id, view);
     return view;
   }

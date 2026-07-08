@@ -3,6 +3,7 @@ import { Application, Container } from 'pixi.js';
 import { sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
 import { Controls } from './input/controls.js';
+import { ControlGroups } from './input/groups.js';
 import { Hotkeys, type CheatCodes, type CheatKind } from './input/hotkeys.js';
 import { startLoop, type TickDriver } from './loop.js';
 import { Connection } from './net/connection.js';
@@ -27,6 +28,7 @@ import {
   showStartScreen,
   type StartChoice,
 } from './ui/screens.js';
+import { GroupBar } from './ui/groupBar.js';
 import { Sidebar } from './ui/sidebar.js';
 
 interface GameSetup {
@@ -189,10 +191,21 @@ async function boot(): Promise<void> {
   const buildRadius = new BuildRadiusOverlay(ghostLayer);
   const placement = new PlacementMode(ghostLayer, state, sendCommand);
   const controls = new Controls(app, world, state, sendCommand, placement);
+  const groups = new ControlGroups(state, controls);
+  controls.onManualSelect = () => groups.clearMarks();
+  const groupBar = new GroupBar(groups);
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
   const minimap = new Minimap(state, camera);
   const debug = new DebugOverlay();
-  const hotkeys = new Hotkeys(state, controls, sendCommand, camera, canPause, await loadCheatCodes());
+  const hotkeys = new Hotkeys(
+    state,
+    controls,
+    sendCommand,
+    camera,
+    canPause,
+    await loadCheatCodes(),
+    groups,
+  );
   const alerts = new Alerts();
 
   ore.sync(state);
@@ -216,6 +229,8 @@ async function boot(): Promise<void> {
       debug,
       hotkeys,
       alerts,
+      groups,
+      groupBar,
       onGameOver: (winner) =>
         showEndScreen(winner === session.localPlayer, recorder ? () => recorder.download() : null),
     },
@@ -234,6 +249,7 @@ async function boot(): Promise<void> {
     recorder,
     hotkeys,
     alerts,
+    groups,
   };
 }
 

@@ -3,6 +3,7 @@ import { worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { Camera } from './camera.js';
 import type { Controls } from './controls.js';
+import type { ControlGroups } from './groups.js';
 
 /**
  * Global keyboard shortcuts. Pause is client-local, so it is only offered
@@ -28,8 +29,6 @@ export class Hotkeys {
   private readonly cheatOverlay = document.getElementById('cheat')!;
   private readonly cheatInput = document.getElementById('cheat-input') as HTMLInputElement;
   private readonly cheatStatus = document.getElementById('cheat-status')!;
-  /** Control groups: digit → unit ids (client-only, never touches the sim). */
-  private readonly groups = new Map<number, number[]>();
   /** Last recalled group + timestamp, for double-tap-to-center. */
   private lastRecall: { group: number; at: number } | null = null;
 
@@ -40,6 +39,7 @@ export class Hotkeys {
     private camera: Camera,
     private canPause: boolean,
     private cheatCodes: CheatCodes,
+    private groups: ControlGroups,
   ) {
     window.addEventListener('keydown', (e) => this.onKey(e));
     this.cheatInput.addEventListener('keydown', (e) => {
@@ -80,7 +80,7 @@ export class Hotkeys {
         if (digit === 0) break;
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault(); // don't trigger browser tab-switching
-          this.assignGroup(digit);
+          this.groups.assign(digit);
         } else {
           this.recallGroup(digit);
         }
@@ -88,26 +88,13 @@ export class Hotkeys {
     }
   }
 
-  /** Stores the current selection under a digit (empty selection clears it). */
-  private assignGroup(digit: number): void {
-    this.groups.set(digit, [...this.controls.selected]);
-  }
-
   /**
-   * Reselects a group's still-living own units. A second recall of the same
-   * group within 400 ms centers the camera on the group's centroid.
+   * Recalls a group's units (via ControlGroups) and, on a second recall of the
+   * same group within 400 ms, centers the camera on its centroid.
    */
   private recallGroup(digit: number): void {
-    const ids = this.groups.get(digit);
-    if (!ids || ids.length === 0) return;
-    const live = this.state.units.filter(
-      (u) => u.owner === session.localPlayer && ids.includes(u.id),
-    );
+    const live = this.groups.recall(digit);
     if (live.length === 0) return;
-
-    this.controls.selected.clear();
-    for (const u of live) this.controls.selected.add(u.id);
-    this.controls.selectedBuilding = null;
 
     const now = performance.now();
     if (this.lastRecall && this.lastRecall.group === digit && now - this.lastRecall.at < 400) {

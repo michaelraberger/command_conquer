@@ -20,6 +20,8 @@ const PICK_RADIUS = 26; // px around a unit that counts as clicking it
 export class Controls {
   readonly selected = new Set<number>();
   selectedBuilding: number | null = null;
+  /** Notified whenever the player selects on the map (clears group-chip marks). */
+  onManualSelect: (() => void) | null = null;
   private dragStart: { x: number; y: number } | null = null;
   private readonly dragRect: Graphics;
   private readonly canvas: HTMLCanvasElement;
@@ -119,6 +121,7 @@ export class Controls {
         bestId = unit.id;
       }
     }
+    this.onManualSelect?.();
     this.selected.clear();
     this.selectedBuilding = null;
     if (bestId !== -1) {
@@ -140,6 +143,7 @@ export class Controls {
     const maxX = Math.max(a.x, b.x);
     const minY = Math.min(a.y, b.y);
     const maxY = Math.max(a.y, b.y);
+    this.onManualSelect?.();
     this.selected.clear();
     this.selectedBuilding = null;
     for (const unit of this.state.units) {

@@ -93,7 +93,11 @@ ist die Konsole deaktiviert.
 - **R**: gesamten Baubereich ein-/ausblenden (ohne Gebäude anklicken zu müssen)
 - **H**: Kamera auf die eigene Basis zentrieren
 - **Strg+1…9**: aktuelle Auswahl als Kontrollgruppe speichern · **1…9**: Gruppe
-  wieder auswählen (Doppeltipp zentriert die Kamera auf die Gruppe)
+  wieder auswählen (Doppeltipp zentriert die Kamera auf die Gruppe). Angelegte
+  Gruppen erscheinen als **schwebende Chips links am Rand** – anklickbar, mit
+  Mehrfachauswahl (mehrere Chips = Vereinigung). Markierte Gruppen zeigen ihre
+  **Nummer über jeder zugehörigen Einheit**; eine Karten-Auswahl hebt die
+  Markierung wieder auf
 - Angriffs-Warnung: Werden eigene Einheiten oder Gebäude beschädigt, erscheint
   ein Banner („Basis/Einheiten werden angegriffen") und ein roter Ping auf der
   Minimap zeigt, wo

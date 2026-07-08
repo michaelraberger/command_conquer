@@ -5,7 +5,7 @@ import {
   buildingRule,
   type BuildingType,
 } from '@cac/sim';
-import { Container, Graphics, Rectangle, Texture, type Renderer } from 'pixi.js';
+import { Container, Graphics, Rectangle, Text, Texture, type Renderer } from 'pixi.js';
 import { TILE_H, TILE_W } from './iso.js';
 
 /**
@@ -53,6 +53,8 @@ export interface GameTextures {
   projectile: Texture;
   selectSmall: Texture;
   selectLarge: Texture;
+  /** Small control-group number badges, indexed by digit (1–9; [0] unused). */
+  digits: Texture[];
   buildings: Record<BuildingType, BuildingSprite>;
   /** Wall sprites per upgrade tier (level 1..3). */
   walls: BuildingSprite[];
@@ -696,6 +698,29 @@ function bakeBrackets(renderer: Renderer, w: number, h: number): Texture {
   });
 }
 
+/** Small rounded badge with a white control-group digit, for the unit overlay. */
+function bakeDigit(renderer: Renderer, digit: number): Texture {
+  const root = new Container();
+  root.addChild(
+    new Graphics()
+      .roundRect(-8, -8, 16, 16, 4)
+      .fill({ color: 0x101418, alpha: 0.85 })
+      .stroke({ width: 1, color: 0x8aff8a, alpha: 0.9 }),
+  );
+  const label = new Text({
+    text: String(digit),
+    style: { fontFamily: 'Menlo, Consolas, monospace', fontSize: 13, fontWeight: '700', fill: 0xffffff },
+  });
+  label.anchor.set(0.5);
+  label.position.set(0, 0);
+  root.addChild(label);
+  return renderer.generateTexture({
+    target: root,
+    frame: new Rectangle(-9, -9, 18, 18),
+    resolution: 2,
+  });
+}
+
 /* ------------------------------- registry ------------------------------- */
 
 export function createTextures(renderer: Renderer): GameTextures {
@@ -835,6 +860,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     }),
     selectSmall: bakeBrackets(renderer, 26, 20),
     selectLarge: bakeBrackets(renderer, 42, 30),
+    digits: [Texture.EMPTY, ...Array.from({ length: 9 }, (_, i) => bakeDigit(renderer, i + 1))],
     buildings,
     walls,
   };
