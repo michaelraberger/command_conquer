@@ -22,6 +22,8 @@ export class Controls {
   selectedBuilding: number | null = null;
   /** Notified whenever the player selects on the map (clears group-chip marks). */
   onManualSelect: (() => void) | null = null;
+  /** True while the camera is in grab-pan mode (space held) — suppresses input. */
+  isPanning: (() => boolean) | null = null;
   private dragStart: { x: number; y: number } | null = null;
   private readonly dragRect: Graphics;
   private readonly canvas: HTMLCanvasElement;
@@ -52,6 +54,7 @@ export class Controls {
   }
 
   private onDown(e: FederatedPointerEvent): void {
+    if (this.isPanning?.()) return; // space held → camera grab-pan owns the drag
     if (this.placement.busy) {
       if (e.button === 0) {
         const { cx, cy } = this.cellAt(e.global);
@@ -69,6 +72,7 @@ export class Controls {
   }
 
   private onMove(e: FederatedPointerEvent): void {
+    if (this.isPanning?.()) return; // don't fight the grab cursor / start a box
     if (this.placement.busy) {
       const { cx, cy } = this.cellAt(e.global);
       this.placement.hover(cx, cy);

@@ -191,6 +191,7 @@ async function boot(): Promise<void> {
   const buildRadius = new BuildRadiusOverlay(ghostLayer);
   const placement = new PlacementMode(ghostLayer, state, sendCommand);
   const controls = new Controls(app, world, state, sendCommand, placement);
+  controls.isPanning = () => camera.spaceHeld;
   const groups = new ControlGroups(state, controls);
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);

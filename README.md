@@ -87,7 +87,8 @@ ist die Konsole deaktiviert.
   nach außen bauen, um zu expandieren
 - Rechtsklick: Bewegen / Angriff / Ernten / Sammelpunkt setzen
 - Strg+Rechtsklick: Angriffsbewegung · Esc: Platzierung abbrechen
-- WASD/Pfeile + Bildschirmrand: Kamera · `^`/Backquote: Debug-Overlay
+- WASD/Pfeile + Bildschirmrand: Kamera · **Leertaste halten + Maus ziehen**:
+  Karte greifen und verschieben (Hand-Tool) · `^`/Backquote: Debug-Overlay
 - **P**: Pause (nur Einzelspieler/Replay; im Multiplayer deaktiviert)
 - **U**: ausgewähltes Gebäude ausbauen (aktuell Mauern → nächste Stufe)
 - **R**: gesamten Baubereich ein-/ausblenden (ohne Gebäude anklicken zu müssen)
