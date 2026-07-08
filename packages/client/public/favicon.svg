@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect x="1" y="1" width="30" height="30" rx="6" fill="#111823"/>
+  <!-- tracks + wheels -->
+  <rect x="3.5" y="20.5" width="25" height="6.5" rx="3.25" fill="#2d3138" stroke="#20242a" stroke-width="1"/>
+  <g fill="#565b62">
+    <circle cx="7.5" cy="23.75" r="1.7"/>
+    <circle cx="12.7" cy="23.75" r="1.7"/>
+    <circle cx="17.9" cy="23.75" r="1.7"/>
+    <circle cx="23.1" cy="23.75" r="1.7"/>
+  </g>
+  <!-- hull -->
+  <path d="M4.5 20.5 L7 14.5 L25 14.5 L27.5 20.5 Z" fill="#9aa0a6" stroke="#24272c" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M7 14.5 L25 14.5 L24 16.6 L8 16.6 Z" fill="#c5cad0"/>
+  <!-- turret + hatch -->
+  <rect x="11.5" y="8" width="9" height="6.5" rx="1.6" fill="#aab0b6" stroke="#24272c" stroke-width="1"/>
+  <circle cx="16" cy="11.25" r="1.7" fill="#4da6ff"/>
+  <!-- gun barrel -->
+  <rect x="20" y="10.3" width="9.5" height="2" rx="1" fill="#7c828a" stroke="#24272c" stroke-width="0.6"/>
+</svg>
