@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TERRAIN_DIRT,
+  TERRAIN_ROCK,
   TERRAIN_WATER,
   TRANSPORT_CAPACITY,
   canPlaceBuilding,
@@ -165,6 +166,24 @@ describe('transport ship', () => {
     expect(out2.hp).toBe(42);
     // They really crossed: east of the channel now.
     expect(cellOf(state, out1).cx).toBeGreaterThan(27);
+  });
+
+  it('cannot unload against a cliff — only clear beaches work', () => {
+    const state = coast();
+    const transport = spawnUnit(state, 'TRANSPORT', 0, 21, 20);
+    const rifle = spawnUnit(state, 'RIFLEMAN', 0, 19, 20);
+    tick(state, [{ type: 'LOAD', playerId: 0, unitIds: [rifle.id], transportId: transport.id }]);
+    for (let i = 0; i < 200 && transport.passengers.length < 1; i++) tick(state);
+    expect(transport.passengers.length).toBe(1);
+
+    // Wall the only reachable shore (west, cols 18–19) with impassable cliffs.
+    for (let y = 17; y <= 23; y++) {
+      for (let x = 18; x <= 19; x++) state.terrain[cellIndex(state, x, y)] = TERRAIN_ROCK;
+    }
+    tick(state, [{ type: 'UNLOAD', playerId: 0, unitIds: [transport.id] }]);
+    // No passable cell in reach → the passenger stays aboard.
+    expect(transport.passengers.length).toBe(1);
+    expect(state.units.some((u) => u.id === rifle.id)).toBe(false);
   });
 
   it('enforces the passenger capacity', () => {

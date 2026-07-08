@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TERRAIN_DIRT,
+  TERRAIN_ROCK,
   TERRAIN_WATER,
   createGame,
   findPath,
@@ -14,6 +16,30 @@ function waterShare(state: GameState): number {
     if (state.terrain[i] === TERRAIN_WATER) water++;
   }
   return water / state.terrain.length;
+}
+
+/** Counts coastal land cells (8-adjacent to water) of a given terrain kind. */
+function coastalCellsOfKind(state: GameState, kind: number): number {
+  const w = state.mapWidth;
+  const h = state.mapHeight;
+  let count = 0;
+  for (let cy = 0; cy < h; cy++) {
+    for (let cx = 0; cx < w; cx++) {
+      if (state.terrain[cy * w + cx] !== kind) continue;
+      let coast = false;
+      for (let dy = -1; dy <= 1 && !coast; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if ((dx !== 0 || dy !== 0) && x >= 0 && y >= 0 && x < w && y < h) {
+            if (state.terrain[y * w + x] === TERRAIN_WATER) coast = true;
+          }
+        }
+      }
+      if (coast) count++;
+    }
+  }
+  return count;
 }
 
 /** Ground path from one spawn area toward the other (best-effort). */
@@ -57,6 +83,16 @@ describe('map types', () => {
     for (const type of ['BADLANDS', 'RIVER', 'ISLANDS'] as const) {
       const state = createGame(7, { mapType: type });
       expect(groundPathReaches(state, 23, 17)).toBe(true);
+    }
+  });
+
+  it('island coasts mix cliffs and beaches (landing only at bays)', () => {
+    for (const seed of [7, 42, 123]) {
+      const state = createGame(seed, { mapType: 'ISLANDS' });
+      // Most of the shoreline is impassable cliff...
+      expect(coastalCellsOfKind(state, TERRAIN_ROCK)).toBeGreaterThan(20);
+      // ...but there are a few clear beach cells to land on.
+      expect(coastalCellsOfKind(state, TERRAIN_DIRT)).toBeGreaterThan(0);
     }
   });
 });

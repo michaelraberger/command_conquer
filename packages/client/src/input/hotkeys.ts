@@ -11,6 +11,7 @@ import type { Controls } from './controls.js';
  *
  * P pause · U upgrade selected building · R toggle full build radius ·
  * H center camera on own base · E unload selected transport ships.
+ * Ctrl+1–9 assign a control group, 1–9 recall it (double-tap centers camera).
  * C opens the (solo-only) cheat console; the codes are secret and named in
  * balance.json, so nothing on screen reveals them.
  */
@@ -27,6 +28,10 @@ export class Hotkeys {
   private readonly cheatOverlay = document.getElementById('cheat')!;
   private readonly cheatInput = document.getElementById('cheat-input') as HTMLInputElement;
   private readonly cheatStatus = document.getElementById('cheat-status')!;
+  /** Control groups: digit → unit ids (client-only, never touches the sim). */
+  private readonly groups = new Map<number, number[]>();
+  /** Last recalled group + timestamp, for double-tap-to-center. */
+  private lastRecall: { group: number; at: number } | null = null;
 
   constructor(
     private state: GameState,
@@ -70,7 +75,49 @@ export class Hotkeys {
         e.preventDefault();
         this.openCheatConsole();
         break;
+      default: {
+        const digit = e.key >= '1' && e.key <= '9' ? Number(e.key) : 0;
+        if (digit === 0) break;
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault(); // don't trigger browser tab-switching
+          this.assignGroup(digit);
+        } else {
+          this.recallGroup(digit);
+        }
+      }
     }
+  }
+
+  /** Stores the current selection under a digit (empty selection clears it). */
+  private assignGroup(digit: number): void {
+    this.groups.set(digit, [...this.controls.selected]);
+  }
+
+  /**
+   * Reselects a group's still-living own units. A second recall of the same
+   * group within 400 ms centers the camera on the group's centroid.
+   */
+  private recallGroup(digit: number): void {
+    const ids = this.groups.get(digit);
+    if (!ids || ids.length === 0) return;
+    const live = this.state.units.filter(
+      (u) => u.owner === session.localPlayer && ids.includes(u.id),
+    );
+    if (live.length === 0) return;
+
+    this.controls.selected.clear();
+    for (const u of live) this.controls.selected.add(u.id);
+    this.controls.selectedBuilding = null;
+
+    const now = performance.now();
+    if (this.lastRecall && this.lastRecall.group === digit && now - this.lastRecall.at < 400) {
+      const cx = live.reduce((s, u) => s + u.x, 0) / live.length;
+      const cy = live.reduce((s, u) => s + u.y, 0) / live.length;
+      const p = worldToScreen(cx, cy);
+      this.camera.x = p.x;
+      this.camera.y = p.y;
+    }
+    this.lastRecall = { group: digit, at: now };
   }
 
   /**

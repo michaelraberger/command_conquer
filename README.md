@@ -8,8 +8,10 @@ und 1-gegen-1-Multiplayer. Eigene prozedurale Grafiken (keine Original-Assets).
 **Karten:** Beim Start wählbar – **Ödland** (klassisch, viel Land),
 **Flusstal** (ein Fluss mit einer einzigen Landbrücke als Engpass) und
 **Inselgruppe** (Heimatinseln im Ozean, ohne Bodenverbindung – hier zählen
-Luft- und Marineeinheiten). Karten sind deterministisch aus Seed +
-Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
+Luft- und Marineeinheiten). Die Inselküsten sind von **Klippen** gesäumt; nur an
+wenigen freien **Strandbuchten** kann ein Transportschiff anlanden – Landungen
+gehen also nicht überall, sondern nur an den Buchten. Karten sind deterministisch
+aus Seed + Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
 speichern sie mit.
 
 **Marine:** Die **Werft** wird auf offenem Wasser im Bauradius der Basis
@@ -87,6 +89,8 @@ ist die Konsole deaktiviert.
 - **U**: ausgewähltes Gebäude ausbauen (aktuell Mauern → nächste Stufe)
 - **R**: gesamten Baubereich ein-/ausblenden (ohne Gebäude anklicken zu müssen)
 - **H**: Kamera auf die eigene Basis zentrieren
+- **Strg+1…9**: aktuelle Auswahl als Kontrollgruppe speichern · **1…9**: Gruppe
+  wieder auswählen (Doppeltipp zentriert die Kamera auf die Gruppe)
 - Angriffs-Warnung: Werden eigene Einheiten oder Gebäude beschädigt, erscheint
   ein Banner („Basis/Einheiten werden angegriffen") und ein roter Ping auf der
   Minimap zeigt, wo

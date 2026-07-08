@@ -190,7 +190,76 @@ function generateIslands(width: number, height: number, rng: RngCarrier): Uint8A
     }
   }
   scatterTrees(terrain, width, height, rng, 8);
+  // Cliff the whole shoreline, then cut a few landable beach bays into it.
+  treatCoasts(terrain, width, height, rng);
   return terrain;
+}
+
+/**
+ * Coastal treatment for island maps: line the entire shoreline with impassable
+ * cliffs (ROCK), then carve a handful of clear beach bays (DIRT) per island.
+ * Ships can therefore only land at the bays, not anywhere along the coast.
+ * Deterministic (runs in the seeded RNG stream) and only ever turns land into
+ * other land — never water — so island separation and water share are kept.
+ */
+function treatCoasts(terrain: Uint8Array, width: number, height: number, rng: RngCarrier): void {
+  const isWater = (cx: number, cy: number): boolean =>
+    cx >= 0 && cy >= 0 && cx < width && cy < height && terrain[cy * width + cx] === TERRAIN_WATER;
+
+  // 1. Every land cell touching water becomes a cliff.
+  for (let cy = 0; cy < height; cy++) {
+    for (let cx = 0; cx < width; cx++) {
+      const idx = cy * width + cx;
+      if (terrain[idx] === TERRAIN_WATER) continue;
+      let coast = false;
+      for (let dy = -1; dy <= 1 && !coast; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if ((dx !== 0 || dy !== 0) && isWater(cx + dx, cy + dy)) {
+            coast = true;
+            break;
+          }
+        }
+      }
+      if (coast) terrain[idx] = TERRAIN_ROCK;
+    }
+  }
+
+  // 2. Carve beach bays: walk out from an island center in a few directions to
+  // the first cliff cell, then clear a small blob of cliff back to open dirt.
+  const DIRS: ReadonlyArray<readonly [number, number]> = [
+    [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1],
+  ];
+  const carveBeach = (bx: number, by: number, dirX: number, dirY: number, reach: number): void => {
+    for (let t = 1; t <= reach; t++) {
+      const ax = bx + dirX * t;
+      const ay = by + dirY * t;
+      if (ax < 0 || ay < 0 || ax >= width || ay >= height) return;
+      const cell = terrain[ay * width + ax]!;
+      if (cell === TERRAIN_WATER) return; // no cliff found before the sea
+      if (cell !== TERRAIN_ROCK) continue;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (dx * dx + dy * dy > 5) continue;
+          const x = ax + dx;
+          const y = ay + dy;
+          if (x < 0 || y < 0 || x >= width || y >= height) continue;
+          if (terrain[y * width + x] === TERRAIN_ROCK) terrain[y * width + x] = TERRAIN_DIRT;
+        }
+      }
+      return;
+    }
+  };
+  const beachIsland = (bx: number, by: number, r: number, count: number): void => {
+    const start = nextInt(rng, 8);
+    for (let k = 0; k < count; k++) {
+      const [dx, dy] = DIRS[(start + k * 3) % 8]!;
+      carveBeach(bx, by, dx, dy, r * 2 + 4);
+    }
+  };
+  // Home islands get three bays each; the contested center islet gets two.
+  beachIsland(16, 16, 12, 3);
+  beachIsland(46, 46, 12, 3);
+  beachIsland(32, 32, 6, 2);
 }
 
 /** Tree clusters on walkable land (block movement, read as forest). */

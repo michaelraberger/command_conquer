@@ -44,7 +44,7 @@
       }
       #pause {
         position: fixed;
-        inset: 0 188px 0 0;
+        inset: 0 210px 0 0;
         display: none;
         flex-direction: column;
         align-items: center;
@@ -58,7 +58,7 @@
       }
       #cheat {
         position: fixed;
-        inset: 0 188px 0 0;
+        inset: 0 210px 0 0;
         display: none;
         align-items: center;
         justify-content: center;
@@ -117,7 +117,7 @@
       #lowpower,
       #attack {
         position: fixed;
-        left: calc((100% - 188px) / 2);
+        left: calc((100% - 210px) / 2);
         transform: translateX(-50%);
         display: none;
         flex-direction: column;
@@ -181,7 +181,7 @@
         top: 0;
         right: 0;
         bottom: 0;
-        width: 188px;
+        width: 210px;
         background: rgba(16, 20, 26, 0.92);
         border-left: 1px solid #2c3a4a;
         color: #d7e0ea;
@@ -246,13 +246,16 @@
         padding: 8px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 7px;
       }
       .item {
         position: relative;
+        /* Keep natural content height — never let the flex column squeeze the
+           tile (that clipped the power line); #items scrolls instead. */
+        flex: 0 0 auto;
         border: 1px solid #2c3a4a;
         border-radius: 4px;
-        padding: 7px 9px;
+        padding: 7px 10px 8px;
         cursor: pointer;
         background: #1a2129;
         overflow: hidden;
@@ -288,14 +291,16 @@
       .item .state {
         position: relative;
         font-size: 10px;
+        line-height: 1.4;
         color: #8fa1b3;
-        margin-top: 2px;
+        margin-top: 3px;
         min-height: 12px;
       }
       .item .power {
         position: relative;
         font-size: 10px;
-        margin-top: 2px;
+        line-height: 1.4;
+        margin-top: 3px;
       }
       #binfo {
         display: none;
@@ -584,6 +589,7 @@
       Linksklick/Ziehen: Auswählen · Rechtsklick: Bewegen / Angriff / Ernten /
       Sammelpunkt · Strg+Rechtsklick: Angriffsbewegung · WASD/Pfeile: Kamera ·
       P: Pause · U: Ausbauen · R: Bauradius · H: Basis zentrieren · E: Transporter entladen ·
+      Strg+1–9: Gruppe zuweisen · 1–9: Gruppe abrufen ·
       Rechtsklick auf Transportschiff: Einheiten verladen · ^/`: Debug
     </div>
 
