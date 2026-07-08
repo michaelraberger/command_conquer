@@ -9,8 +9,8 @@
     "harvestCapacity": 500,
     "harvestRate": 4,
     "gemValue": 2,
-    "regrowthInterval": 1800,
-    "regrowthAmount": 4,
+    "regrowthInterval": 3600,
+    "regrowthAmount": 3,
     "regrowthCap": 500
   },
   "units": {

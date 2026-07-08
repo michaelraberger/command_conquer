@@ -802,12 +802,12 @@ const ECONOMY_DEFAULTS = {
   gemValue: 2,
   /**
    * Resource regrowth: every N ticks fertile cells gain AMOUNT, up to CAP.
-   * Deliberately slow (~1 min per pulse, ~2 h to fully refill a depleted
-   * field) so fields still run dry under active harvesting and only recover
-   * over a long game — never fast enough to be free income.
+   * Deliberately very slow (~2 min per pulse) so ore stays scarce, hoarding is
+   * curbed (together with the storage cap) and matches run long — never fast
+   * enough to be free income. Tunable in balance.json.
    */
-  regrowthInterval: 900,
-  regrowthAmount: 4,
+  regrowthInterval: 1800,
+  regrowthAmount: 3,
   regrowthCap: 500,
 };
 export let STARTING_CREDITS = ECONOMY_DEFAULTS.startCredits;

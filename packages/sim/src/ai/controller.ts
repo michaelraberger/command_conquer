@@ -259,64 +259,129 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
   }
 }
 
+/** Once this long past the first-attack tick, the AI stops holding back and
+ *  goes for the kill regardless (late-game escalation). ~15 min. */
+const LATE_ESCALATION = 15 * 60 * 15;
+/** Every step past the first attack, the committed raid fraction grows +0.1. */
+const RAID_ESCALATION_STEP = 5 * 60 * 15;
+/** Raid targets, most-wanted first — hit the economy/production, not the HQ. */
+const RAID_PRIORITY: readonly BuildingType[] = [
+  'REFINERY', 'SILO', 'FACTORY', 'BARRACKS', 'WERKSTATT', 'HELIPAD', 'SHIPYARD',
+];
+
+/**
+ * Deterministic attack target. In "finisher" mode the AI aims for the enemy HQ
+ * (nearest CONYARD, else anything) to end the game; otherwise it raids the
+ * economy/production by priority — deliberately NOT the last construction yard,
+ * so the match keeps going. Nearest-to-home, ties broken by lowest id.
+ */
+function pickAttackTarget(
+  state: GameState,
+  player: Player,
+  home: Building | undefined,
+  finisher: boolean,
+): Building | null {
+  const hx = home ? home.cx : Math.floor(state.mapWidth / 2);
+  const hy = home ? home.cy : Math.floor(state.mapHeight / 2);
+  const nearest = (pred: (b: Building) => boolean): Building | null => {
+    let best: Building | null = null;
+    let bestD = Infinity;
+    for (const b of state.buildings) {
+      if (b.type === 'WALL' || !areEnemies(state, player.id, b.owner) || !pred(b)) continue;
+      const dx = b.cx - hx;
+      const dy = b.cy - hy;
+      const d = dx * dx + dy * dy;
+      if (d < bestD || (d === bestD && best !== null && b.id < best.id)) {
+        best = b;
+        bestD = d;
+      }
+    }
+    return best;
+  };
+  if (finisher) return nearest((b) => b.type === 'CONYARD') ?? nearest(() => true);
+  for (const t of RAID_PRIORITY) {
+    const b = nearest((x) => x.type === t);
+    if (b) return b;
+  }
+  return nearest((b) => b.type !== 'CONYARD') ?? nearest(() => true);
+}
+
 function manageArmy(state: GameState, player: Player, params: AiParams): void {
   // Offensive units can strike ground/buildings. Anti-air (FLAK) and
   // torpedo-only subs stay out of ground waves — they defend autonomously in
   // guard stance instead.
-  const combatIds = state.units
-    .filter((u) => {
-      if (u.owner !== player.id) return false;
-      const weapon = unitRule(u.type).weapon;
-      return weapon !== null && weapon.targets !== 'air' && unitRule(u.type).navalOnly !== true;
-    })
-    .map((u) => u.id);
-  if (combatIds.length === 0) return;
+  const combat = state.units.filter((u) => {
+    if (u.owner !== player.id) return false;
+    const weapon = unitRule(u.type).weapon;
+    return weapon !== null && weapon.targets !== 'air' && unitRule(u.type).navalOnly !== true;
+  });
+  if (combat.length === 0) return;
 
   const home = state.buildings.find((b) => b.owner === player.id && b.type === 'CONYARD');
   const commands: Command[] = [];
 
-  // Defense: enemies close to the base pull everyone home.
+  // Defense: enemies close to the base pull everyone home (overrides offense).
   if (home) {
     const threat = state.units.some((u) => {
-      if (u.owner === player.id) return false;
+      if (!areEnemies(state, player.id, u.owner)) return false;
       const dx = (u.cell % state.mapWidth) - home.cx;
       const dy = Math.floor(u.cell / state.mapWidth) - home.cy;
       return dx * dx + dy * dy < 12 * 12;
     });
     if (threat) {
-      commands.push({
-        type: 'ATTACK_MOVE',
-        playerId: player.id,
-        unitIds: combatIds,
-        cx: home.cx + 1,
-        cy: home.cy + 1,
-      });
-      applyCommands(state, commands);
+      applyCommands(state, [
+        { type: 'ATTACK_MOVE', playerId: player.id, unitIds: combat.map((u) => u.id), cx: home.cx + 1, cy: home.cy + 1 },
+      ]);
       return;
     }
   }
 
-  // Offense: periodic waves once the army is big enough — but never before
-  // the grace period is over ("KI greift erst nach 10 Minuten an").
-  if (
-    state.tick >= params.firstAttackTick &&
-    combatIds.length >= params.attackStrength &&
-    state.tick - player.aiLastAttackTick >= params.attackCooldown
-  ) {
-    const target = state.buildings.find((b) => areEnemies(state, player.id, b.owner) && b.type === 'CONYARD')
-      ?? state.buildings.find((b) => areEnemies(state, player.id, b.owner));
-    if (target) {
-      player.aiLastAttackTick = state.tick;
-      commands.push({
-        type: 'ATTACK_MOVE',
-        playerId: player.id,
-        unitIds: combatIds,
-        cx: target.cx,
-        cy: target.cy,
-      });
-      applyCommands(state, commands);
+  // Pull badly damaged units back home instead of feeding them to the grinder.
+  const hurt = new Set<number>();
+  if (home) {
+    for (const u of combat) {
+      if (u.hp * 100 < unitRule(u.type).maxHp * 30) hurt.add(u.id);
+    }
+    if (hurt.size > 0) {
+      commands.push({ type: 'MOVE', playerId: player.id, unitIds: [...hurt], cx: home.cx + 1, cy: home.cy + 1 });
     }
   }
+
+  // Offense: periodic waves once the army is big enough and the grace period is
+  // over — but raid the economy with a fraction of the force (keep a reserve),
+  // and only go for the kill when clearly ahead or very late.
+  if (
+    state.tick >= params.firstAttackTick &&
+    combat.length >= params.attackStrength &&
+    state.tick - player.aiLastAttackTick >= params.attackCooldown
+  ) {
+    const enemyBuildings = state.buildings.filter(
+      (b) => b.type !== 'WALL' && areEnemies(state, player.id, b.owner),
+    ).length;
+    const enemyCombat = state.units.filter(
+      (u) => areEnemies(state, player.id, u.owner) && unitRule(u.type).weapon !== null,
+    ).length;
+    const finisher =
+      enemyBuildings <= 2 ||
+      state.tick > params.firstAttackTick + LATE_ESCALATION ||
+      combat.length >= 2 * enemyCombat + 4;
+
+    const target = pickAttackTarget(state, player, home, finisher);
+    if (target) {
+      const frac = finisher
+        ? 1
+        : Math.min(1, 0.5 + Math.floor((state.tick - params.firstAttackTick) / RAID_ESCALATION_STEP) * 0.1);
+      const available = combat.filter((u) => !hurt.has(u.id)).map((u) => u.id);
+      const n = Math.max(params.attackStrength, Math.ceil(combat.length * frac));
+      const attackers = available.slice(0, n);
+      if (attackers.length > 0) {
+        player.aiLastAttackTick = state.tick;
+        commands.push({ type: 'ATTACK_MOVE', playerId: player.id, unitIds: attackers, cx: target.cx, cy: target.cy });
+      }
+    }
+  }
+
+  if (commands.length > 0) applyCommands(state, commands);
 }
 
 /**
