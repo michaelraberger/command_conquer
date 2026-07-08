@@ -262,7 +262,7 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
   WERKSTATT: {
     frameTop: 42,
     fx: 0x6db4d6,
-    body: (g, w, h, fx) => {
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.4, 1.7, 10, 0xb0a794);
       // Open repair platform with a gantry crane.
@@ -271,10 +271,14 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.rect(a.x - 2, a.y - 34, 4, 34).fill(0x8f8775);
       g.rect(b.x - 2, b.y - 34, 4, 34).fill(0x8f8775);
       g.rect(Math.min(a.x, b.x) - 2, Math.min(a.y, b.y) - 36, Math.abs(b.x - a.x) + 4, 5).fill(0xd8b13c);
-      // Wrench glyph on the flat roof.
-      const c = iso(0.85, 1.0);
-      g.circle(c.x - 5, c.y - 14, 4).stroke({ width: 2.5, color: fx });
-      g.rect(c.x - 3, c.y - 13, 12, 3).fill(fx);
+      // Schraubenschlüssel (open-end wrench) laid flat on the roof.
+      const c = iso(0.85, 1.05);
+      const wx = c.x, wy = c.y - 15;
+      const steel = 0xd7dde3;
+      const edge = 0x50565e;
+      g.roundRect(wx - 1.7, wy - 2, 3.4, 15, 1.4).fill(steel).stroke({ width: 1, color: edge }); // handle
+      g.roundRect(wx - 4.6, wy - 8, 9.2, 5.6, 1.6).fill(steel).stroke({ width: 1, color: edge }); // jaw head
+      g.rect(wx - 1.5, wy - 8.8, 3, 3.6).fill(0x2a2f36); // slot (the open jaw)
     },
     team: (g) => teamMark(g, 0.7, 1.7, 12),
   },
@@ -589,9 +593,14 @@ function drawRepair(g: Graphics): void {
   g.circle(-2, 0, 2.6).fill(METAL_DK); // crane pivot
   g.rect(-2, -1, 16, 2.4).fill(METAL); // boom
   g.rect(13, -3, 2.4, 6).fill(METAL_DK); // hook head
+  // Red service cross on the cab roof (fixed colour, never faction-tinted).
+  g.roundRect(-10, -0.6, 5.2, 1.6, 0.5).fill(0xffffff);
+  g.roundRect(-8.2, -2.4, 1.6, 5.2, 0.5).fill(0xffffff);
+  g.roundRect(-9.7, -0.3, 4.6, 1, 0.5).fill(0xe23b32);
+  g.roundRect(-7.9, -2.1, 1, 4.6, 0.5).fill(0xe23b32);
 }
 function teamRepair(g: Graphics): void {
-  g.roundRect(-6, -4, 7, 8, 2).fill(0xffffff); // equipment box
+  g.roundRect(1, -3.5, 4.5, 7, 1.5).fill(0xffffff); // accent panel on the service body
 }
 
 /** Two-layer foot-soldier sprite: neutral olive body + white helmet/gear mask. */

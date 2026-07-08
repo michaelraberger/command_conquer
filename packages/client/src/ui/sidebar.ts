@@ -17,6 +17,7 @@ import {
   type Command,
   type GameState,
   type ProductionCategory,
+  type Unit,
   type UnitType,
 } from '@cac/sim';
 import type { Controls } from '../input/controls.js';
@@ -281,11 +282,7 @@ export class Sidebar {
     const id = this.controls.selectedBuilding;
     const building = id === null ? null : this.state.buildings.find((b) => b.id === id);
     if (!building) {
-      if (this.lastBinfoKey !== '') {
-        this.binfoEl.replaceChildren();
-        this.binfoEl.style.display = 'none';
-        this.lastBinfoKey = '';
-      }
+      this.updateUnitInfo();
       return;
     }
     const key = `${building.id}:${building.hp}:${building.level}:${this.player().credits}`;
@@ -330,5 +327,53 @@ export class Sidebar {
       this.controls.selectedBuilding = null;
     });
     this.binfoEl.append(sell);
+  }
+
+  /** Shows what the current unit selection is: a single unit's name + hp, or a
+   *  by-type breakdown for a group. Shares the #binfo panel with buildings. */
+  private updateUnitInfo(): void {
+    const units = [...this.controls.selected]
+      .map((uid) => this.state.units.find((u) => u.id === uid))
+      .filter((u): u is Unit => u !== undefined);
+    if (units.length === 0) {
+      if (this.lastBinfoKey !== '') {
+        this.binfoEl.replaceChildren();
+        this.binfoEl.style.display = 'none';
+        this.lastBinfoKey = '';
+      }
+      return;
+    }
+    // Tally by type (ascending id order is already deterministic).
+    const counts = new Map<UnitType, number>();
+    for (const u of units) counts.set(u.type, (counts.get(u.type) ?? 0) + 1);
+    const key = `u:${[...counts].map(([t, n]) => `${t}${n}`).join(',')}:${
+      units.length === 1 ? units[0]!.hp : ''
+    }`;
+    if (key === this.lastBinfoKey) return;
+    this.lastBinfoKey = key;
+
+    this.binfoEl.style.display = 'block';
+    this.binfoEl.replaceChildren();
+    const title = document.createElement('div');
+    title.className = 'btitle';
+    if (counts.size === 1) {
+      const [type, n] = [...counts][0]!;
+      title.textContent = n === 1 ? unitRule(type).name : `${unitRule(type).name} ×${n}`;
+    } else {
+      title.textContent = `${units.length} Einheiten`;
+    }
+    this.binfoEl.append(title);
+
+    if (units.length === 1) {
+      const hp = document.createElement('div');
+      hp.className = 'bhp';
+      hp.textContent = `HP ${units[0]!.hp} / ${unitRule(units[0]!.type).maxHp}`;
+      this.binfoEl.append(hp);
+    } else {
+      const list = document.createElement('div');
+      list.className = 'bhint';
+      list.textContent = [...counts].map(([t, n]) => `${unitRule(t).name} ×${n}`).join(', ');
+      this.binfoEl.append(list);
+    }
   }
 }
