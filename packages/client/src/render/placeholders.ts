@@ -21,6 +21,17 @@ export interface BuildingSprite {
   anchorY: number;
 }
 
+/**
+ * A unit's art in two layers per facing: a neutral, faction-independent body
+ * and a white team mask that the renderer tints to the owner's colour. Lets
+ * every unit keep its own detailed grey shape (readable at a glance) while the
+ * faction shows only as a small coloured accent (turret hatch, stripe, …).
+ */
+export interface UnitSprite {
+  body: Texture;
+  team: Texture;
+}
+
 export interface GameTextures {
   dirt: Texture[];
   grass: Texture[];
@@ -31,25 +42,25 @@ export interface GameTextures {
   gems: Texture;
   tree: Texture;
   fogTile: Texture;
-  tank: Texture[];
-  mammoth: Texture[];
-  artillery: Texture[];
-  rifleman: Texture[];
-  harvester: Texture[];
-  repair: Texture[];
-  rocketeer: Texture[];
-  scout: Texture[];
-  lighttank: Texture[];
-  flamer: Texture[];
-  dog: Texture[];
-  teslatank: Texture[];
-  flak: Texture[];
-  heli: Texture[];
-  jet: Texture[];
-  gunboat: Texture[];
-  destroyer: Texture[];
-  sub: Texture[];
-  transport: Texture[];
+  tank: UnitSprite[];
+  mammoth: UnitSprite[];
+  artillery: UnitSprite[];
+  rifleman: UnitSprite[];
+  harvester: UnitSprite[];
+  repair: UnitSprite[];
+  rocketeer: UnitSprite[];
+  scout: UnitSprite[];
+  lighttank: UnitSprite[];
+  flamer: UnitSprite[];
+  dog: UnitSprite[];
+  teslatank: UnitSprite[];
+  flak: UnitSprite[];
+  heli: UnitSprite[];
+  jet: UnitSprite[];
+  gunboat: UnitSprite[];
+  destroyer: UnitSprite[];
+  sub: UnitSprite[];
+  transport: UnitSprite[];
   projectile: Texture;
   selectSmall: Texture;
   selectLarge: Texture;
@@ -415,20 +426,39 @@ function facingAngle(facing: number): number {
   return Math.atan2(vx + vy, 2 * (vx - vy));
 }
 
-function bakeVehicle(
+/* Neutral steel palette — units read by shape/shading; faction shows via the
+   white team layer that the renderer tints. */
+const HULL = 0x9aa0a6;
+const HULL_HI = 0xc5cad0;
+const HULL_LO = 0x686f77;
+const OUTLINE = 0x24272c;
+const TREAD = 0x33363b;
+const METAL = 0x7c828a;
+const METAL_DK = 0x50555b;
+const GLASS = 0x86a7bf;
+/** Infantry olive-drab palette. */
+const UNIFORM = 0x8d8a72;
+const UNIFORM_HI = 0xb1ad91;
+const GEAR = 0x33332c;
+
+/** Bakes one layer (body or team mask) at a facing into a texture. */
+function bakeUnitLayer(
   renderer: Renderer,
-  facing: number,
   size: number,
+  facing: number,
   draw: (g: Graphics) => void,
+  withShadow: boolean,
 ): Texture {
   const root = new Container();
-  root.addChild(
-    new Graphics().ellipse(0, 5, size * 0.62, size * 0.34).fill({ color: 0x000000, alpha: 0.32 }),
-  );
-  const body = new Graphics();
-  draw(body);
-  body.rotation = facingAngle(facing);
-  root.addChild(body);
+  if (withShadow) {
+    root.addChild(
+      new Graphics().ellipse(0, 5, size * 0.62, size * 0.34).fill({ color: 0x000000, alpha: 0.32 }),
+    );
+  }
+  const g = new Graphics();
+  draw(g);
+  g.rotation = facingAngle(facing);
+  root.addChild(g);
   return renderer.generateTexture({
     target: root,
     frame: new Rectangle(-size, -size, size * 2, size * 2),
@@ -436,198 +466,295 @@ function bakeVehicle(
   });
 }
 
+/** Two-layer vehicle sprite: neutral body (with drop shadow) + white team mask. */
+function bakeVehicle(
+  renderer: Renderer,
+  facing: number,
+  size: number,
+  drawBody: (g: Graphics) => void,
+  drawTeam: (g: Graphics) => void,
+): UnitSprite {
+  return {
+    body: bakeUnitLayer(renderer, size, facing, drawBody, true),
+    team: bakeUnitLayer(renderer, size, facing, drawTeam, false),
+  };
+}
+
+// ── Medium tank: tracked hull, round turret, single cannon ──
 function drawTank(g: Graphics): void {
-  g.rect(-16, -13, 32, 6).fill(0x62615e);
-  g.rect(-16, 7, 32, 6).fill(0x62615e);
-  g.poly([-15, -9, 10, -9, 16, 0, 10, 9, -15, 9]).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c });
-  g.circle(0, 0, 7).fill(0xe2e2e2).stroke({ width: 1, color: 0x4a4a4a });
-  g.rect(6, -2, 18, 4).fill(0x8f8f8f);
-  g.rect(21, -2.5, 3, 5).fill(0x6f6f6f); // muzzle
+  g.rect(-15, -13, 30, 5).fill(TREAD);
+  g.rect(-15, 8, 30, 5).fill(TREAD);
+  g.roundRect(-15, -9, 30, 18, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-15, -9, 30, 4).fill(HULL_HI);
+  g.circle(-1, 0, 8).fill(HULL_HI).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(6, -2.2, 19, 4.4).fill(METAL);
+  g.rect(23, -2.6, 4, 5.2).fill(METAL_DK); // muzzle
+}
+function teamTank(g: Graphics): void {
+  g.circle(-1, 0, 3.2).fill(0xffffff); // turret hatch
 }
 
+// ── Mammoth: huge, wide, twin barrels, boxy turret ──
 function drawMammoth(g: Graphics): void {
-  g.rect(-21, -17, 42, 8).fill(0x57565a);
-  g.rect(-21, 9, 42, 8).fill(0x57565a);
-  g.roundRect(-20, -12, 40, 24, 4).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c });
-  g.roundRect(-8, -8, 18, 16, 3).fill(0xd6d6d6).stroke({ width: 1, color: 0x4a4a4a });
-  g.rect(8, -7, 20, 4.5).fill(0x8f8f8f); // twin barrels
-  g.rect(8, 2.5, 20, 4.5).fill(0x8f8f8f);
-  g.rect(25, -7.5, 4, 5.5).fill(0x6f6f6f);
-  g.rect(25, 2, 4, 5.5).fill(0x6f6f6f);
+  g.rect(-20, -17, 40, 6).fill(TREAD);
+  g.rect(-20, 11, 40, 6).fill(TREAD);
+  g.roundRect(-20, -13, 40, 26, 4).fill(HULL).stroke({ width: 1.4, color: OUTLINE });
+  g.rect(-20, -13, 40, 5).fill(HULL_HI);
+  g.roundRect(-9, -9, 20, 18, 3).fill(HULL_HI).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(8, -7, 22, 4.5).fill(METAL);
+  g.rect(8, 2.5, 22, 4.5).fill(METAL);
+  g.rect(28, -7.6, 4, 5).fill(METAL_DK);
+  g.rect(28, 2.2, 4, 5).fill(METAL_DK);
+}
+function teamMammoth(g: Graphics): void {
+  g.roundRect(-6, -4, 11, 8, 2).fill(0xffffff); // turret roof
 }
 
+// ── Artillery: open darker chassis, gun shield, very long thin barrel ──
 function drawArtillery(g: Graphics): void {
-  g.rect(-14, -11, 28, 5).fill(0x62615e);
-  g.rect(-14, 6, 28, 5).fill(0x62615e);
-  g.roundRect(-13, -8, 24, 16, 3).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c });
-  g.poly([-2, -7, 6, -7, 6, 7, -2, 7]).fill(0xa8a8a8); // gun shield
-  g.rect(4, -2, 26, 4).fill(0x8f8f8f); // long barrel
-  g.rect(27, -3, 4, 6).fill(0x6f6f6f);
+  g.rect(-14, -11, 26, 5).fill(TREAD);
+  g.rect(-14, 6, 26, 5).fill(TREAD);
+  g.roundRect(-14, -8, 22, 16, 2).fill(HULL_LO).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-14, -8, 22, 3).fill(HULL);
+  g.poly([-2, -8, 6, -8, 6, 8, -2, 8]).fill(HULL).stroke({ width: 1, color: OUTLINE }); // shield
+  g.rect(2, -1.6, 30, 3.2).fill(METAL); // long barrel
+  g.rect(30, -2.2, 4, 4.4).fill(METAL_DK);
+}
+function teamArtillery(g: Graphics): void {
+  g.rect(-12, -3, 6, 6).fill(0xffffff); // rear crew box
 }
 
+// ── Harvester: bulky, ore bin, front scoop with teeth ──
 function drawHarvester(g: Graphics): void {
-  g.rect(-18, -14, 36, 6).fill(0x62615e);
-  g.rect(-18, 8, 36, 6).fill(0x62615e);
-  g.roundRect(-17, -10, 34, 20, 3).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c });
-  g.roundRect(-15, -8, 18, 16, 2).fill(0x8f8f8f);
-  g.circle(10, 0, 6).fill(0xdedede).stroke({ width: 1, color: 0x4a4a4a });
+  g.rect(-17, -14, 34, 6).fill(TREAD);
+  g.rect(-17, 8, 34, 6).fill(TREAD);
+  g.roundRect(-17, -10, 30, 20, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-17, -10, 30, 5).fill(HULL_HI);
+  g.roundRect(-14, -7, 12, 14, 2).fill(HULL_LO); // ore bin
+  g.poly([13, -8, 22, -4, 22, 4, 13, 8]).fill(METAL).stroke({ width: 1, color: OUTLINE }); // scoop
+  for (const oy of [-5, -1, 3]) g.rect(19, oy, 4, 1.6).fill(METAL_DK); // teeth
+}
+function teamHarvester(g: Graphics): void {
+  g.rect(-12, -4, 8, 8).fill(0xffffff); // bin lid
 }
 
+// ── Repair vehicle: service body + forward crane boom & hook ──
 function drawRepair(g: Graphics): void {
-  g.rect(-15, -12, 30, 5).fill(0x62615e);
-  g.rect(-15, 7, 30, 5).fill(0x62615e);
-  g.roundRect(-14, -9, 28, 18, 3).fill(0xe0c14a).stroke({ width: 1, color: 0x3c3c3c }); // yellow service body
-  g.roundRect(-12, -7, 12, 14, 2).fill(0xf0d878); // cab
-  // Wrench glyph on the flatbed.
-  g.circle(6, -3, 3).stroke({ width: 2, color: 0x4a4a4a });
-  g.rect(7, -3, 8, 2.4).fill(0x4a4a4a);
+  g.rect(-14, -11, 26, 5).fill(TREAD);
+  g.rect(-14, 7, 26, 5).fill(TREAD);
+  g.roundRect(-14, -8, 20, 16, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.roundRect(-13, -6, 9, 12, 2).fill(HULL_HI); // cab
+  g.circle(-2, 0, 2.6).fill(METAL_DK); // crane pivot
+  g.rect(-2, -1, 16, 2.4).fill(METAL); // boom
+  g.rect(13, -3, 2.4, 6).fill(METAL_DK); // hook head
+}
+function teamRepair(g: Graphics): void {
+  g.roundRect(-6, -4, 7, 8, 2).fill(0xffffff); // equipment box
 }
 
-/** Generic foot-soldier bake: shadow + a body drawn pointing +x, then rotated. */
-function bakeInfantry(renderer: Renderer, facing: number, draw: (g: Graphics) => void): Texture {
-  const root = new Container();
-  root.addChild(new Graphics().ellipse(0, 3, 8, 5).fill({ color: 0x000000, alpha: 0.32 }));
-  const body = new Graphics();
-  draw(body);
-  body.rotation = facingAngle(facing);
-  root.addChild(body);
-  return renderer.generateTexture({
-    target: root,
-    frame: new Rectangle(-16, -16, 32, 32),
-    resolution: 2,
-  });
+/** Two-layer foot-soldier sprite: neutral olive body + white helmet/gear mask. */
+function bakeInfantry(
+  renderer: Renderer,
+  facing: number,
+  drawBody: (g: Graphics) => void,
+  drawTeam: (g: Graphics) => void,
+): UnitSprite {
+  const frame = new Rectangle(-16, -16, 32, 32);
+  const bodyRoot = new Container();
+  bodyRoot.addChild(new Graphics().ellipse(0, 3, 8, 5).fill({ color: 0x000000, alpha: 0.32 }));
+  const gb = new Graphics();
+  drawBody(gb);
+  gb.rotation = facingAngle(facing);
+  bodyRoot.addChild(gb);
+  const gt = new Graphics();
+  drawTeam(gt);
+  gt.rotation = facingAngle(facing);
+  return {
+    body: renderer.generateTexture({ target: bodyRoot, frame, resolution: 2 }),
+    team: renderer.generateTexture({ target: gt, frame, resolution: 2 }),
+  };
+}
+
+// Infantry team accent sits at the centre (helmet), so it stays put as the
+// figure rotates. Weapons/props point +x and give each type its silhouette.
+function teamHelmet(g: Graphics): void {
+  g.circle(0, 0, 2.3).fill(0xffffff);
 }
 
 function drawRifleman(body: Graphics): void {
-  body.rect(2, -1, 9, 2).fill(0x4a4a4a);
-  body.circle(0, 0, 5).fill(0xd2d2d2).stroke({ width: 1, color: 0x3c3c3c });
-  body.circle(0, 0, 2.5).fill(0x909090);
+  body.rect(2, -0.9, 10, 1.9).fill(GEAR); // rifle
+  body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
+  body.circle(-1.4, -1.4, 2).fill(UNIFORM_HI); // shoulder highlight
 }
 
 function drawRocketeer(body: Graphics): void {
-  body.rect(1, -2.5, 12, 3.5).fill(0x5a5a5a); // rocket tube
-  body.circle(13, -0.8, 1.8).fill(0xd06a3a); // warhead tip
-  body.circle(0, 0, 5).fill(0xd2d2d2).stroke({ width: 1, color: 0x3c3c3c });
-  body.circle(0, 0, 2.5).fill(0x8a8a8a);
+  body.rect(1, -2.6, 13, 3.6).fill(0x4a4a42); // launcher tube
+  body.circle(14, -0.8, 1.9).fill(0xc0673a); // warhead tip
+  body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
+  body.circle(-1.4, 1.4, 1.8).fill(UNIFORM_HI);
 }
 
 function drawFlamer(body: Graphics): void {
-  body.circle(-4, 0, 3.2).fill(0x7a7a7a).stroke({ width: 1, color: 0x4a4a4a }); // fuel pack
-  body.circle(0, 0, 5).fill(0xd2d2d2).stroke({ width: 1, color: 0x3c3c3c });
-  body.rect(3, -1.5, 11, 3).fill(0x4a4a4a); // nozzle
-  body.circle(14, 0, 1.9).fill(0xff8a3a); // pilot flame
-  body.circle(0, 0, 2.5).fill(0x9a9a9a);
+  body.roundRect(-6.5, -3, 5, 6, 1.5).fill(0x5f5f52).stroke({ width: 1, color: 0x2a2a24 }); // twin tanks
+  body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
+  body.rect(3, -1.4, 12, 2.8).fill(GEAR); // nozzle
+  body.circle(15, 0, 2).fill(0xff8a3a); // pilot flame
 }
 
 function drawDog(body: Graphics): void {
-  body.ellipse(-1, 0, 6, 3.2).fill(0xc8c8c8).stroke({ width: 1, color: 0x4a4a4a }); // body
-  body.rect(-8, -0.7, 4, 1.4).fill(0x9a9a9a); // tail
-  body.circle(6, -0.4, 2.7).fill(0xd8d8d8).stroke({ width: 1, color: 0x4a4a4a }); // head
-  body.poly([8, -1.4, 11, -2.2, 9, 0]).fill(0xb0b0b0); // snout
-  for (const [lx, ly] of [[-4, 2.4], [3, 2.4], [-4, -3.8], [3, -3.8]] as const) {
-    body.rect(lx, ly, 1.4, 2).fill(0x8a8a8a);
+  body.ellipse(-1, 0, 6.5, 3.2).fill(0x8f8878).stroke({ width: 1, color: 0x2a2a24 }); // body
+  body.poly([-7.5, -0.6, -11, -1.8, -11, 1.4, -7.5, 0.8]).fill(0x7a7466); // tail
+  body.circle(6, 0, 2.8).fill(0xa39c88).stroke({ width: 1, color: 0x2a2a24 }); // head
+  body.poly([8, -1.5, 12, -2, 10, 0.6]).fill(0x8f8878); // snout
+  for (const [lx, ly] of [[-4, 2.6], [3, 2.6], [-4, -4], [3, -4]] as const) {
+    body.rect(lx, ly, 1.4, 2).fill(0x5f5a4f); // legs
   }
 }
+function teamDog(g: Graphics): void {
+  g.rect(1, -2.4, 3, 4.8).fill(0xffffff); // collar/harness across the neck
+}
 
+// ── Scout: light wheeled recon car (visible wheels), open-top MG ──
 function drawScout(g: Graphics): void {
-  g.rect(-11, -8, 22, 4).fill(0x62615e); // wheels
-  g.rect(-11, 4, 22, 4).fill(0x62615e);
-  g.roundRect(-10, -6, 20, 12, 3).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c }); // hull
-  g.roundRect(-3, -4, 9, 8, 2).fill(0x9aa4b0); // cabin
-  g.rect(6, -1, 8, 2).fill(0x8f8f8f); // pintle MG
+  for (const ox of [-8, 0, 8]) {
+    g.circle(ox, -7.5, 3).fill(TREAD);
+    g.circle(ox, 7.5, 3).fill(TREAD);
+  }
+  g.roundRect(-11, -6, 22, 12, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-11, -6, 22, 4).fill(HULL_HI);
+  g.roundRect(-4, -4, 9, 8, 2).fill(GLASS); // windshield/cabin
+  g.rect(5, -1, 10, 2).fill(METAL); // pintle MG
+}
+function teamScout(g: Graphics): void {
+  g.rect(-9, -3, 6, 6).fill(0xffffff); // rear plate
 }
 
+// ── Light tank: small angular wedge hull, small turret ──
 function drawLightTank(g: Graphics): void {
-  g.rect(-13, -11, 26, 5).fill(0x62615e);
-  g.rect(-13, 6, 26, 5).fill(0x62615e);
-  g.poly([-12, -7, 8, -7, 13, 0, 8, 7, -12, 7]).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c });
-  g.circle(-1, 0, 5.5).fill(0xe2e2e2).stroke({ width: 1, color: 0x4a4a4a });
-  g.rect(4, -1.5, 15, 3).fill(0x8f8f8f); // barrel
-  g.rect(17, -2, 3, 4).fill(0x6f6f6f);
+  g.rect(-12, -10, 24, 4.5).fill(TREAD);
+  g.rect(-12, 6, 24, 4.5).fill(TREAD);
+  g.poly([-12, -8, 8, -8, 13, 0, 8, 8, -12, 8]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.poly([-12, -8, 8, -8, 9, -5, -12, -5]).fill(HULL_HI);
+  g.circle(-2, 0, 6).fill(HULL_HI).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(4, -1.6, 16, 3.2).fill(METAL);
+  g.rect(18, -2, 3.5, 4).fill(METAL_DK);
+}
+function teamLightTank(g: Graphics): void {
+  g.circle(-2, 0, 2.6).fill(0xffffff);
 }
 
+// ── Tesla tank: tracked hull crowned by a glowing coil ──
 function drawTeslaTank(g: Graphics): void {
-  g.rect(-15, -12, 30, 5).fill(0x57565a);
-  g.rect(-15, 7, 30, 5).fill(0x57565a);
-  g.roundRect(-14, -9, 28, 18, 3).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c });
-  g.circle(0, 0, 5).fill(0x8f8f8f).stroke({ width: 1, color: 0x4a4a4a }); // coil base
-  g.circle(0, 0, 2.6).fill(0xdfefff); // energy node
-  g.circle(0, 0, 6.5).stroke({ width: 1, color: 0xbfeaff, alpha: 0.6 });
+  g.rect(-15, -12, 30, 5).fill(TREAD);
+  g.rect(-15, 7, 30, 5).fill(TREAD);
+  g.roundRect(-15, -9, 30, 18, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-15, -9, 30, 4).fill(HULL_HI);
+  g.circle(2, 0, 6).fill(0x5a636d).stroke({ width: 1.2, color: OUTLINE }); // coil base
+  g.circle(2, 0, 3).fill(0xdff2ff); // energy node
+  g.circle(2, 0, 8).stroke({ width: 1.2, color: 0xbfeaff, alpha: 0.7 }); // arc ring
+}
+function teamTeslaTank(g: Graphics): void {
+  g.rect(-13, -3, 6, 6).fill(0xffffff); // rear hull plate
 }
 
+// ── Flak: light chassis, quad barrels raised forward ──
 function drawFlak(g: Graphics): void {
-  g.rect(-13, -11, 26, 5).fill(0x62615e);
-  g.rect(-13, 6, 26, 5).fill(0x62615e);
-  g.roundRect(-12, -8, 24, 16, 3).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c });
-  g.circle(-1, 0, 5).fill(0xdedede).stroke({ width: 1, color: 0x4a4a4a }); // turret
-  // Quad flak barrels angled forward-up.
-  for (const oy of [-3.5, -1.2, 1.2, 3.5]) g.rect(3, oy - 0.6, 16, 1.6).fill(0x8f8f8f);
+  g.rect(-12, -10, 24, 4.5).fill(TREAD);
+  g.rect(-12, 6, 24, 4.5).fill(TREAD);
+  g.roundRect(-12, -8, 24, 16, 3).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-12, -8, 24, 4).fill(HULL_HI);
+  g.circle(-2, 0, 5).fill(HULL_HI).stroke({ width: 1.2, color: OUTLINE }); // turret ring
+  for (const oy of [-3.6, -1.2, 1.2, 3.6]) {
+    g.rect(2, oy - 0.6, 17, 1.6).fill(METAL);
+    g.rect(18, oy - 0.7, 2, 1.8).fill(METAL_DK);
+  }
+}
+function teamFlak(g: Graphics): void {
+  g.circle(-2, 0, 2.4).fill(0xffffff);
 }
 
-/** Attack helicopter: hull + tail boom + a faint spinning rotor disc. */
+// ── Attack helicopter: fuselage + tail boom + faint rotor disc ──
 function drawHeli(g: Graphics): void {
-  g.ellipse(-16, 0, 8, 2.5).fill(0x9a9a9a); // tail boom
-  g.rect(-24, -4, 4, 8).fill(0x8f8f8f); // tail fin
-  g.roundRect(-8, -6, 22, 12, 5).fill(0xcfcfcf).stroke({ width: 1, color: 0x3c3c3c }); // fuselage
-  g.roundRect(6, -4, 8, 8, 3).fill(0x9aa4b0); // cockpit
-  g.rect(2, -9, 3, 18).fill(0x6f6f6f); // stub wings / weapon pylons
-  g.circle(0, 0, 22).fill({ color: 0xdedede, alpha: 0.18 }); // rotor disc
-  g.circle(0, 0, 22).stroke({ width: 1, color: 0xffffff, alpha: 0.25 });
+  g.ellipse(-16, 0, 8, 2.5).fill(HULL_LO); // tail boom
+  g.rect(-24, -4, 4, 8).fill(METAL); // tail fin
+  g.roundRect(-8, -6, 22, 12, 5).fill(HULL).stroke({ width: 1.2, color: OUTLINE }); // fuselage
+  g.rect(-8, -6, 22, 4).fill(HULL_HI);
+  g.roundRect(6, -4, 8, 8, 3).fill(GLASS); // cockpit
+  g.rect(2, -9, 3, 18).fill(METAL_DK); // weapon pylons
+  g.circle(0, 0, 22).fill({ color: 0xe8edf2, alpha: 0.15 }); // rotor disc
+  g.circle(0, 0, 22).stroke({ width: 1, color: 0xffffff, alpha: 0.22 });
+}
+function teamHeli(g: Graphics): void {
+  g.rect(-6, -3, 8, 6).fill(0xffffff); // fuselage panel
 }
 
-/** Jet: pointed fuselage with swept wings and tailplanes. */
+// ── Jet: pointed fuselage, swept wings, tailplanes ──
 function drawJet(g: Graphics): void {
-  g.poly([22, 0, 6, -4, -16, -3, -16, 3, 6, 4]).fill(0xcfcfcf).stroke({ width: 1, color: 0x3c3c3c }); // fuselage
-  g.poly([-2, -3, -10, -18, -16, -18, -8, -3]).fill(0xb8b8b8); // left wing
-  g.poly([-2, 3, -10, 18, -16, 18, -8, 3]).fill(0xb8b8b8); // right wing
-  g.poly([-13, -2, -20, -8, -20, -2].map((v) => v)).fill(0xa8a8a8); // tailplane L
-  g.poly([-13, 2, -20, 8, -20, 2]).fill(0xa8a8a8); // tailplane R
-  g.circle(10, 0, 2.4).fill(0x9aa4b0); // canopy
+  g.poly([22, 0, 6, -4, -16, -3, -16, 3, 6, 4]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.poly([-2, -3, -10, -18, -16, -18, -8, -3]).fill(HULL_LO); // left wing
+  g.poly([-2, 3, -10, 18, -16, 18, -8, 3]).fill(HULL_LO); // right wing
+  g.poly([-13, -2, -20, -8, -20, -2]).fill(METAL); // tailplane L
+  g.poly([-13, 2, -20, 8, -20, 2]).fill(METAL); // tailplane R
+  g.circle(10, 0, 2.4).fill(GLASS); // canopy
   g.circle(-16, 0, 2.4).fill(0xff8a3a); // exhaust glow
+}
+function teamJet(g: Graphics): void {
+  g.rect(-8, -1.6, 10, 3.2).fill(0xffffff); // spine stripe
 }
 
 /* Ships face +x like vehicles; bakeVehicle's drop shadow reads as their wake. */
 
-/** Patrol gunboat: small pointed hull with a single deck MG. */
+// ── Patrol gunboat: small pointed hull, cabin, deck MG ──
 function drawGunboat(g: Graphics): void {
-  g.poly([18, 0, 10, -5, -14, -5, -17, 0, -14, 5, 10, 5]).fill(0xc9c9c9).stroke({ width: 1, color: 0x3c3c3c }); // hull
-  g.poly([18, 0, 10, -5, 10, 5]).fill(0xdedede); // bow deck
-  g.roundRect(-10, -3, 12, 6, 2).fill(0x9aa4b0); // cabin
-  g.circle(4, 0, 3).fill(0x8f8f8f).stroke({ width: 1, color: 0x4a4a4a }); // MG mount
-  g.rect(6, -0.8, 9, 1.6).fill(0x6f6f6f);
-  g.rect(-16, -1, 3, 2).fill(0x6f6f6f); // stern
+  g.poly([18, 0, 10, -5, -14, -5, -17, 0, -14, 5, 10, 5]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.poly([18, 0, 10, -5, 10, 5]).fill(HULL_HI); // bow deck
+  g.roundRect(-10, -3, 12, 6, 2).fill(HULL_LO); // cabin
+  g.circle(4, 0, 3).fill(METAL).stroke({ width: 1, color: OUTLINE }); // MG mount
+  g.rect(6, -0.8, 9, 1.6).fill(METAL_DK);
+  g.rect(-16, -1, 3, 2).fill(METAL_DK); // stern
+}
+function teamGunboat(g: Graphics): void {
+  g.roundRect(-9, -2, 8, 4, 1).fill(0xffffff); // cabin roof
 }
 
-/** Destroyer: long hull, two gun turrets and a radar mast. */
+// ── Destroyer: long hull, two turrets, radar mast ──
 function drawDestroyer(g: Graphics): void {
-  g.poly([26, 0, 16, -6, -20, -6, -25, 0, -20, 6, 16, 6]).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c }); // hull
-  g.poly([26, 0, 16, -6, 16, 6]).fill(0xd6d6d6); // bow
-  g.roundRect(-12, -4, 16, 8, 2).fill(0x9a9a9a); // superstructure
-  g.rect(-2, -10, 2, 8).fill(0x6f6f6f); // mast
+  g.poly([26, 0, 16, -6, -20, -6, -25, 0, -20, 6, 16, 6]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.poly([26, 0, 16, -6, 16, 6]).fill(HULL_HI); // bow
+  g.roundRect(-12, -4, 16, 8, 2).fill(HULL_LO); // superstructure
+  g.rect(-2, -10, 2, 8).fill(METAL_DK); // mast
   g.circle(-1, -11, 2).fill(0xcfd6dc); // radar
   for (const ox of [10, -18]) {
-    g.circle(ox, 0, 3.5).fill(0xdedede).stroke({ width: 1, color: 0x4a4a4a }); // turret
-    g.rect(ox + 2, -1, 9, 2).fill(0x8f8f8f); // barrel
+    g.circle(ox, 0, 3.5).fill(HULL_HI).stroke({ width: 1, color: OUTLINE }); // turret
+    g.rect(ox + 2, -1, 9, 2).fill(METAL); // barrel
   }
 }
-
-/** Submarine: slender teardrop hull with a conning tower (rendered dimmed). */
-function drawSub(g: Graphics): void {
-  g.ellipse(0, 0, 22, 5.5).fill(0x707a84).stroke({ width: 1, color: 0x2f353b }); // hull
-  g.ellipse(8, 0, 8, 3).fill(0x828c96); // fore deck
-  g.roundRect(-6, -3, 10, 6, 2.5).fill(0x59636d).stroke({ width: 1, color: 0x2f353b }); // tower
-  g.rect(-2, -6, 1.6, 4).fill(0x3f474f); // periscope
-  g.ellipse(-19, 0, 4, 2.2).fill(0x59636d); // stern planes
+function teamDestroyer(g: Graphics): void {
+  g.roundRect(-11, -3, 14, 6, 1).fill(0xffffff); // superstructure roof
 }
 
-/** Transport: broad hull with a flat cargo deck and loading ramp at the bow. */
+// ── Submarine: slender teardrop hull + conning tower (rendered dimmed) ──
+function drawSub(g: Graphics): void {
+  g.ellipse(0, 0, 22, 5.5).fill(HULL_LO).stroke({ width: 1, color: OUTLINE }); // hull
+  g.ellipse(8, 0, 8, 3).fill(HULL); // fore deck
+  g.roundRect(-6, -3, 10, 6, 2.5).fill(0x4b545d).stroke({ width: 1, color: OUTLINE }); // tower
+  g.rect(-2, -6, 1.6, 4).fill(METAL_DK); // periscope
+  g.ellipse(-19, 0, 4, 2.2).fill(0x4b545d); // stern planes
+}
+function teamSub(g: Graphics): void {
+  g.roundRect(-5, -2, 8, 4, 1).fill(0xffffff); // tower top
+}
+
+// ── Transport: broad hull, cargo well, bow loading ramp ──
 function drawTransportShip(g: Graphics): void {
-  g.poly([20, 0, 14, -8, -18, -8, -22, 0, -18, 8, 14, 8]).fill(0xbfbfbf).stroke({ width: 1, color: 0x3c3c3c }); // hull
-  g.roundRect(-16, -6, 28, 12, 2).fill(0x8f8f8f); // cargo well
-  g.rect(-16, -6, 28, 12).stroke({ width: 1, color: 0x5f5f5f });
-  for (const ox of [-10, -2, 6]) g.rect(ox, -6, 1, 12).fill(0x6f6f6f); // deck ribs
-  g.poly([20, 0, 14, -8, 14, 8]).fill(0xa8a8a8); // bow ramp
-  g.roundRect(-21, -3, 5, 6, 1.5).fill(0x9aa4b0); // pilot house
+  g.poly([20, 0, 14, -8, -18, -8, -22, 0, -18, 8, 14, 8]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.roundRect(-16, -6, 28, 12, 2).fill(HULL_LO); // cargo well
+  for (const ox of [-10, -2, 6]) g.rect(ox, -6, 1, 12).fill(METAL_DK); // deck ribs
+  g.poly([20, 0, 14, -8, 14, 8]).fill(HULL_HI); // bow ramp
+  g.roundRect(-21, -3, 5, 6, 1.5).fill(HULL_LO); // pilot house
+}
+function teamTransportShip(g: Graphics): void {
+  g.roundRect(-20, -2, 4, 4, 1).fill(0xffffff); // pilot house roof
 }
 
 /**
@@ -724,45 +851,45 @@ function bakeDigit(renderer: Renderer, digit: number): Texture {
 /* ------------------------------- registry ------------------------------- */
 
 export function createTextures(renderer: Renderer): GameTextures {
-  const tank: Texture[] = [];
-  const mammoth: Texture[] = [];
-  const artillery: Texture[] = [];
-  const rifleman: Texture[] = [];
-  const harvester: Texture[] = [];
-  const repair: Texture[] = [];
-  const rocketeer: Texture[] = [];
-  const scout: Texture[] = [];
-  const lighttank: Texture[] = [];
-  const flamer: Texture[] = [];
-  const dog: Texture[] = [];
-  const teslatank: Texture[] = [];
-  const flak: Texture[] = [];
-  const heli: Texture[] = [];
-  const jet: Texture[] = [];
-  const gunboat: Texture[] = [];
-  const destroyer: Texture[] = [];
-  const sub: Texture[] = [];
-  const transport: Texture[] = [];
+  const tank: UnitSprite[] = [];
+  const mammoth: UnitSprite[] = [];
+  const artillery: UnitSprite[] = [];
+  const rifleman: UnitSprite[] = [];
+  const harvester: UnitSprite[] = [];
+  const repair: UnitSprite[] = [];
+  const rocketeer: UnitSprite[] = [];
+  const scout: UnitSprite[] = [];
+  const lighttank: UnitSprite[] = [];
+  const flamer: UnitSprite[] = [];
+  const dog: UnitSprite[] = [];
+  const teslatank: UnitSprite[] = [];
+  const flak: UnitSprite[] = [];
+  const heli: UnitSprite[] = [];
+  const jet: UnitSprite[] = [];
+  const gunboat: UnitSprite[] = [];
+  const destroyer: UnitSprite[] = [];
+  const sub: UnitSprite[] = [];
+  const transport: UnitSprite[] = [];
   for (let f = 0; f < FACING_COUNT; f++) {
-    tank.push(bakeVehicle(renderer, f, 28, drawTank));
-    mammoth.push(bakeVehicle(renderer, f, 34, drawMammoth));
-    artillery.push(bakeVehicle(renderer, f, 32, drawArtillery));
-    harvester.push(bakeVehicle(renderer, f, 30, drawHarvester));
-    repair.push(bakeVehicle(renderer, f, 28, drawRepair));
-    scout.push(bakeVehicle(renderer, f, 24, drawScout));
-    lighttank.push(bakeVehicle(renderer, f, 26, drawLightTank));
-    teslatank.push(bakeVehicle(renderer, f, 30, drawTeslaTank));
-    flak.push(bakeVehicle(renderer, f, 26, drawFlak));
-    heli.push(bakeVehicle(renderer, f, 30, drawHeli));
-    jet.push(bakeVehicle(renderer, f, 30, drawJet));
-    gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat));
-    destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer));
-    sub.push(bakeVehicle(renderer, f, 28, drawSub));
-    transport.push(bakeVehicle(renderer, f, 28, drawTransportShip));
-    rifleman.push(bakeInfantry(renderer, f, drawRifleman));
-    rocketeer.push(bakeInfantry(renderer, f, drawRocketeer));
-    flamer.push(bakeInfantry(renderer, f, drawFlamer));
-    dog.push(bakeInfantry(renderer, f, drawDog));
+    tank.push(bakeVehicle(renderer, f, 28, drawTank, teamTank));
+    mammoth.push(bakeVehicle(renderer, f, 34, drawMammoth, teamMammoth));
+    artillery.push(bakeVehicle(renderer, f, 32, drawArtillery, teamArtillery));
+    harvester.push(bakeVehicle(renderer, f, 30, drawHarvester, teamHarvester));
+    repair.push(bakeVehicle(renderer, f, 28, drawRepair, teamRepair));
+    scout.push(bakeVehicle(renderer, f, 24, drawScout, teamScout));
+    lighttank.push(bakeVehicle(renderer, f, 26, drawLightTank, teamLightTank));
+    teslatank.push(bakeVehicle(renderer, f, 30, drawTeslaTank, teamTeslaTank));
+    flak.push(bakeVehicle(renderer, f, 26, drawFlak, teamFlak));
+    heli.push(bakeVehicle(renderer, f, 30, drawHeli, teamHeli));
+    jet.push(bakeVehicle(renderer, f, 30, drawJet, teamJet));
+    gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat, teamGunboat));
+    destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer, teamDestroyer));
+    sub.push(bakeVehicle(renderer, f, 28, drawSub, teamSub));
+    transport.push(bakeVehicle(renderer, f, 28, drawTransportShip, teamTransportShip));
+    rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
+    rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
+    flamer.push(bakeInfantry(renderer, f, drawFlamer, teamHelmet));
+    dog.push(bakeInfantry(renderer, f, drawDog, teamDog));
   }
 
   const buildings = Object.fromEntries(

@@ -11,14 +11,17 @@ import {
   type GameState,
   type Unit,
 } from '@cac/sim';
-import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import { session } from '../session.js';
 import { depthOf, worldToScreen } from './iso.js';
-import type { GameTextures } from './placeholders.js';
+import type { GameTextures, UnitSprite } from './placeholders.js';
 
 interface UnitView {
   root: Container;
+  /** Neutral, faction-independent unit art. */
   body: Sprite;
+  /** White team mask, tinted to the owner's faction colour. */
+  team: Sprite;
   sel: Sprite;
   bar: Graphics;
   /** Control-group number badge above the unit (hidden unless in a marked group). */
@@ -122,7 +125,9 @@ export class EntityRenderer {
       const { x, y } = worldToScreen(fx, fy);
       view.root.position.set(x, y);
       view.root.zIndex = view.air ? AIR_Z + depthOf(fx, fy) : depthOf(fx, fy);
-      view.body.texture = this.textureFor(unit);
+      const spr = this.spriteFor(unit);
+      view.body.texture = spr.body;
+      view.team.texture = spr.team;
       view.sel.visible = selected.has(unit.id);
       this.updateUnitBar(unit, view, selected.has(unit.id));
 
@@ -198,8 +203,8 @@ export class EntityRenderer {
     }
   }
 
-  private textureFor(unit: Unit): Texture {
-    const sets: Record<Unit['type'], Texture[]> = {
+  private spriteFor(unit: Unit): UnitSprite {
+    const sets: Record<Unit['type'], UnitSprite[]> = {
       TANK: this.tex.tank,
       MAMMOTH: this.tex.mammoth,
       ARTILLERY: this.tex.artillery,
@@ -324,12 +329,17 @@ export class EntityRenderer {
     sel.anchor.set(0.5);
     sel.position.set(0, (big ? 0 : 2) - lift);
     sel.visible = false;
-    const body = new Sprite(this.textureFor(unit));
+    const spr = this.spriteFor(unit);
+    // Neutral body stays untinted; the team mask carries the faction colour.
+    const body = new Sprite(spr.body);
     body.anchor.set(0.5);
     body.position.set(0, -lift);
-    body.tint = this.playerColors.get(unit.owner) ?? 0xffffff;
-    // Submerged submarines shimmer through the water surface.
-    if (unitRule(unit.type).submerged === true) body.alpha = 0.55;
+    const team = new Sprite(spr.team);
+    team.anchor.set(0.5);
+    team.position.set(0, -lift);
+    team.tint = this.playerColors.get(unit.owner) ?? 0xffffff;
+    // Submerged submarines shimmer through the water surface (whole sprite).
+    if (unitRule(unit.type).submerged === true) root.alpha = 0.55;
     const bar = new Graphics();
     bar.position.set(0, (big ? -24 : -17) - lift);
     bar.visible = false;
@@ -343,11 +353,12 @@ export class EntityRenderer {
       const shadow = new Graphics().ellipse(0, 0, 11, 6).fill({ color: 0x000000, alpha: 0.28 });
       root.addChild(shadow);
     }
-    root.addChild(sel, body, bar, groupLabel);
+    root.addChild(sel, body, team, bar, groupLabel);
     this.layer.addChild(root);
     const view: UnitView = {
       root,
       body,
+      team,
       sel,
       bar,
       groupLabel,
