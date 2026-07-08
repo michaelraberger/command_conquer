@@ -2,8 +2,8 @@
 
 Echtzeitstrategie im Browser: Basisbau, Erz-Wirtschaft, Alliierte vs. Sowjets,
 Tesla-Spulen, Mammutpanzer, aufrüstbare Mauern, Nebel des Krieges, KI-Gegner
-in drei Schwierigkeitsgraden, Superwaffen (Atomrakete/Wettersturm), Replays
-und 1-gegen-1-Multiplayer. Eigene prozedurale Grafiken (keine Original-Assets).
+in drei Schwierigkeitsgraden und Superwaffen (Atomrakete/Wettersturm).
+Einzelspieler gegen die KI. Eigene prozedurale Grafiken (keine Original-Assets).
 
 **Karten:** Beim Start wählbar – **Ödland** (klassisch, viel Land),
 **Flusstal** (ein Fluss mit einer einzigen Landbrücke als Engpass) und
@@ -11,8 +11,7 @@ und 1-gegen-1-Multiplayer. Eigene prozedurale Grafiken (keine Original-Assets).
 Luft- und Marineeinheiten). Die Inselküsten sind von **Klippen** gesäumt; nur an
 wenigen freien **Strandbuchten** kann ein Transportschiff anlanden – Landungen
 gehen also nicht überall, sondern nur an den Buchten. Karten sind deterministisch
-aus Seed + Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
-speichern sie mit. Die KI (normal/schwer) baut Luftwaffe (Flugplatz + Helis/Jets)
+aus Seed + Kartentyp erzeugt. Die KI (normal/schwer) baut Luftwaffe (Flugplatz + Helis/Jets)
 und auf Inselkarten eine Werft mit Kampfschiffen und einem Transportschiff –
 sie landet über die Buchten an und greift so auch über Wasser an; die leichte
 KI bleibt bodengebunden.
@@ -31,13 +30,8 @@ entlädt an der Küste – so erobert man fremde Inseln).
 npm install
 npm run dev        # Client unter http://localhost:5173
 npm test           # Determinismus- und Sim-Tests
-npm run test -w @cac/server   # Lockstep-Integrationstest
 npm run typecheck
 ```
-
-**Mehrspieler:** `npm run dev -w @cac/server` startet den Lockstep-Server
-(ws://localhost:8787). Spieler 1 klickt „Mehrspieler-Partie eröffnen" und gibt
-den Code weiter, Spieler 2 tritt mit dem Code bei.
 
 ## Balance anpassen
 
@@ -52,9 +46,8 @@ Seite neu laden, fertig (kein Rebuild nötig):
 - `cheats`: eigene Codewörter für die Cheats (siehe unten)
 
 Unbekannte Schlüssel und kaputte Werte werden ignoriert (Standard greift);
-alle Werte werden auf Ganzzahlen gestutzt (Determinismus). Die Konfig ist
-Teil der Spieloptionen: Replays speichern sie mit, im Multiplayer gilt die
-Konfig des Hosts für beide Spieler. Fehlt die Datei, gelten die Standardwerte.
+alle Werte werden auf Ganzzahlen gestutzt (Determinismus). Fehlt die Datei,
+gelten die Standardwerte.
 
 ## Cheats (nur Solo)
 
@@ -73,8 +66,7 @@ sie — und werden in `balance.json` unter `cheats` frei benannt:
 Links steht das (frei wählbare) Codewort, rechts die feste Cheat-Art
 (`MONEY`/`REVEAL`/`POWER`). So kann jeder seine eigenen Wörter vergeben; das
 Standard-Set oben gilt, wenn die Sektion fehlt. Cheats laufen als normale
-Befehle durch die Sim, Replays spielen sie originalgetreu ab. Im Multiplayer
-ist die Konsole deaktiviert.
+Befehle durch die Sim.
 
 ## Steuerung
 
@@ -92,7 +84,7 @@ Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
 - Strg+Rechtsklick: Angriffsbewegung · Esc: Platzierung abbrechen
 - WASD/Pfeile + Bildschirmrand: Kamera · **Leertaste halten + Maus ziehen**:
   Karte greifen und verschieben (Hand-Tool) · `^`/Backquote: Debug-Overlay
-- **P**: Pause (nur Einzelspieler/Replay; im Multiplayer deaktiviert)
+- **P**: Pause
 - **U**: ausgewähltes Gebäude ausbauen (aktuell Mauern → nächste Stufe)
 - **R**: gesamten Baubereich ein-/ausblenden (ohne Gebäude anklicken zu müssen)
 - **H**: Kamera auf die eigene Basis zentrieren
@@ -146,19 +138,14 @@ Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
 - Superwaffe: Raketensilo (Sowjets) / Wetterkontrolle (Alliierte) bauen →
   lädt 2 Minuten (braucht Strom) → „Ziel wählen" → Klick auf die Karte.
   Flächenschaden mit Falloff, ignoriert Panzerung
-- Replays: „Replay speichern" (Sidebar oder Endbildschirm) lädt die Partie
-  als JSON herunter; „Replay ansehen …" im Startbildschirm spielt sie
-  bit-identisch ab (Seed + Command-Log, dank deterministischer Sim)
 
 ## Struktur
 
 - `packages/sim` – deterministischer Spielkern (null Dependencies, kein DOM).
   Die Determinismus-Regeln stehen in `packages/sim/README.md` – **vor jeder
   Änderung am Sim-Code lesen**. Auch die KI lebt hier (reiner Command-
-  Generator → multiplayer-sicher).
-- `packages/client` – PixiJS-Rendering, Input, UI, Netcode.
-- `packages/server` – WebSocket-Lockstep-Relay (Lobby, Command-Broadcast,
-  Desync-Erkennung per Hash-Vergleich).
+  Generator).
+- `packages/client` – PixiJS-Rendering, Input, UI.
 
 ## Meilensteine
 
@@ -168,11 +155,9 @@ Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
 - [x] M3 – Wirtschaft + Basisbau
 - [x] M4 – Fraktionen, Fog of War, Tesla-Spule & Mammutpanzer, Mauern, Werkstatt
 - [x] M5 – KI-Gegner, Sieg/Niederlage, Startbildschirm
-- [x] M6 – Multiplayer (Lockstep-Relay)
 
 ## Ideen für später
 
-- Luft-/Marineeinheiten, Garnisonen
+- Garnisonen, mehr Einheiten
 - Richtige Sprite-Sheets hinter der `SpriteDef`-Schicht (CC0-Packs oder eigene)
 - Karten-Editor, mehr Karten, größere Formate
-- Golden-Replay-Regressionstests (gespeicherte Replays als Test-Fixtures)

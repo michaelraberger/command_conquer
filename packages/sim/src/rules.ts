@@ -774,9 +774,7 @@ export const CHEAT_POWER = 300;
 
 /**
  * Runtime-tunable balance ("rules.ini light"). A config is applied per game
- * via GameOptions.balance: it is stored in replays and, in multiplayer, sent
- * by the host — every peer applies the identical config, so lockstep and
- * replays stay deterministic. Unknown keys are ignored; broken numbers fall
+ * via GameOptions.balance. Unknown keys are ignored; broken numbers fall
  * back to the default. All values are truncated to integers (the sim only
  * does integer math); rangeCells may be fractional (converted to sub-cells).
  */

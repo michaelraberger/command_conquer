@@ -5,10 +5,7 @@ import { Camera } from './input/camera.js';
 import { Controls } from './input/controls.js';
 import { ControlGroups } from './input/groups.js';
 import { Hotkeys, type CheatCodes, type CheatKind } from './input/hotkeys.js';
-import { startLoop, type TickDriver } from './loop.js';
-import { Connection } from './net/connection.js';
-import { LockstepDriver } from './net/lockstep.js';
-import { Recorder, RecordingDriver, ReplayDriver } from './replay.js';
+import { LocalDriver, startLoop, type TickDriver } from './loop.js';
 import { BuildRadiusOverlay } from './render/buildRadius.js';
 import { Effects } from './render/effects.js';
 import { EntityRenderer } from './render/entities.js';
@@ -21,13 +18,7 @@ import { Alerts } from './ui/alerts.js';
 import { DebugOverlay } from './ui/debug.js';
 import { Minimap } from './ui/minimap.js';
 import { PlacementMode } from './ui/placement.js';
-import {
-  hideStartScreen,
-  setLobbyStatus,
-  showEndScreen,
-  showStartScreen,
-  type StartChoice,
-} from './ui/screens.js';
+import { showEndScreen, showStartScreen, type StartChoice } from './ui/screens.js';
 import { GroupBar } from './ui/groupBar.js';
 import { HelpMenu } from './ui/help.js';
 import { Sidebar } from './ui/sidebar.js';
@@ -35,9 +26,6 @@ import { Sidebar } from './ui/sidebar.js';
 interface GameSetup {
   state: GameState;
   driver: TickDriver;
-  recorder: Recorder | null;
-  /** Pause is client-local, so it is disabled in lockstep multiplayer. */
-  canPause: boolean;
 }
 
 /** balance.json also carries a client-only `cheats` section (see below). */
@@ -66,10 +54,8 @@ function loadConfig(): Promise<RawConfig | null> {
 
 /**
  * Balance overrides from public/balance.json — retune prices, power, speeds
- * and the ore economy without touching code. The config is part of the game
- * options, so replays store it and the multiplayer host hands it to the guest.
- * The `cheats` section is stripped: it is a client-only naming convenience and
- * must not leak into replays or the wire protocol.
+ * and the ore economy without touching code. The `cheats` section is stripped
+ * out here; it is a client-only naming convenience, not a balance value.
  */
 async function loadBalance(): Promise<BalanceConfig | undefined> {
   const cfg = await loadConfig();
@@ -94,68 +80,17 @@ async function loadCheatCodes(): Promise<CheatCodes> {
 }
 
 async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
-  if (choice.mode === 'ai') {
-    const seed = (Math.random() * 0xffffffff) >>> 0;
-    const enemy: Faction = choice.faction === 'ALLIES' ? 'SOVIETS' : 'ALLIES';
-    session.localPlayer = 0;
-    const options = {
-      factions: [choice.faction, enemy] as [Faction, Faction],
-      ai: true,
-      aiDifficulty: choice.difficulty,
-      mapType: choice.mapType,
-      balance: await loadBalance(),
-    };
-    const recorder = new Recorder(seed, options);
-    return {
-      state: createGame(seed, options),
-      driver: new RecordingDriver(recorder),
-      recorder,
-      canPause: true,
-    };
-  }
-
-  if (choice.mode === 'replay') {
-    session.localPlayer = 0;
-    return {
-      state: createGame(choice.file.seed, choice.file.options),
-      driver: new ReplayDriver(choice.file),
-      recorder: null,
-      canPause: true,
-    };
-  }
-
-  setLobbyStatus('Verbinde…');
-  const conn = await Connection.connect(choice.url);
-  if (choice.mode === 'host') {
-    conn.send({
-      t: 'host',
-      faction: choice.faction,
-      mapType: choice.mapType,
-      balance: await loadBalance(),
-    });
-    const hosted = await conn.waitFor('hosted');
-    setLobbyStatus(`Partie eröffnet – Code: ${hosted.code} (warte auf Mitspieler …)`);
-  } else {
-    conn.send({ t: 'join', code: choice.code, faction: choice.faction });
-    setLobbyStatus('Trete bei …');
-  }
-  const start = await conn.waitFor('start');
-  hideStartScreen();
-  session.localPlayer = start.playerId;
-  conn.onMessage((msg) => {
-    if (msg.t === 'desync') console.error(`DESYNC bei Tick ${msg.tick}!`);
-    if (msg.t === 'left') setLobbyStatus('Der Mitspieler hat die Partie verlassen.');
-  });
-  return {
-    state: createGame(start.seed, {
-      factions: start.factions,
-      mapType: start.mapType,
-      balance: start.balance,
-    }),
-    driver: new LockstepDriver(conn),
-    recorder: null,
-    canPause: false,
+  const seed = (Math.random() * 0xffffffff) >>> 0;
+  const enemy: Faction = choice.faction === 'ALLIES' ? 'SOVIETS' : 'ALLIES';
+  session.localPlayer = 0;
+  const options = {
+    factions: [choice.faction, enemy] as [Faction, Faction],
+    ai: true,
+    aiDifficulty: choice.difficulty,
+    mapType: choice.mapType,
+    balance: await loadBalance(),
   };
+  return { state: createGame(seed, options), driver: new LocalDriver() };
 }
 
 async function boot(): Promise<void> {
@@ -164,13 +99,7 @@ async function boot(): Promise<void> {
   document.getElementById('app')!.appendChild(app.canvas);
 
   const choice = await showStartScreen();
-  const { state, driver, recorder, canPause } = await setupFromChoice(choice);
-
-  if (recorder) {
-    const saveBtn = document.getElementById('save-replay') as HTMLButtonElement;
-    saveBtn.style.display = 'block';
-    saveBtn.addEventListener('click', () => recorder.download());
-  }
+  const { state, driver } = await setupFromChoice(choice);
 
   const textures = createTextures(app.renderer);
 
@@ -204,7 +133,7 @@ async function boot(): Promise<void> {
     controls,
     sendCommand,
     camera,
-    canPause,
+    true, // solo only now → pause always available
     await loadCheatCodes(),
     groups,
   );
@@ -234,8 +163,7 @@ async function boot(): Promise<void> {
       alerts,
       groups,
       groupBar,
-      onGameOver: (winner) =>
-        showEndScreen(winner === session.localPlayer, recorder ? () => recorder.download() : null),
+      onGameOver: (winner) => showEndScreen(winner === session.localPlayer),
     },
     driver,
   );
@@ -249,7 +177,6 @@ async function boot(): Promise<void> {
     placement,
     sendCommand,
     session,
-    recorder,
     hotkeys,
     alerts,
     groups,

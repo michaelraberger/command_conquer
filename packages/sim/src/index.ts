@@ -128,10 +128,3 @@ export { canPlaceBuilding } from './systems/placement.js';
 export { powerBalance } from './systems/production.js';
 export { aiSystem } from './ai/controller.js';
 export { tick, TICKS_PER_SECOND, TICK_MS } from './tick.js';
-export {
-  INPUT_DELAY_TICKS,
-  HASH_INTERVAL_TICKS,
-  DEFAULT_SERVER_PORT,
-  type ClientMessage,
-  type ServerMessage,
-} from './protocol.js';

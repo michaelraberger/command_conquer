@@ -22,9 +22,8 @@ import {
 } from './systems/production.js';
 
 /**
- * Commands are the ONLY external mutation entry point into the sim — in
- * multiplayer this union IS the network protocol. Target coordinates are
- * cell coordinates.
+ * Commands are the ONLY external mutation entry point into the sim. Target
+ * coordinates are cell coordinates.
  */
 export type Command =
   | { type: 'MOVE'; playerId: number; unitIds: number[]; cx: number; cy: number }

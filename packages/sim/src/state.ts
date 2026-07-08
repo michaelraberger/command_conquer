@@ -261,12 +261,11 @@ export interface GameOptions {
   /** Player 1 is controlled by the built-in AI. */
   ai?: boolean;
   aiDifficulty?: AiDifficulty;
-  /** Map layout (default BADLANDS). Part of replays/multiplayer setup. */
+  /** Map layout (default BADLANDS). */
   mapType?: MapType;
   mapWidth?: number;
   mapHeight?: number;
-  /** Balance overrides (balance.json). Part of replays/multiplayer setup —
-   *  every peer must apply the identical config or the lockstep desyncs. */
+  /** Balance overrides (balance.json) applied to the rules for this game. */
   balance?: BalanceConfig | undefined;
 }
 

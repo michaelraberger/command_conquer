@@ -1,8 +1,8 @@
 # @cac/sim – deterministischer Spielkern
 
-Dieses Paket ist die gemeinsame Wahrheit für Singleplayer, Replays und
-späteren Lockstep-Multiplayer. **Jede** Abweichung von diesen Regeln ist ein
-potenzieller Desync und damit ein Bug:
+Dieses Paket ist die gemeinsame Wahrheit für das Spiel. Der deterministische
+Kern hält KI-Verhalten, Serialisierung und Hash-Tests reproduzierbar. **Jede**
+Abweichung von diesen Regeln bricht die Reproduzierbarkeit und ist ein Bug:
 
 1. **Null Dependencies.** Kein DOM, kein PixiJS, kein `window`, `document`,
    `performance`, `Date`, `setTimeout`. Der Kern muss headless in Node laufen.
