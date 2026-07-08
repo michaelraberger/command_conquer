@@ -134,6 +134,100 @@
       #help .help-close:hover {
         background: #2d5175;
       }
+      #help #tour-open {
+        background: #1f2c1f;
+        border-color: #53c94f;
+      }
+      #help #tour-open:hover {
+        background: #24361f;
+      }
+      /* Onboarding tour: dim backdrop + moving spotlight + fixed bottom card. */
+      #tour {
+        position: fixed;
+        inset: 0;
+        display: none;
+        background: rgba(6, 9, 12, 0.55);
+        z-index: 12;
+      }
+      #tour.open {
+        display: block;
+      }
+      #tour-highlight {
+        position: fixed;
+        display: none;
+        border: 2px solid #8aff8a;
+        border-radius: 6px;
+        box-shadow:
+          0 0 0 4px rgba(83, 201, 79, 0.25),
+          0 0 16px rgba(83, 201, 79, 0.5);
+        pointer-events: none;
+        transition:
+          left 0.15s ease,
+          top 0.15s ease,
+          width 0.15s ease,
+          height 0.15s ease;
+      }
+      #tour-card {
+        position: fixed;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%);
+        width: 460px;
+        max-width: 92vw;
+        background: rgba(16, 20, 26, 0.98);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 18px 22px;
+        color: #d7e0ea;
+        font-size: 13px;
+      }
+      #tour-step {
+        font-size: 10px;
+        letter-spacing: 1px;
+        color: #8fa1b3;
+        margin-bottom: 4px;
+      }
+      #tour-card h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        letter-spacing: 1px;
+      }
+      #tour-card p {
+        margin: 0 0 14px;
+        line-height: 1.5;
+        color: #c3ced9;
+      }
+      #tour-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #tour-nav .spacer {
+        flex: 1;
+      }
+      #tour-nav button {
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        padding: 7px 14px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #tour-nav button:hover {
+        background: #2d5175;
+      }
+      #tour-nav #tour-skip {
+        background: none;
+        border-color: #2c3a4a;
+        color: #8fa1b3;
+      }
+      #tour-nav #tour-back {
+        background: none;
+        border-color: #2c3a4a;
+        color: #d7e0ea;
+      }
       #pause {
         position: fixed;
         inset: 0 210px 0 0;
@@ -706,7 +800,23 @@
             <dt>F1</dt><dd>Dieses Menü öffnen / schließen</dd>
           </dl>
         </div>
+        <button id="tour-open" class="help-close">Kurzeinführung starten</button>
         <button id="help-close" class="help-close">Schließen (Esc)</button>
+      </div>
+    </div>
+
+    <div id="tour">
+      <div id="tour-highlight"></div>
+      <div id="tour-card">
+        <div id="tour-step"></div>
+        <h2 id="tour-title"></h2>
+        <p id="tour-body"></p>
+        <div id="tour-nav">
+          <button id="tour-skip">Überspringen</button>
+          <span class="spacer"></span>
+          <button id="tour-back">Zurück</button>
+          <button id="tour-next">Weiter</button>
+        </div>
       </div>
     </div>
 

@@ -21,6 +21,7 @@ import { PlacementMode } from './ui/placement.js';
 import { showEndScreen, showStartScreen, type StartChoice } from './ui/screens.js';
 import { GroupBar } from './ui/groupBar.js';
 import { HelpMenu } from './ui/help.js';
+import { OnboardingTour } from './ui/tour.js';
 import { Sidebar } from './ui/sidebar.js';
 
 interface GameSetup {
@@ -139,6 +140,8 @@ async function boot(): Promise<void> {
   );
   const alerts = new Alerts();
   new HelpMenu();
+  const tour = new OnboardingTour();
+  tour.maybeShowOnFirstRun();
 
   ore.sync(state);
   fog.sync(state, session.localPlayer);

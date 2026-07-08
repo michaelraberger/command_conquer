@@ -70,8 +70,10 @@ Befehle durch die Sim.
 
 ## Steuerung
 
-Alle Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder
-**F1** öffnet es (Esc/Klick daneben schließt).
+Beim ersten Spielstart läuft automatisch eine **Kurzeinführung** (überspringbar,
+jederzeit über „?" → „Kurzeinführung starten" erneut aufrufbar). Alle
+Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
+öffnet es (Esc/Klick daneben schließt).
 
 - Teamfarben nach Fraktion: **Alliierte blau, Sowjets rot** (Einheiten,
   Gebäude und Minimap)
