@@ -12,7 +12,10 @@ Luft- und Marineeinheiten). Die Inselküsten sind von **Klippen** gesäumt; nur 
 wenigen freien **Strandbuchten** kann ein Transportschiff anlanden – Landungen
 gehen also nicht überall, sondern nur an den Buchten. Karten sind deterministisch
 aus Seed + Kartentyp erzeugt; im Multiplayer bestimmt der Host die Karte, Replays
-speichern sie mit.
+speichern sie mit. Die KI (normal/schwer) baut Luftwaffe (Flugplatz + Helis/Jets)
+und auf Inselkarten eine Werft mit Kampfschiffen und einem Transportschiff –
+sie landet über die Buchten an und greift so auch über Wasser an; die leichte
+KI bleibt bodengebunden.
 
 **Marine:** Die **Werft** wird auf offenem Wasser im Bauradius der Basis
 platziert und baut Schiffe (Tab „See"): **Kanonenboot** (beide Fraktionen),

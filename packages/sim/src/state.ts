@@ -149,6 +149,9 @@ export interface GameState {
   winner: number;
   mapWidth: number;
   mapHeight: number;
+  /** Layout this game was generated with (BADLANDS/RIVER/ISLANDS). Read by the
+   *  AI to decide when it needs air/naval to cross water. */
+  mapType: MapType;
   terrain: Uint8Array;
   /** Harvestable resource units per cell. */
   ore: Uint16Array;
@@ -302,6 +305,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     winner: -1,
     mapWidth,
     mapHeight,
+    mapType: options.mapType ?? 'BADLANDS',
     terrain: new Uint8Array(0),
     ore: new Uint16Array(size),
     resourceKind: new Uint8Array(size),
@@ -319,7 +323,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     events: [],
   };
 
-  const mapType = options.mapType ?? 'BADLANDS';
+  const mapType = state.mapType;
   state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType);
   for (const [sx, sy] of PLAYER_SPAWNS) {
     clearArea(state.terrain, mapWidth, sx, sy, 4);
