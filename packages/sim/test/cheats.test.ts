@@ -3,6 +3,8 @@ import {
   CHEAT_MONEY,
   CHEAT_POWER,
   FOG_VISIBLE,
+  MOTHERLOAD_CREDITS,
+  MOTHERLOAD_POWER,
   createGame,
   hashState,
   powerBalance,
@@ -38,6 +40,32 @@ describe('cheats', () => {
     expect(state.fogs[0]!.every((f) => f === FOG_VISIBLE)).toBe(true);
   });
 
+  it('MOTHERLOAD unlocks a prereq-gated unit for the cheater', () => {
+    const state = createGame(1);
+    // Player 0 starts with a CONYARD only — a TANK needs a FACTORY first.
+    tick(state, [{ type: 'BUILD_START', playerId: 0, item: 'TANK' }]);
+    expect(state.players[0]!.queues.vehicle.item).toBeNull(); // gated off
+
+    tick(state, [{ type: 'CHEAT', playerId: 0, cheat: 'MOTHERLOAD' }]);
+    tick(state, [{ type: 'BUILD_START', playerId: 0, item: 'TANK' }]);
+    expect(state.players[0]!.queues.vehicle.item).toBe('TANK'); // now buildable
+  });
+
+  it('MOTHERLOAD keeps credits and power topped up for the cheater only', () => {
+    const state = createGame(2);
+    const powerBefore = powerBalance(state, 0).produced;
+    tick(state, [{ type: 'CHEAT', playerId: 0, cheat: 'MOTHERLOAD' }]);
+
+    expect(powerBalance(state, 0).produced).toBe(powerBefore + MOTHERLOAD_POWER);
+    expect(powerBalance(state, 1).produced).toBe(powerBefore); // opponent untouched
+
+    // Drain the cheater's credits — the next tick refills them.
+    state.players[0]!.credits = 0;
+    tick(state);
+    expect(state.players[0]!.credits).toBe(MOTHERLOAD_CREDITS);
+    expect(state.players[1]!.motherload).toBe(false);
+  });
+
   it('cheats replay deterministically through the command log', () => {
     const run = (): string => {
       const state = createGame(42);
@@ -45,6 +73,7 @@ describe('cheats', () => {
         { type: 'CHEAT', playerId: 0, cheat: 'MONEY' },
         { type: 'CHEAT', playerId: 0, cheat: 'REVEAL' },
         { type: 'CHEAT', playerId: 0, cheat: 'POWER' },
+        { type: 'CHEAT', playerId: 0, cheat: 'MOTHERLOAD' },
       ]);
       for (let i = 0; i < 50; i++) tick(state);
       return hashState(state);

@@ -17,7 +17,7 @@ import type { ControlGroups } from './groups.js';
  * balance.json, so nothing on screen reveals them.
  */
 /** Cheat kinds the sim understands. */
-export type CheatKind = 'MONEY' | 'REVEAL' | 'POWER';
+export type CheatKind = 'MONEY' | 'REVEAL' | 'POWER' | 'MOTHERLOAD';
 /** Console code (as typed) → cheat kind, supplied from the config. */
 export type CheatCodes = Record<string, CheatKind>;
 

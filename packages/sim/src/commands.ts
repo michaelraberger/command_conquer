@@ -48,7 +48,7 @@ export type Command =
   | { type: 'DEPLOY'; playerId: number; unitIds: number[] }
   | { type: 'RESEARCH_START'; playerId: number; tech: string }
   | { type: 'RESEARCH_CANCEL'; playerId: number }
-  | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' };
+  | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' | 'MOTHERLOAD' };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
   for (const cmd of commands) {
@@ -284,6 +284,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         if (cmd.cheat === 'MONEY') player.credits += CHEAT_MONEY;
         else if (cmd.cheat === 'POWER') player.powerBonus += CHEAT_POWER;
         else if (cmd.cheat === 'REVEAL') player.mapRevealed = true;
+        else if (cmd.cheat === 'MOTHERLOAD') player.motherload = true;
         break;
       }
       case 'SET_RALLY': {

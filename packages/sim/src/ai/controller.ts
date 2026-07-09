@@ -93,12 +93,12 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
 /** Desired base, in build order. Duplicate entries raise the target count. */
 const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   SOVIETS: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'TESLA', 'POWER', 'TESLA',
-    'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'RADAR', 'TECHCENTER', 'TESLA', 'POWER',
+    'TESLA', 'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
   ],
   ALLIES: [
     'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'PILLBOX', 'POWER', 'PILLBOX',
-    'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'WEATHER',
+    'WERKSTATT', 'HELIPAD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER', 'PRISM', 'WEATHER',
   ],
 };
 
@@ -274,6 +274,17 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
       const wantHeavy =
         params.useHighTech && tanks >= 3 && heavies < 3 && player.credits > 2200;
       startProduction(state, player.id, wantHeavy ? heavy : 'TANK');
+    }
+    // Soviet siege support: a pair of V3 launchers once the tank line is full
+    // (startProduction no-ops while the queue is busy or the Radarturm/prereqs
+    // are missing, so this never stalls the build order).
+    if (
+      state.mapType !== 'ISLANDS' &&
+      availableToFaction(unitRule('V3').factions, player.faction) &&
+      countUnits(state, player.id, 'V3') < 2 &&
+      player.credits > 1600
+    ) {
+      startProduction(state, player.id, 'V3');
     }
   }
 

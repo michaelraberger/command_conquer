@@ -44,7 +44,7 @@ export const FACTION_COLORS: Record<Faction, number> = {
 };
 
 /** Visual/audio flavor of a weapon, consumed by the client effect layer. */
-export type WeaponFx = 'BULLET' | 'CANNON' | 'TESLA' | 'ARTY' | 'FLAME' | 'ROCKET';
+export type WeaponFx = 'BULLET' | 'CANNON' | 'TESLA' | 'ARTY' | 'FLAME' | 'ROCKET' | 'PRISM';
 
 export interface WeaponRule {
   damage: number;
@@ -63,6 +63,8 @@ export interface WeaponRule {
   targets: WeaponTargets;
   /** Can hit submerged units (depth charges/torpedoes). */
   antiSub: boolean;
+  /** Lobbed trajectory (artillery/V3): fires over walls; direct fire cannot. */
+  arcing?: boolean;
 }
 
 export interface UnitRule {
@@ -150,7 +152,8 @@ export const UNIT_RULES = {
     speed: 22,
     radius: 110,
     armor: 'light',
-    weapon: weapon(90, 7, 45, 140, { none: 90, light: 80, heavy: 70 }, 'ARTY'),
+    // Lobbed shells: the one Allied weapon that fires over walls (arcing).
+    weapon: { ...weapon(90, 7, 45, 140, { none: 90, light: 80, heavy: 70 }, 'ARTY'), arcing: true },
     cost: 1200,
     buildTime: 120,
     category: 'vehicle',
@@ -295,6 +298,23 @@ export const UNIT_RULES = {
     factions: ['SOVIETS'],
     sight: 5,
     antiInfantryOnly: true,
+  },
+  V3: {
+    name: 'V3-Werfer',
+    maxHp: 150,
+    speed: 22,
+    radius: 110,
+    armor: 'light',
+    // Siege rocket: the longest ground reach in the game and warheads that
+    // flatten structures — paid for with a slow reload and a fragile chassis.
+    // Arcing: the V3 lobs its rocket clean over walls.
+    weapon: { ...weapon(140, 9.5, 75, 80, { none: 80, light: 100, heavy: 100 }, 'ROCKET'), arcing: true },
+    cost: 800,
+    buildTime: 90,
+    category: 'vehicle',
+    requires: ['FACTORY', 'RADAR'],
+    factions: ['SOVIETS'],
+    sight: 7,
   },
   TESLATANK: {
     name: 'Tesla-Panzer',
@@ -688,6 +708,25 @@ export const BUILDING_RULES = {
     factions: ['ALLIES'],
     sight: 6,
   },
+  PRISM: {
+    name: 'Prisma-Turm',
+    maxHp: 600,
+    cost: 1500,
+    buildTime: 100,
+    power: -75,
+    width: 1,
+    height: 1,
+    armor: 'light',
+    produces: null,
+    // Concentrated light beam: long reach, brutal on infantry and light armour,
+    // less so on heavy tanks. Prism towers reinforce each other (see defense.ts).
+    weapon: weapon(110, 7, 34, 0, { none: 100, light: 110, heavy: 80 }, 'PRISM'),
+    superweapon: null,
+    requires: ['HELIPAD'],
+    buildable: true,
+    factions: ['ALLIES'],
+    sight: 7,
+  },
   HELIPAD: {
     name: 'Flugplatz',
     maxHp: 900,
@@ -796,6 +835,25 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 4,
+  },
+  RADAR: {
+    name: 'Radarturm',
+    maxHp: 750,
+    cost: 1000,
+    buildTime: 100,
+    power: -50,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: ['REFINERY'],
+    buildable: true,
+    factions: ['SOVIETS'],
+    // The radar sweep: by far the widest sight in the game — the tower itself
+    // uncovers a huge patch of map. Also the launch key for the V3 (requires).
+    sight: 11,
   },
   WALL: {
     name: 'Mauer',
@@ -994,9 +1052,21 @@ export const VEHICLE_REPAIR_REACH = 1.6;
 export const TRANSPORT_CAPACITY = 5;
 /** Board/unload reach between a shore unit and the ship, in cells. */
 export const TRANSPORT_REACH = 2;
+/** Prism towers "link": each friendly, online Prism Tower within this range
+ *  adds a slice of extra beam damage to a firing tower, capped so a cluster
+ *  can't one-shot everything. See defenseSystem. */
+const PRISM_LINK_RANGE = Math.round(5 * SUBCELL);
+export const PRISM_LINK_RANGE_SQ = PRISM_LINK_RANGE * PRISM_LINK_RANGE;
+export const PRISM_LINK_BONUS_PCT = 20;
+export const PRISM_LINK_MAX = 4;
+
 /** Cheats (solo games): credits per money cheat, watts per power cheat. */
 export const CHEAT_MONEY = 10_000;
 export const CHEAT_POWER = 300;
+/** Motherload cheat: credit floor topped up each tick + free power, big enough
+ *  that no single tick of spending can drain it (effectively unlimited). */
+export const MOTHERLOAD_CREDITS = 1_000_000;
+export const MOTHERLOAD_POWER = 1_000_000;
 
 /* ----------------------------- balance config ---------------------------- */
 

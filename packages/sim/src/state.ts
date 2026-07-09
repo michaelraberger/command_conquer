@@ -140,6 +140,9 @@ export interface Player {
   mapRevealed: boolean;
   /** Cheat: flat extra power added to the balance. */
   powerBonus: number;
+  /** Cheat (motherload): unlock every unit/building of the faction and top up
+   *  credits + power to effectively unlimited each tick. */
+  motherload: boolean;
   /** Completed technologies (see TECH_RULES). Plain sorted array for replay. */
   researched: TechId[];
   /** Tech being researched right now (drains credits over time), or null. */
@@ -358,6 +361,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     aiLastAttackTick: 0,
     mapRevealed: false,
     powerBonus: 0,
+    motherload: false,
     researched: [],
     research: null,
   });

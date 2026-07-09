@@ -1,12 +1,13 @@
 import { SUBCELL, facingFromDelta } from '../fixed.js';
 import { findPath } from '../path/astar.js';
-import { unitRule, type UnitRule, type WeaponRule } from '../rules.js';
+import { buildingRule, unitRule, type UnitRule, type WeaponRule } from '../rules.js';
 import {
   aimPoint,
   damageTarget,
   findTarget,
   isAir,
   isNaval,
+  losBlockedByWall,
   nearestEnemyBuilding,
   nearestEnemyUnit,
   targetDistSq,
@@ -15,7 +16,7 @@ import {
   weaponHitsBuildings,
   type Target,
 } from '../targeting.js';
-import type { GameState, Unit } from '../state.js';
+import type { Building, GameState, Unit } from '../state.js';
 
 /** Chasing units recompute their pursuit path every N ticks (staggered by id). */
 const CHASE_REPATH_INTERVAL = 10;
@@ -76,15 +77,16 @@ export function combatSystem(state: GameState): void {
         }
       }
     } else if (!unit.path) {
-      // Guard stance: idle units fire at any enemy in range, and otherwise
-      // step toward a nearby attacker just out of range — so units near a
-      // fight automatically move in to defend instead of standing idle.
+      // Guard stance: idle units fire at any enemy in range (armed enemies
+      // before harvesters etc.), and otherwise step toward a nearby attacker
+      // just out of range — so units near a fight automatically move in to
+      // defend instead of standing idle.
       const accept = unitAccept(weapon, rule);
-      const inRange = nearestEnemyUnit(state, unit.owner, unit.x, unit.y, weapon.rangeSq, accept);
+      const inRange = nearestThreatUnit(state, unit, weapon, weapon.rangeSq, accept);
       if (inRange) {
         tryFire(state, unit, { kind: 'unit', unit: inRange }, weapon);
       } else {
-        const near = nearestEnemyUnit(state, unit.owner, unit.x, unit.y, GUARD_RANGE_SQ, accept);
+        const near = nearestThreatUnit(state, unit, weapon, GUARD_RANGE_SQ, accept);
         if (near) {
           // Attack-move toward the attacker's cell; self-limiting because the
           // unit re-evaluates once it arrives (no endless cross-map chase).
@@ -111,6 +113,51 @@ function unitAccept(weapon: WeaponRule, rule: UnitRule): (u: Unit) => boolean {
   return byLayer;
 }
 
+/** Threat filter: armed units soak auto-acquired fire before harvesters etc. */
+function isArmedUnit(u: Unit): boolean {
+  return unitRule(u.type).weapon !== null;
+}
+
+/**
+ * Walls give cover: direct fire may not cross a WALL/GATE cell. Arcing weapons
+ * (Artillerie, V3) lob over the top, aircraft shoot from above, and shots at
+ * aircraft fly over the wall too. Base-defense towers are exempt in
+ * defenseSystem (they are tall) — this check is for units only.
+ */
+function losClear(state: GameState, unit: Unit, weapon: WeaponRule, target: Target): boolean {
+  if (weapon.arcing === true || isAir(unit)) return true;
+  if (target.kind === 'unit' && isAir(target.unit)) return true;
+  const aim = aimPoint(target, unit.x, unit.y);
+  const ignoreId = target.kind === 'building' ? target.building.id : 0;
+  return !losBlockedByWall(state, unit.x, unit.y, aim.x, aim.y, ignoreId);
+}
+
+/**
+ * Auto-acquisition prefers threats over bystanders: armed enemies within range
+ * first, then a defense building actively covering the area, and only then
+ * unarmed units (harvesters, MCVs, spies) and passive structures. Explicit
+ * ATTACK orders bypass this — what the player clicks is what gets shot.
+ */
+function nearestThreatUnit(
+  state: GameState,
+  unit: Unit,
+  weapon: WeaponRule,
+  rangeSq: number,
+  accept: (u: Unit) => boolean,
+): Unit | null {
+  const clear = (u: Unit): boolean => losClear(state, unit, weapon, { kind: 'unit', unit: u });
+  return (
+    nearestEnemyUnit(
+      state,
+      unit.owner,
+      unit.x,
+      unit.y,
+      rangeSq,
+      (u) => accept(u) && isArmedUnit(u) && clear(u),
+    ) ?? nearestEnemyUnit(state, unit.owner, unit.x, unit.y, rangeSq, (u) => accept(u) && clear(u))
+  );
+}
+
 /** Whether this weapon may engage the given target at all. */
 function canEngage(weapon: WeaponRule, rule: UnitRule, target: Target): boolean {
   if (target.kind === 'building') {
@@ -119,32 +166,87 @@ function canEngage(weapon: WeaponRule, rule: UnitRule, target: Target): boolean 
   return unitAccept(weapon, rule)(target.unit);
 }
 
-/** Units in range first, then enemy structures (walls only via explicit ATTACK). */
+/**
+ * Auto-acquisition by threat: armed enemy units first, then defense buildings,
+ * then unarmed units (harvesters etc.), then passive structures. Targets with
+ * a wall in the line of fire are skipped; as a last resort the nearest enemy
+ * wall/gate in range is attacked, so a breaching force chews through the wall
+ * instead of idling in front of it.
+ */
 function acquireTarget(
   state: GameState,
   unit: Unit,
   weapon: WeaponRule,
   rule: UnitRule,
 ): Target | null {
-  const enemyUnit = nearestEnemyUnit(
+  const accept = unitAccept(weapon, rule);
+  const clearU = (u: Unit): boolean => losClear(state, unit, weapon, { kind: 'unit', unit: u });
+  const clearB = (b: Building): boolean =>
+    losClear(state, unit, weapon, { kind: 'building', building: b });
+
+  const armed = nearestEnemyUnit(
     state,
     unit.owner,
     unit.x,
     unit.y,
     weapon.rangeSq,
-    unitAccept(weapon, rule),
+    (u) => accept(u) && isArmedUnit(u) && clearU(u),
   );
-  if (enemyUnit) return { kind: 'unit', unit: enemyUnit };
-  if (rule.antiInfantryOnly === true || rule.navalOnly === true || !weaponHitsBuildings(weapon)) {
-    return null;
+  if (armed) return { kind: 'unit', unit: armed };
+
+  const hitsBuildings =
+    rule.antiInfantryOnly !== true && rule.navalOnly !== true && weaponHitsBuildings(weapon);
+  if (hitsBuildings) {
+    const defense = nearestEnemyBuilding(
+      state,
+      unit.owner,
+      unit.x,
+      unit.y,
+      weapon.rangeSq,
+      false,
+      (b) => buildingRule(b.type).weapon !== null && clearB(b),
+    );
+    if (defense) return { kind: 'building', building: defense };
   }
-  const building = nearestEnemyBuilding(state, unit.owner, unit.x, unit.y, weapon.rangeSq, false);
+
+  const bystander = nearestEnemyUnit(
+    state,
+    unit.owner,
+    unit.x,
+    unit.y,
+    weapon.rangeSq,
+    (u) => accept(u) && clearU(u),
+  );
+  if (bystander) return { kind: 'unit', unit: bystander };
+  if (!hitsBuildings) return null;
+  const building = nearestEnemyBuilding(
+    state,
+    unit.owner,
+    unit.x,
+    unit.y,
+    weapon.rangeSq,
+    false,
+    clearB,
+  );
   if (building) return { kind: 'building', building };
+  // Everything worth shooting is behind a wall — breach the wall itself.
+  const wall = nearestEnemyBuilding(
+    state,
+    unit.owner,
+    unit.x,
+    unit.y,
+    weapon.rangeSq,
+    true,
+    (b) => (b.type === 'WALL' || b.type === 'GATE') && clearB(b),
+  );
+  if (wall) return { kind: 'building', building: wall };
   return null;
 }
 
 function engageOrChase(state: GameState, unit: Unit, target: Target, weapon: WeaponRule): void {
-  if (targetDistSq(target, unit.x, unit.y) <= weapon.rangeSq) {
+  // A wall in the line of fire blocks the shot (losClear) — treated like being
+  // out of range, the unit closes in instead. Target the wall to breach it.
+  if (targetDistSq(target, unit.x, unit.y) <= weapon.rangeSq && losClear(state, unit, weapon, target)) {
     unit.path = null;
     tryFire(state, unit, target, weapon);
     return;

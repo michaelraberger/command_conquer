@@ -8,6 +8,8 @@ import {
   isUnitType,
   techRule,
   unitRule,
+  MOTHERLOAD_CREDITS,
+  MOTHERLOAD_POWER,
   type ProductionCategory,
 } from '../rules.js';
 import { constructBuilding, spawnUnit, type GameState, type Player } from '../state.js';
@@ -15,7 +17,9 @@ import { canPlaceBuilding } from './placement.js';
 
 /** Net power balance for a player (produced minus consumed + cheat bonus). */
 export function powerBalance(state: GameState, playerId: number): { produced: number; used: number } {
-  let produced = state.players.find((p) => p.id === playerId)?.powerBonus ?? 0;
+  const player = state.players.find((p) => p.id === playerId);
+  let produced = player?.powerBonus ?? 0;
+  if (player?.motherload) produced += MOTHERLOAD_POWER; // cheat: unlimited energy
   let used = 0;
   for (const b of state.buildings) {
     if (b.owner !== playerId) continue;
@@ -59,9 +63,12 @@ export function startProduction(state: GameState, playerId: number, item: string
   if (rule === null) return;
   if (isBuildingType(item) && !buildingRule(item).buildable) return;
   if (!availableToFaction(rule.factions, player.faction)) return;
-  if (!prereqsMet(state, playerId, rule.requires)) return;
-  // Tech gate: advanced items need their technology researched first.
-  if (rule.tech !== undefined && !player.researched.includes(rule.tech)) return;
+  // Motherload cheat unlocks everything of the faction — skip prereq/tech gates.
+  if (!player.motherload) {
+    if (!prereqsMet(state, playerId, rule.requires)) return;
+    // Tech gate: advanced items need their technology researched first.
+    if (rule.tech !== undefined && !player.researched.includes(rule.tech)) return;
+  }
   queue.item = item;
   queue.progress = 0;
 }
@@ -148,6 +155,8 @@ const CATEGORIES: readonly ProductionCategory[] = ['building', 'infantry', 'vehi
  */
 export function productionSystem(state: GameState): void {
   for (const player of state.players) {
+    // Motherload cheat: refill the coffers each tick so spending never runs dry.
+    if (player.motherload && player.credits < MOTHERLOAD_CREDITS) player.credits = MOTHERLOAD_CREDITS;
     const { produced, used } = powerBalance(state, player.id);
     const lowPower = used > produced;
     if (lowPower && state.tick % 2 === 1) continue;

@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "preview", "packages/client", "--port", "4173", "--strictPort"],
       "port": 4173
+    },
+    {
+      "name": "client-dev-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "packages/client", "--port", "5174", "--strictPort"],
+      "port": 5174
     }
   ]
 }

@@ -232,11 +232,14 @@ export class Sidebar {
       }
       const q = this.queue(el.category);
       const rule = isBuildingType(el.item) ? buildingRule(el.item) : unitRule(el.item as UnitType);
-      const prereqsMet = rule.requires.every((req) =>
-        this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === req),
-      );
+      const prereqsMet =
+        player.motherload ||
+        rule.requires.every((req) =>
+          this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === req),
+        );
       const tech = techFor(el.item);
-      const techLocked = tech !== undefined && !player.researched.includes(tech);
+      const techLocked =
+        !player.motherload && tech !== undefined && !player.researched.includes(tech);
       const isThis = q.item === el.item;
       const busy = q.item !== null && !isThis;
 

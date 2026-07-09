@@ -11,6 +11,7 @@ import { Effects } from './render/effects.js';
 import { EntityRenderer } from './render/entities.js';
 import { FogRenderer } from './render/fog.js';
 import { OreRenderer } from './render/ore.js';
+import { PrismLinkOverlay } from './render/prismLinks.js';
 import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
@@ -35,8 +36,13 @@ interface RawConfig extends BalanceConfig {
 }
 
 /** Secret cheat codes when balance.json has no `cheats` section of its own. */
-const DEFAULT_CHEATS: CheatCodes = { money: 'MONEY', visible: 'REVEAL', power: 'POWER' };
-const CHEAT_KINDS = new Set<CheatKind>(['MONEY', 'REVEAL', 'POWER']);
+const DEFAULT_CHEATS: CheatCodes = {
+  money: 'MONEY',
+  visible: 'REVEAL',
+  power: 'POWER',
+  motherload: 'MOTHERLOAD',
+};
+const CHEAT_KINDS = new Set<CheatKind>(['MONEY', 'REVEAL', 'POWER', 'MOTHERLOAD']);
 
 let configPromise: Promise<RawConfig | null> | null = null;
 
@@ -114,8 +120,17 @@ async function boot(): Promise<void> {
   entityLayer.sortableChildren = true;
   placeDoodads(state, textures, entityLayer);
   const effects = new Effects();
+  const prismLinks = new PrismLinkOverlay();
   const fog = new FogRenderer(state, textures);
-  world.addChild(terrainLayer, ore.layer, ghostLayer, entityLayer, effects.layer, fog.layer);
+  world.addChild(
+    terrainLayer,
+    ore.layer,
+    ghostLayer,
+    entityLayer,
+    prismLinks.layer,
+    effects.layer,
+    fog.layer,
+  );
   app.stage.addChild(world);
 
   const camera = new Camera(state);
@@ -158,6 +173,7 @@ async function boot(): Promise<void> {
       controls,
       entities,
       effects,
+      prismLinks,
       ore,
       fog,
       buildRadius,

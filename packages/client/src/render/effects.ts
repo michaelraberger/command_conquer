@@ -26,6 +26,10 @@ export class Effects {
           this.addLightning(from, to);
           continue;
         }
+        if (e.fx === 'PRISM') {
+          this.addPrismBeam(from, to);
+          continue;
+        }
         if (e.fx === 'FLAME') {
           const mx = from.x;
           const my = from.y - 9;
@@ -212,6 +216,28 @@ export class Effects {
         this.addLightning({ x: hit.x, y: hit.y - 60 }, hit);
       }
     }
+  }
+
+  /** Straight, bright light beam from the prism crystal to the target, with a
+   *  soft outer glow and a flash at the impact point. Purely cosmetic. */
+  private addPrismBeam(from: { x: number; y: number }, to: { x: number; y: number }): void {
+    const ax = from.x;
+    const ay = from.y - 46; // fire from the crystal atop the tower
+    const bx = to.x;
+    const by = to.y - 6;
+    this.add(
+      170,
+      (g) => {
+        g.moveTo(ax, ay).lineTo(bx, by).stroke({ width: 7, color: 0x7fe6ff, alpha: 0.25 }); // glow
+        g.moveTo(ax, ay).lineTo(bx, by).stroke({ width: 3, color: 0xd6f7ff, alpha: 0.85 }); // core
+        g.moveTo(ax, ay).lineTo(bx, by).stroke({ width: 1, color: 0xffffff, alpha: 0.95 });
+        g.circle(ax, ay, 5).fill({ color: 0xd6f7ff, alpha: 0.9 }); // emitter spark
+        g.circle(bx, by, 6).fill({ color: 0xeaffff, alpha: 0.85 }); // impact bloom
+      },
+      (g, t) => {
+        g.alpha = 1 - t * t;
+      },
+    );
   }
 
   /** Jagged tesla arc with a soft glow — client-local randomness is fine. */

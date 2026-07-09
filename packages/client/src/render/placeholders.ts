@@ -48,6 +48,7 @@ export interface GameTextures {
   tank: UnitSprite[];
   mammoth: UnitSprite[];
   artillery: UnitSprite[];
+  v3: UnitSprite[];
   rifleman: UnitSprite[];
   harvester: UnitSprite[];
   repair: UnitSprite[];
@@ -302,6 +303,27 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 1, 1, 22),
   },
+  RADAR: {
+    frameTop: 50,
+    fx: 0x8dffa0, // radar-scope green
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      prismAt(g, 0.2, 0.2, 1.2, 1.6, 16, 0xb0a794); // operations block
+      const m = iso(1.4, 0.75);
+      g.rect(m.x - 2.5, m.y - 44, 5, 40).fill(0x6f675a); // mast
+      g.rect(m.x - 6, m.y - 24, 12, 3).fill(0x6f675a); // cross brace
+      // Tilted dish bowl with a lit inner face and a feed arm.
+      g.ellipse(m.x + 3, m.y - 46, 12, 7).fill(0xcfd6dc).stroke({ width: 1, color: 0x5a6068 });
+      g.ellipse(m.x + 1, m.y - 47, 8, 4.5).fill(0xe8edf2);
+      g.rect(m.x + 2, m.y - 50, 9, 1.8).fill(0x50565e); // feed arm
+      g.circle(m.x + 11, m.y - 49, 2.2).fill(fx); // emitter blip (fx)
+      // Radar scope glowing on the block roof.
+      const r = iso(0.75, 1.05);
+      g.circle(r.x, r.y - 18, 4.5).fill({ color: fx, alpha: 0.85 });
+      g.circle(r.x, r.y - 18, 7).stroke({ width: 1, color: fx, alpha: 0.4 });
+    },
+    team: (g) => teamMark(g, 0.75, 1.7, 14),
+  },
   TESLA: {
     frameTop: 52,
     fx: 0x7fd4ff,
@@ -329,6 +351,24 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.rect(c.x - 9, c.y - 9, 18, 3.5).fill(0x3a352c); // firing slit
     },
     team: (g) => teamMark(g, 0.5, 0.5, 15),
+  },
+  PRISM: {
+    frameTop: 54,
+    fx: 0xa7f0ff,
+    body: (g, _w, _h, fx) => {
+      concretePlate(g, 1, 1);
+      const c = iso(0.5, 0.5);
+      prismAt(g, 0.3, 0.3, 0.4, 0.4, 8, 0xb0a794); // faceted base block
+      // Tapered pylon rising to the emitter crystal.
+      g.poly([c.x - 5, c.y - 6, c.x + 5, c.y - 6, c.x + 2.5, c.y - 40, c.x - 2.5, c.y - 40]).fill(0x9aa7b0);
+      g.poly([c.x - 5, c.y - 6, c.x - 2.5, c.y - 40, c.x, c.y - 40, c.x, c.y - 6]).fill(0x8592a0); // shaded face
+      // Glowing prism crystal on top (diamond, never faction-tinted).
+      const ey = c.y - 48;
+      g.poly([c.x, ey - 10, c.x + 7, ey, c.x, ey + 8, c.x - 7, ey]).fill(fx).stroke({ width: 1, color: 0xe8ffff });
+      g.poly([c.x, ey - 10, c.x, ey + 8, c.x - 7, ey]).fill({ color: 0xe8ffff, alpha: 0.55 }); // lit facet
+      g.circle(c.x, ey, 11).stroke({ width: 1, color: fx, alpha: 0.5 }); // energy halo
+    },
+    team: (g) => teamMark(g, 0.5, 0.5, 9),
   },
   HELIPAD: {
     frameTop: 22,
@@ -603,6 +643,23 @@ function drawArtillery(g: Graphics): void {
 }
 function teamArtillery(g: Graphics): void {
   g.rect(-12, -3, 6, 6).fill(0xffffff); // rear crew box
+}
+
+// ── V3 launcher: flatbed truck, angled launch ramp, one big finned rocket ──
+function drawV3(g: Graphics): void {
+  g.rect(-14, -11, 26, 5).fill(TREAD);
+  g.rect(-14, 6, 26, 5).fill(TREAD);
+  g.roundRect(-14, -8, 24, 16, 2).fill(HULL_LO).stroke({ width: 1.2, color: OUTLINE });
+  g.rect(-14, -8, 24, 3).fill(HULL);
+  g.roundRect(-13, -5.5, 8, 11, 2).fill(HULL_HI); // cab up front
+  g.poly([-4, 4, 15, -1.5, 15, 1, -4, 6.5]).fill(METAL_DK); // launch ramp rail
+  // The V3 rocket itself, resting on the ramp: pale body, red nose, tail fins.
+  g.roundRect(-3, -3.2, 19, 4.4, 2.2).fill(0xd8dde2).stroke({ width: 1, color: OUTLINE });
+  g.poly([16, -3.2, 22, -1, 16, 1.2]).fill(0xe23b32);
+  g.rect(-4.5, -5, 3, 8).fill(METAL); // fins
+}
+function teamV3(g: Graphics): void {
+  g.rect(-12, -3.5, 5.5, 7).fill(0xffffff); // cab roof
 }
 
 // ── Harvester: bulky, ore bin, front scoop with teeth ──
@@ -1003,6 +1060,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const tank: UnitSprite[] = [];
   const mammoth: UnitSprite[] = [];
   const artillery: UnitSprite[] = [];
+  const v3: UnitSprite[] = [];
   const rifleman: UnitSprite[] = [];
   const harvester: UnitSprite[] = [];
   const repair: UnitSprite[] = [];
@@ -1028,6 +1086,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     tank.push(bakeVehicle(renderer, f, 28, drawTank, teamTank));
     mammoth.push(bakeVehicle(renderer, f, 34, drawMammoth, teamMammoth));
     artillery.push(bakeVehicle(renderer, f, 32, drawArtillery, teamArtillery));
+    v3.push(bakeVehicle(renderer, f, 32, drawV3, teamV3));
     harvester.push(bakeVehicle(renderer, f, 30, drawHarvester, teamHarvester));
     repair.push(bakeVehicle(renderer, f, 28, drawRepair, teamRepair));
     scout.push(bakeVehicle(renderer, f, 24, drawScout, teamScout));
@@ -1139,6 +1198,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     tank,
     mammoth,
     artillery,
+    v3,
     rifleman,
     sniper,
     spion,

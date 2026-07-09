@@ -32,6 +32,41 @@ export function weaponHitsBuildings(weapon: WeaponRule): boolean {
   return weapon.targets !== 'air';
 }
 
+/**
+ * Walls give cover: true when a WALL/GATE cell lies strictly between the two
+ * points, so direct fire cannot cross it. The shooter's own cell and the
+ * target's footprint (`ignoreId`, e.g. when the wall itself is the target) do
+ * not block. Integer sampling at half-cell steps — deterministic by design.
+ */
+export function losBlockedByWall(
+  state: GameState,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  ignoreId = 0,
+): boolean {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const adx = dx < 0 ? -dx : dx;
+  const ady = dy < 0 ? -dy : dy;
+  const longest = adx > ady ? adx : ady;
+  const steps = Math.trunc((2 * longest) / SUBCELL) + 1; // ~half-cell sampling
+  const fromCell = Math.trunc(y0 / SUBCELL) * state.mapWidth + Math.trunc(x0 / SUBCELL);
+  const toCell = Math.trunc(y1 / SUBCELL) * state.mapWidth + Math.trunc(x1 / SUBCELL);
+  for (let i = 1; i < steps; i++) {
+    const sx = x0 + Math.trunc((dx * i) / steps);
+    const sy = y0 + Math.trunc((dy * i) / steps);
+    const cell = Math.trunc(sy / SUBCELL) * state.mapWidth + Math.trunc(sx / SUBCELL);
+    if (cell === fromCell || cell === toCell) continue;
+    const id = state.structures[cell]!;
+    if (id === 0 || id === ignoreId) continue;
+    const b = state.buildings.find((s) => s.id === id);
+    if (b && (b.type === 'WALL' || b.type === 'GATE')) return true;
+  }
+  return false;
+}
+
 /** Anything a weapon can shoot at. */
 export type Target =
   | { kind: 'unit'; unit: Unit }
@@ -111,12 +146,12 @@ export function nearestEnemyUnit(
   let bestD = -1;
   for (const other of state.units) {
     if (other.hp <= 0 || !areEnemies(state, owner, other.owner)) continue;
-    if (accept && !accept(other)) continue;
     const d2 = distSq(other.x - x, other.y - y);
-    if (d2 <= rangeSq && (best === null || d2 < bestD)) {
-      best = other;
-      bestD = d2;
-    }
+    if (d2 > rangeSq || (best !== null && d2 >= bestD)) continue;
+    // Distance first — accept may run a (pricier) line-of-sight walk.
+    if (accept && !accept(other)) continue;
+    best = other;
+    bestD = d2;
   }
   return best;
 }
@@ -129,6 +164,7 @@ export function nearestEnemyBuilding(
   y: number,
   rangeSq: number,
   includeWalls: boolean,
+  accept?: (b: Building) => boolean,
 ): Building | null {
   let best: Building | null = null;
   let bestD = -1;
@@ -136,10 +172,11 @@ export function nearestEnemyBuilding(
     if (b.hp <= 0 || !areEnemies(state, owner, b.owner)) continue;
     if (!includeWalls && b.type === 'WALL') continue;
     const d2 = targetDistSq({ kind: 'building', building: b }, x, y);
-    if (d2 <= rangeSq && (best === null || d2 < bestD)) {
-      best = b;
-      bestD = d2;
-    }
+    if (d2 > rangeSq || (best !== null && d2 >= bestD)) continue;
+    // Distance first — accept may run a (pricier) line-of-sight walk.
+    if (accept && !accept(b)) continue;
+    best = b;
+    bestD = d2;
   }
   return best;
 }

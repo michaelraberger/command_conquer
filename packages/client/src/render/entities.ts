@@ -213,6 +213,7 @@ export class EntityRenderer {
       TANK: this.tex.tank,
       MAMMOTH: this.tex.mammoth,
       ARTILLERY: this.tex.artillery,
+      V3: this.tex.v3,
       HARVESTER: this.tex.harvester,
       REPAIR: this.tex.repair,
       RIFLEMAN: this.tex.rifleman,

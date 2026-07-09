@@ -2,7 +2,8 @@
   "cheats": {
     "money": "MONEY",
     "visible": "REVEAL",
-    "power": "POWER"
+    "power": "POWER",
+    "motherload": "MOTHERLOAD"
   },
   "economy": {
     "startCredits": 5000,
