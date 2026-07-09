@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TERRAIN_DIRT,
   TERRAIN_ROCK,
+  buildAdjacency,
   cellIndex,
   constructBuilding,
   createGame,
@@ -49,6 +50,12 @@ describe('Tor (gate)', () => {
     tick(s, [{ type: 'MOVE', playerId: 0, unitIds: [mine.id], cx: 34, cy: 20 }]);
     for (let i = 0; i < 300; i++) tick(s);
     expect(mine.cell % s.mapWidth).toBeLessThan(31); // can't use the enemy's gate
+  });
+
+  it('does not extend the build radius (like a wall)', () => {
+    expect(buildAdjacency('GATE')).toBe(0);
+    expect(buildAdjacency('WALL')).toBe(0);
+    expect(buildAdjacency('POWER')).toBeGreaterThan(0);
   });
 
   it('reopens the cell (as plain ground) when the gate is destroyed', () => {

@@ -942,11 +942,11 @@ export const BUILD_ADJACENCY = 3;
 
 /**
  * How far a building of `type` projects the buildable area, in cells.
- * Walls project 0 — they never extend where you can build (you can only place
- * a wall inside the area your real buildings already opened).
+ * Walls and gates project 0 — they never extend where you can build (you can
+ * only place them inside the area your real buildings already opened).
  */
 export function buildAdjacency(type: BuildingType): number {
-  return type === 'WALL' ? 0 : BUILD_ADJACENCY;
+  return type === 'WALL' || type === 'GATE' ? 0 : BUILD_ADJACENCY;
 }
 /**
  * Economy defaults. The live values below are `let` exports so a balance
