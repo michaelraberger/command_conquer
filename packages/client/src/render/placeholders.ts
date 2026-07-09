@@ -66,6 +66,7 @@ export interface GameTextures {
   jet: UnitSprite[];
   strikejet: UnitSprite[];
   airlift: UnitSprite[];
+  paraplane: UnitSprite[];
   gunboat: UnitSprite[];
   destroyer: UnitSprite[];
   sub: UnitSprite[];
@@ -930,6 +931,22 @@ function teamAirlift(g: Graphics): void {
   g.rect(-5, -3.5, 11, 7).fill(0xffffff); // fuselage panel
 }
 
+// ── Paradrop plane: long fuselage, straight wings, twin engine nacelles ──
+function drawParaplane(g: Graphics): void {
+  g.rect(-7, -16, 5, 32).fill(HULL_LO).stroke({ width: 1, color: OUTLINE }); // straight wings
+  g.roundRect(-20, -5, 40, 10, 4).fill(HULL).stroke({ width: 1.2, color: OUTLINE }); // fuselage
+  g.rect(-20, -5, 40, 3).fill(HULL_HI);
+  g.roundRect(14, -3.5, 7, 7, 3).fill(GLASS); // cockpit
+  g.poly([-20, -2, -26, -7, -24, 0, -26, 7, -20, 2]).fill(HULL_LO); // tailplane
+  for (const wy of [-11, 11]) {
+    g.roundRect(-6, wy - 2.5, 10, 5, 2).fill(METAL_DK); // engine nacelles
+    g.circle(4, wy, 4).fill({ color: 0xe8edf2, alpha: 0.25 }); // prop disc
+  }
+}
+function teamParaplane(g: Graphics): void {
+  g.rect(-3, -3.5, 9, 7).fill(0xffffff); // fuselage band
+}
+
 /* Ships face +x like vehicles; bakeVehicle's drop shadow reads as their wake. */
 
 // ── Patrol gunboat: small pointed hull, cabin, deck MG ──
@@ -1100,6 +1117,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const jet: UnitSprite[] = [];
   const strikejet: UnitSprite[] = [];
   const airlift: UnitSprite[] = [];
+  const paraplane: UnitSprite[] = [];
   const gunboat: UnitSprite[] = [];
   const destroyer: UnitSprite[] = [];
   const sub: UnitSprite[] = [];
@@ -1119,6 +1137,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     jet.push(bakeVehicle(renderer, f, 30, drawJet, teamJet));
     strikejet.push(bakeVehicle(renderer, f, 30, drawStrikeJet, teamStrikeJet));
     airlift.push(bakeVehicle(renderer, f, 34, drawAirlift, teamAirlift));
+    paraplane.push(bakeVehicle(renderer, f, 36, drawParaplane, teamParaplane));
     gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat, teamGunboat));
     destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer, teamDestroyer));
     sub.push(bakeVehicle(renderer, f, 28, drawSub, teamSub));
@@ -1238,6 +1257,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     jet,
     strikejet,
     airlift,
+    paraplane,
     gunboat,
     destroyer,
     sub,

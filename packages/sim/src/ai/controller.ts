@@ -160,6 +160,7 @@ export function aiSystem(state: GameState): void {
     manageInvasion(state, player, params);
     manageArmy(state, player, params);
     manageSuperweapon(state, player, params);
+    manageParadrop(state, player, params);
   }
 }
 
@@ -548,6 +549,20 @@ function manageSuperweapon(state: GameState, player: Player, params: AiParams): 
   if (!target) return;
   applyCommands(state, [
     { type: 'FIRE_SUPERWEAPON', playerId: player.id, cx: target.cx + 1, cy: target.cy + 1 },
+  ]);
+}
+
+/** Drop paratroopers on the raid target once the (free) power is charged.
+ *  No high-tech gate: every difficulty builds a Flugplatz anyway. */
+function manageParadrop(state: GameState, player: Player, params: AiParams): void {
+  if (state.tick < params.firstAttackTick) return; // same grace period as nukes
+  if (player.paradropCooldown > 0) return;
+  if (!state.buildings.some((b) => b.owner === player.id && b.type === 'HELIPAD')) return;
+  const home = state.buildings.find((b) => b.owner === player.id && b.type === 'CONYARD');
+  const target = pickAttackTarget(state, player, home, false);
+  if (!target) return;
+  applyCommands(state, [
+    { type: 'PARADROP', playerId: player.id, cx: target.cx + 1, cy: target.cy + 1 },
   ]);
 }
 

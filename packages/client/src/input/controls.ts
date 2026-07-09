@@ -116,6 +116,7 @@ export class Controls {
     let bestDist = PICK_RADIUS * PICK_RADIUS;
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
+      if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
       const p = this.unitStagePos(unit.x, unit.y);
       const dx = p.x - e.global.x;
       const dy = p.y - e.global.y;
@@ -152,6 +153,7 @@ export class Controls {
     this.selectedBuilding = null;
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
+      if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
       const p = this.unitStagePos(unit.x, unit.y);
       if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) {
         this.selected.add(unit.id);
@@ -183,6 +185,7 @@ export class Controls {
     let bestDist = PICK_RADIUS * PICK_RADIUS;
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
+      if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
       if (unit.hp >= unitRule(unit.type).maxHp) continue; // only damaged units
       const p = this.unitStagePos(unit.x, unit.y);
       const dx = p.x - global.x;

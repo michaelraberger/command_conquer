@@ -82,6 +82,10 @@ export {
   SUPERWEAPON_CHARGE_TICKS,
   SUPERWEAPON_TRAVEL_TICKS,
   IRON_CURTAIN_TICKS,
+  PARADROP_COOLDOWN_TICKS,
+  PARADROP_COUNTS,
+  PARADROP_UNIT,
+  PARADROP_DROP_RADIUS,
   type UnitRule,
   type UnitType,
   type BuildingRule,
@@ -100,6 +104,7 @@ export type { SimEvent } from './events.js';
 export {
   createGame,
   spawnUnit,
+  createPassenger,
   constructBuilding,
   dockCell,
   serialize,

@@ -100,6 +100,9 @@ export interface UnitRule {
   infiltrator?: boolean;
   /** Only buildable once this technology is researched (undefined = immediate). */
   tech?: TechId;
+  /** Internal scripted unit (paradrop plane): never in build menus, never
+   *  selectable, and every player command addressed to it is ignored. */
+  hidden?: boolean;
 }
 
 function weapon(
@@ -474,6 +477,25 @@ export const UNIT_RULES = {
     sight: 7,
     air: true,
     carrier: true,
+  },
+  PARAPLANE: {
+    name: 'Transportflugzeug',
+    maxHp: 200,
+    speed: 50,
+    radius: 120,
+    armor: 'light',
+    // Scripted paradrop plane (see paradropSystem): flies in from the map
+    // edge, drops its paratroopers, flies out. Never buildable or steerable —
+    // deliberately NOT a carrier so LOAD/UNLOAD commands can't touch it.
+    weapon: null,
+    cost: 0,
+    buildTime: 1,
+    category: 'air',
+    requires: [],
+    factions: null,
+    sight: 6,
+    air: true,
+    hidden: true,
   },
   SPION: {
     name: 'Spion',
@@ -1010,6 +1032,13 @@ export const SUPERWEAPON_CHARGE_TICKS = 1800;
 export const SUPERWEAPON_TRAVEL_TICKS = 75;
 /** How long the iron curtain keeps vehicles/buildings invulnerable (10 s). */
 export const IRON_CURTAIN_TICKS = 150;
+
+/** Paradrop support power (free, gated on owning a Flugplatz): per-player
+ *  cooldown, faction-sized squads, drop scatter radius around the target. */
+export const PARADROP_COOLDOWN_TICKS = 3600; // 4:00 at 15 ticks/s
+export const PARADROP_COUNTS: Record<Faction, number> = { ALLIES: 6, SOVIETS: 9 };
+export const PARADROP_UNIT: UnitType = 'RIFLEMAN';
+export const PARADROP_DROP_RADIUS = 3;
 
 /**
  * Selling refunds half of everything invested (classic C&C). For walls that

@@ -11,4 +11,5 @@ export type SimEvent =
   | { type: 'HIT'; x: number; y: number }
   | { type: 'DEATH'; x: number; y: number; big: boolean }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
-  | { type: 'REPAIR'; x: number; y: number };
+  | { type: 'REPAIR'; x: number; y: number }
+  | { type: 'PARADROP'; x: number; y: number };

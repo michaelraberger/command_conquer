@@ -107,6 +107,25 @@ export class Effects {
       } else if (e.type === 'SUPERWEAPON') {
         if (e.kind === 'CURTAIN') this.addIronCurtain(worldToScreen(e.x, e.y));
         else this.addSuperweapon(worldToScreen(e.x, e.y), e.kind === 'NUKE');
+      } else if (e.type === 'PARADROP') {
+        // A paratrooper drifts down under a canopy onto the landing point.
+        const p = worldToScreen(e.x, e.y);
+        const drift = (Math.random() - 0.5) * 10; // cosmetic sway only
+        this.add(
+          750,
+          (g) => {
+            g.arc(0, -12, 8, Math.PI, 0); // canopy
+            g.lineTo(3.5, -12).lineTo(0, -4).lineTo(-3.5, -12).lineTo(-8, -12);
+            g.fill({ color: 0xe8edf2, alpha: 0.95 }).stroke({ width: 1, color: 0x5a6068 });
+            g.moveTo(-6, -12).lineTo(0, -4).moveTo(6, -12).lineTo(0, -4)
+              .stroke({ width: 0.8, color: 0x9aa0a6 }); // shroud lines
+            g.circle(0, -2, 2).fill(0x4a5568); // the trooper
+          },
+          (g, t) => {
+            g.position.set(p.x + drift * t, p.y - 46 * (1 - t)); // sinks to the ground
+            g.alpha = t > 0.85 ? (1 - t) / 0.15 : 1; // canopy collapses on landing
+          },
+        );
       } else if (e.type === 'REPAIR') {
         const p = worldToScreen(e.x, e.y);
         this.add(

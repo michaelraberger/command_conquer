@@ -14,6 +14,7 @@ import {
   type ProductionCategory,
 } from './rules.js';
 import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
+import { launchParadrop } from './systems/paradrop.js';
 import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
 import {
@@ -43,6 +44,7 @@ export type Command =
   | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
   | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number; kind?: SuperweaponKind }
+  | { type: 'PARADROP'; playerId: number; cx: number; cy: number }
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
@@ -238,6 +240,16 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         });
         break;
       }
+      case 'PARADROP': {
+        // Free support power: needs a standing Flugplatz and a ready cooldown.
+        // Firing into fog is allowed, same as the superweapons.
+        if (!inBounds(state, cmd.cx, cmd.cy)) break;
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        if (!player || player.paradropCooldown > 0) break;
+        if (!state.buildings.some((b) => b.owner === cmd.playerId && b.type === 'HELIPAD')) break;
+        launchParadrop(state, cmd.playerId, cmd.cx, cmd.cy);
+        break;
+      }
       case 'LOAD': {
         // Ground units walk up to an own carrier (transport ship or air
         // transport) and board.
@@ -312,7 +324,10 @@ function ownedUnits(state: GameState, ids: number[], playerId: number): Unit[] {
   const out: Unit[] = [];
   for (const id of [...ids].sort((a, b) => a - b)) {
     const unit = byId.get(id);
-    if (unit && unit.owner === playerId) out.push(unit);
+    if (!unit || unit.owner !== playerId) continue;
+    // Scripted units (paradrop plane) ignore every player command.
+    if (unitRule(unit.type).hidden === true) continue;
+    out.push(unit);
   }
   return out;
 }

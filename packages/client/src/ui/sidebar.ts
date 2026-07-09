@@ -1,6 +1,7 @@
 import {
   BUILDING_RULES,
   FACTION_NAMES,
+  PARADROP_COOLDOWN_TICKS,
   SUPERWEAPON_CHARGE_TICKS,
   SUPERWEAPON_STATS,
   UNIT_RULES,
@@ -28,7 +29,7 @@ import {
 } from '@cac/sim';
 import type { Controls } from '../input/controls.js';
 import { session } from '../session.js';
-import type { PlacementMode } from './placement.js';
+import type { PlacementMode, StrikeKind } from './placement.js';
 
 const TABS: Array<{ key: ProductionCategory; label: string; short: string; icon: string }> = [
   { key: 'building', label: 'Gebäude', short: 'Bau', icon: '🏭' },
@@ -64,9 +65,10 @@ export class Sidebar {
    *  states). Running these instead of rebuilding keeps buttons clickable. */
   private binfoUpdaters: Array<() => void> = [];
   private swEl = document.getElementById('superweapon')!;
-  /** One row (label + charge bar + fire button) per owned superweapon kind. */
+  /** One row (label + charge bar + fire button) per owned support power:
+   *  superweapon silos plus the paradrop (keyed 'PARADROP'). */
   private swRows = new Map<
-    SuperweaponKind,
+    StrikeKind,
     { root: HTMLElement; fill: HTMLElement; label: HTMLElement; button: HTMLButtonElement }
   >();
 
@@ -113,6 +115,7 @@ export class Sidebar {
     return (Object.keys(UNIT_RULES) as UnitType[]).filter(
       (t) =>
         UNIT_RULES[t].category === this.activeTab &&
+        unitRule(t).hidden !== true && // scripted units (paradrop plane)
         availableToFaction(UNIT_RULES[t].factions, faction),
     );
   }
@@ -279,13 +282,18 @@ export class Sidebar {
       const cur = byKind.get(kind);
       if (!cur || b.charge > cur.charge) byKind.set(kind, b);
     }
+    // Paradrop row: shown while a Flugplatz stands (per-player cooldown).
+    const hasAirfield = this.state.buildings.some(
+      (b) => b.owner === session.localPlayer && b.type === 'HELIPAD',
+    );
     for (const [kind, row] of this.swRows) {
-      if (!byKind.has(kind)) {
+      const stale = kind === 'PARADROP' ? !hasAirfield : !byKind.has(kind);
+      if (stale) {
         row.root.remove();
         this.swRows.delete(kind);
       }
     }
-    const show = byKind.size > 0 ? 'block' : 'none';
+    const show = byKind.size > 0 || hasAirfield ? 'block' : 'none';
     if (this.swEl.style.display !== show) this.swEl.style.display = show;
     for (const [kind, silo] of byKind) {
       const row = this.swRows.get(kind) ?? this.createSwRow(kind);
@@ -300,9 +308,21 @@ export class Sidebar {
       const btnText = this.placement.strike === kind ? 'Ziel anklicken …' : 'Ziel wählen';
       if (row.button.textContent !== btnText) row.button.textContent = btnText;
     }
+    if (hasAirfield) {
+      const row = this.swRows.get('PARADROP') ?? this.createSwRow('PARADROP');
+      const cd = this.player().paradropCooldown;
+      const pct = Math.round(((PARADROP_COOLDOWN_TICKS - cd) / PARADROP_COOLDOWN_TICKS) * 100);
+      const ready = cd === 0;
+      row.fill.style.width = `${pct}%`;
+      const label = ready ? 'Luftlandung BEREIT' : `Luftlandung lädt … ${pct}%`;
+      if (row.label.textContent !== label) row.label.textContent = label;
+      row.button.disabled = !ready;
+      const btnText = this.placement.strike === 'PARADROP' ? 'Ziel anklicken …' : 'Ziel wählen';
+      if (row.button.textContent !== btnText) row.button.textContent = btnText;
+    }
   }
 
-  private createSwRow(kind: SuperweaponKind) {
+  private createSwRow(kind: StrikeKind) {
     const root = document.createElement('div');
     root.className = 'sw-row';
     const label = document.createElement('div');
@@ -317,6 +337,10 @@ export class Sidebar {
     button.disabled = true;
     button.textContent = 'Ziel wählen';
     button.addEventListener('click', () => {
+      if (kind === 'PARADROP') {
+        if (this.player().paradropCooldown === 0) this.placement.activateStrike('PARADROP');
+        return;
+      }
       const charged = this.state.buildings.some(
         (b) =>
           b.owner === session.localPlayer &&

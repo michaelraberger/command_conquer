@@ -246,6 +246,7 @@ export class EntityRenderer {
       JET: this.tex.jet,
       STRIKEJET: this.tex.strikejet,
       AIRLIFT: this.tex.airlift,
+      PARAPLANE: this.tex.paraplane,
       GUNBOAT: this.tex.gunboat,
       DESTROYER: this.tex.destroyer,
       SUB: this.tex.sub,

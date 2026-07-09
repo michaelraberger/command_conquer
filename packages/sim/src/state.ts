@@ -12,6 +12,7 @@ import {
 } from './map.js';
 import {
   FACTION_COLORS,
+  PARADROP_COOLDOWN_TICKS,
   STARTING_CREDITS,
   applyBalance,
   buildingRule,
@@ -39,7 +40,8 @@ export type UnitOrder =
   | { kind: 'REPAIR_BUILDING'; targetId: number }
   | { kind: 'REPAIR_UNIT'; targetId: number }
   | { kind: 'BOARD'; targetId: number }
-  | { kind: 'INFILTRATE'; targetId: number };
+  | { kind: 'INFILTRATE'; targetId: number }
+  | { kind: 'PARADROP'; cx: number; cy: number };
 
 export interface Unit {
   id: number;
@@ -140,6 +142,8 @@ export interface Player {
   queues: Record<ProductionCategory, ProductionQueue>;
   /** AI scratch memory — plain data so it hashes/replays. */
   aiLastAttackTick: number;
+  /** Paradrop: ticks until ready; counts down only while a Flugplatz stands. */
+  paradropCooldown: number;
   /** Cheat: the whole map stays visible for this player. */
   mapRevealed: boolean;
   /** Cheat: flat extra power added to the balance. */
@@ -233,6 +237,40 @@ export function spawnUnit(
   if (!isAir) state.occupancy[cell] = unit.id;
   state.units.push(unit);
   return unit;
+}
+
+/**
+ * Creates a unit directly into a carrier's `passengers` array: full field init
+ * like spawnUnit, but no occupancy claim and not in state.units — so it dies
+ * silently with its carrier (deathSystem only sweeps state.units). Position
+ * fields are placeholders; the drop/unload code rewrites x/y/cell on landing.
+ */
+export function createPassenger(
+  state: GameState,
+  type: UnitType,
+  owner: number,
+  cx: number,
+  cy: number,
+): Unit {
+  return {
+    id: state.nextEntityId++,
+    type,
+    owner,
+    x: cellCenter(cx),
+    y: cellCenter(cy),
+    hp: unitRule(type).maxHp,
+    facing: 12,
+    cell: cellIndex(state, cx, cy),
+    path: null,
+    pathIndex: 0,
+    blockedTicks: 0,
+    repathCount: 0,
+    order: null,
+    cooldown: 0,
+    cargo: 0,
+    passengers: [],
+    curtainTicks: 0,
+  };
 }
 
 /** Creates a building and stamps its footprint into the structures grid. */
@@ -365,6 +403,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       naval: emptyQueue(),
     },
     aiLastAttackTick: 0,
+    paradropCooldown: PARADROP_COOLDOWN_TICKS,
     mapRevealed: false,
     powerBonus: 0,
     motherload: false,

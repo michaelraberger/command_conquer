@@ -1,4 +1,5 @@
 import {
+  PARADROP_DROP_RADIUS,
   SUBCELL,
   SUPERWEAPON_STATS,
   buildingRule,
@@ -8,6 +9,9 @@ import {
   type GameState,
   type SuperweaponKind,
 } from '@cac/sim';
+
+/** Everything the "pick a target cell" mode can aim: superweapons + paradrop. */
+export type StrikeKind = SuperweaponKind | 'PARADROP';
 import { Graphics, type Container } from 'pixi.js';
 import { cellToScreen, TILE_H, TILE_W } from '../render/iso.js';
 import { session } from '../session.js';
@@ -19,8 +23,8 @@ import { session } from '../session.js';
  */
 export class PlacementMode {
   active: BuildingType | null = null;
-  /** Superweapon targeting mode ("Ziel wählen"). */
-  strike: SuperweaponKind | null = null;
+  /** Superweapon/paradrop targeting mode ("Ziel wählen"). */
+  strike: StrikeKind | null = null;
   private readonly ghost = new Graphics();
   private lastCell = { cx: -1, cy: -1 };
 
@@ -49,7 +53,7 @@ export class PlacementMode {
     this.ghost.clear();
   }
 
-  activateStrike(kind: SuperweaponKind): void {
+  activateStrike(kind: StrikeKind): void {
     this.active = null;
     this.strike = kind;
     this.lastCell = { cx: -1, cy: -1 };
@@ -75,19 +79,21 @@ export class PlacementMode {
     }
   }
 
-  /** Blast-radius ellipse (iso projection of the world-space circle). */
+  /** Blast/drop-zone ellipse (iso projection of the world-space circle).
+   *  Superweapons paint red destruction; the paradrop a green landing zone. */
   private redrawStrike(cx: number, cy: number): void {
-    const stats = SUPERWEAPON_STATS[this.strike!];
-    const rCells = stats.radius / SUBCELL;
+    const kind = this.strike!;
+    const rCells = kind === 'PARADROP' ? PARADROP_DROP_RADIUS : SUPERWEAPON_STATS[kind].radius / SUBCELL;
+    const color = kind === 'PARADROP' ? 0x53c94f : 0xff4d4d;
     const { x, y } = cellToScreen(cx, cy);
     const k = Math.SQRT2;
     this.ghost.clear();
     this.ghost
       .ellipse(x, y, rCells * 32 * k, rCells * 16 * k)
-      .fill({ color: 0xff4d4d, alpha: 0.12 })
-      .stroke({ width: 2, color: 0xff4d4d, alpha: 0.9 });
-    this.ghost.moveTo(x - 8, y).lineTo(x + 8, y).stroke({ width: 1.5, color: 0xff4d4d });
-    this.ghost.moveTo(x, y - 4).lineTo(x, y + 4).stroke({ width: 1.5, color: 0xff4d4d });
+      .fill({ color, alpha: 0.12 })
+      .stroke({ width: 2, color, alpha: 0.9 });
+    this.ghost.moveTo(x - 8, y).lineTo(x + 8, y).stroke({ width: 1.5, color });
+    this.ghost.moveTo(x, y - 4).lineTo(x, y + 4).stroke({ width: 1.5, color });
   }
 
   private redraw(cx: number, cy: number): void {
@@ -113,6 +119,11 @@ export class PlacementMode {
 
   /** Attempt to place at the given cell. Returns true if the click was consumed. */
   place(cx: number, cy: number): boolean {
+    if (this.strike === 'PARADROP') {
+      this.send({ type: 'PARADROP', playerId: session.localPlayer, cx, cy });
+      this.cancel();
+      return true;
+    }
     if (this.strike) {
       this.send({ type: 'FIRE_SUPERWEAPON', playerId: session.localPlayer, cx, cy, kind: this.strike });
       this.cancel();
