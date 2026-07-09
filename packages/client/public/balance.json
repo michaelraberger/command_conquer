@@ -182,6 +182,16 @@
       "rangeCells": 4.5,
       "cooldown": 35
     },
+    "STRIKEJET": {
+      "cost": 1200,
+      "buildTime": 110,
+      "maxHp": 110,
+      "speed": 78,
+      "sight": 9,
+      "damage": 22,
+      "rangeCells": 5,
+      "cooldown": 10
+    },
     "GUNBOAT": {
       "cost": 500,
       "buildTime": 50,

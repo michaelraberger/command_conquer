@@ -357,6 +357,23 @@ export const UNIT_RULES = {
     sight: 9,
     air: true,
   },
+  STRIKEJET: {
+    name: 'Sturmjet',
+    maxHp: 110,
+    speed: 78,
+    radius: 100,
+    armor: 'light',
+    // Allied ground-attack jet: rapid strafing runs, strong vs light armour and
+    // structures, weak vs heavy tanks. Ground-only, so anti-air still counters.
+    weapon: weapon(22, 5, 10, 0, { none: 90, light: 115, heavy: 55 }, 'BULLET'),
+    cost: 1200,
+    buildTime: 110,
+    category: 'air',
+    requires: ['HELIPAD'],
+    factions: ['ALLIES'],
+    sight: 9,
+    air: true,
+  },
   GUNBOAT: {
     name: 'Kanonenboot',
     maxHp: 180,

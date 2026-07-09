@@ -63,6 +63,7 @@ export interface GameTextures {
   flak: UnitSprite[];
   heli: UnitSprite[];
   jet: UnitSprite[];
+  strikejet: UnitSprite[];
   airlift: UnitSprite[];
   gunboat: UnitSprite[];
   destroyer: UnitSprite[];
@@ -799,6 +800,21 @@ function teamJet(g: Graphics): void {
   g.rect(-8, -1.6, 10, 3.2).fill(0xffffff); // spine stripe
 }
 
+// ── Allied strike jet: slender fuselage, delta wings, twin exhausts ──
+function drawStrikeJet(g: Graphics): void {
+  g.poly([24, 0, 8, -3, -16, -2.5, -16, 2.5, 8, 3]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
+  g.poly([4, -2.5, -14, -16, -16, -3]).fill(HULL_LO); // left delta wing
+  g.poly([4, 2.5, -14, 16, -16, 3]).fill(HULL_LO); // right delta wing
+  g.poly([-12, -1.5, -19, -6, -19, -1.5]).fill(METAL); // tailplane L
+  g.poly([-12, 1.5, -19, 6, -19, 1.5]).fill(METAL); // tailplane R
+  g.circle(12, 0, 2.2).fill(GLASS); // canopy
+  g.circle(-16, -1.5, 1.7).fill(0xff8a3a); // twin exhausts
+  g.circle(-16, 1.5, 1.7).fill(0xff8a3a);
+}
+function teamStrikeJet(g: Graphics): void {
+  g.poly([3, 0, -6, -2.8, -6, 2.8]).fill(0xffffff); // nose chevron
+}
+
 // ── Cargo helicopter: long boxy fuselage, tandem twin rotor discs, rear ramp ──
 function drawAirlift(g: Graphics): void {
   g.roundRect(-18, -7, 36, 14, 4).fill(HULL).stroke({ width: 1.2, color: OUTLINE }); // fuselage
@@ -985,6 +1001,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const flak: UnitSprite[] = [];
   const heli: UnitSprite[] = [];
   const jet: UnitSprite[] = [];
+  const strikejet: UnitSprite[] = [];
   const airlift: UnitSprite[] = [];
   const gunboat: UnitSprite[] = [];
   const destroyer: UnitSprite[] = [];
@@ -1002,6 +1019,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     flak.push(bakeVehicle(renderer, f, 26, drawFlak, teamFlak));
     heli.push(bakeVehicle(renderer, f, 30, drawHeli, teamHeli));
     jet.push(bakeVehicle(renderer, f, 30, drawJet, teamJet));
+    strikejet.push(bakeVehicle(renderer, f, 30, drawStrikeJet, teamStrikeJet));
     airlift.push(bakeVehicle(renderer, f, 34, drawAirlift, teamAirlift));
     gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat, teamGunboat));
     destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer, teamDestroyer));
@@ -1103,6 +1121,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     flak,
     heli,
     jet,
+    strikejet,
     airlift,
     gunboat,
     destroyer,
