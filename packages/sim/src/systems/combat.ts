@@ -65,6 +65,7 @@ export function combatSystem(state: GameState): void {
         const path = findPath(state, cx, cy, order.cx, order.cy, {
           avoidUnits: false,
           selfId: unit.id,
+          owner: unit.owner,
           water: isNaval(unit),
         });
         if (!path) {
@@ -164,6 +165,7 @@ function engageOrChase(state: GameState, unit: Unit, target: Target, weapon: Wea
     const path = findPath(state, cx, cy, gcx, gcy, {
       avoidUnits: false,
       selfId: unit.id,
+      owner: unit.owner,
       water: isNaval(unit),
     });
     if (path) {

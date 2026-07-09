@@ -87,6 +87,7 @@ function chaseTarget(state: GameState, unit: Unit, target: Target): void {
     // stop centered there, in reach). Buildings block via structures already.
     avoidUnits: target.kind === 'unit',
     selfId: unit.id,
+    owner: unit.owner,
   });
   if (path) {
     unit.path = path;

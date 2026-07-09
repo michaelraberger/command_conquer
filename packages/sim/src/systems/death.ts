@@ -38,7 +38,10 @@ export function deathSystem(state: GameState): void {
       for (let y = building.cy; y < building.cy + rule.height; y++) {
         for (let x = building.cx; x < building.cx + rule.width; x++) {
           const idx = y * state.mapWidth + x;
-          if (state.structures[idx] === building.id) state.structures[idx] = 0;
+          if (state.structures[idx] === building.id) {
+            state.structures[idx] = 0;
+            state.gateOwner[idx] = 0;
+          }
         }
       }
       state.events.push({

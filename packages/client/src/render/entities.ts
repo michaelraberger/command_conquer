@@ -46,6 +46,8 @@ interface BuildingView {
   teamColor: number;
   /** Whether the building currently renders as power-starved (avoids redundant writes). */
   lastStarved: boolean;
+  /** Gates only: whether currently drawn open (a friendly unit is near). */
+  gateOpen: boolean;
 }
 
 interface ProjectileView {
@@ -263,6 +265,25 @@ export class EntityRenderer {
         view.team.anchor.set(def.anchorX, def.anchorY);
         view.lastLevel = building.level;
       }
+      // Gates open when a friendly unit is within ~2.5 cells (cosmetic only).
+      if (building.type === 'GATE') {
+        const open = state.units.some((u) => {
+          if (u.owner !== building.owner) return false;
+          const ucx = u.cell % state.mapWidth;
+          const ucy = (u.cell - ucx) / state.mapWidth;
+          const dx = ucx - building.cx;
+          const dy = ucy - building.cy;
+          return dx * dx + dy * dy <= 6;
+        });
+        if (open !== view.gateOpen) {
+          const def = open ? this.tex.gateOpen : this.tex.buildings.GATE;
+          view.body.texture = def.texture;
+          view.body.anchor.set(def.anchorX, def.anchorY);
+          view.team.texture = def.team;
+          view.team.anchor.set(def.anchorX, def.anchorY);
+          view.gateOpen = open;
+        }
+      }
       // Own power-consuming buildings darken while starved of power.
       const starved =
         building.owner === session.localPlayer &&
@@ -310,7 +331,17 @@ export class EntityRenderer {
     root.position.set(x, y);
     root.zIndex = depthOf((building.cx + rule.width) * SUBCELL, (building.cy + rule.height) * SUBCELL);
     this.layer.addChild(root);
-    return { root, body, team, bar, lastHp: -1, lastLevel: building.level, teamColor, lastStarved: false };
+    return {
+      root,
+      body,
+      team,
+      bar,
+      lastHp: -1,
+      lastLevel: building.level,
+      teamColor,
+      lastStarved: false,
+      gateOpen: false,
+    };
   }
 
   private updateBuildingBar(building: Building, view: BuildingView): void {

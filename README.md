@@ -114,6 +114,10 @@ Tastenkürzel stehen im **Shortcut-Menü**: „?"-Button oben links oder **F1**
   Minimap zeigt, wo
 - Mauern: Sidebar → „Mauer" (Sofortbau, mehrfach platzierbar); Mauer anklicken
   → „Ausbauen"-Button **oder U** für Stufe 2/3 (mehr HP, volle Reparatur)
+- **Tor** (Sidebar → „Tor", braucht Kaserne): blockt wie eine Mauer, ist aber für
+  **eigene** Einheiten passierbar – es **öffnet sich**, wenn eine eigene Einheit
+  naht, und bleibt für Gegner geschlossen. So lässt sich eine Mauerlinie mit einer
+  eigenen Durchfahrt bauen, ohne dem Feind einen Weg zu geben
 - Verkaufen: Gebäude anklicken → „Verkaufen" erstattet 50 % der Investition
   (bei Mauern inklusive bezahlter Ausbaustufen)
 - Auto-Verteidigung: Untätige Einheiten greifen einen Gegner in der Nähe

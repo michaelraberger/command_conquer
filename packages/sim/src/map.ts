@@ -21,6 +21,9 @@ export interface GridView {
   occupancy: Int32Array;
   /** Building id covering each cell, 0 = free. Static obstacles. */
   structures: Int32Array;
+  /** For gate cells: owner id + 1 (so 0 = no gate). Own gates are passable to
+   *  their owner; every other structure blocks. */
+  gateOwner: Int32Array;
 }
 
 export function cellIndex(grid: GridView, cx: number, cy: number): number {
@@ -40,6 +43,19 @@ export function isPassableTerrain(grid: GridView, cx: number, cy: number): boole
   if (!inBounds(grid, cx, cy)) return false;
   const idx = cellIndex(grid, cx, cy);
   return isPassableKind(grid.terrain[idx]!) && grid.structures[idx] === 0;
+}
+
+/**
+ * Passability for a specific owner's ground unit: like isPassableTerrain, but a
+ * gate belonging to `owner` is passable (it opens for its owner's units), while
+ * every other structure — walls, buildings, enemy gates — still blocks.
+ */
+export function passableFor(grid: GridView, cx: number, cy: number, owner: number): boolean {
+  if (!inBounds(grid, cx, cy)) return false;
+  const idx = cellIndex(grid, cx, cy);
+  if (!isPassableKind(grid.terrain[idx]!)) return false;
+  if (grid.structures[idx] === 0) return true;
+  return grid.gateOwner[idx] === owner + 1;
 }
 
 /** Sailable for ships: open water without a structure (shipyard blocks). */

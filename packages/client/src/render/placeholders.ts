@@ -77,6 +77,8 @@ export interface GameTextures {
   buildings: Record<BuildingType, BuildingSprite>;
   /** Wall sprites per upgrade tier (level 1..3). */
   walls: BuildingSprite[];
+  /** Open-gate sprite (swapped in when a friendly unit is near). */
+  gateOpen: BuildingSprite;
 }
 
 /* ------------------------------- helpers -------------------------------- */
@@ -434,6 +436,21 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     team: (g) => {
       const c = iso(0.5, 0.5);
       g.rect(c.x - 3, c.y - 9, 6, 3).fill(0xffffff); // small faction chip
+    },
+  },
+  GATE: {
+    frameTop: 22,
+    fx: 0xb7bec4,
+    body: (g) => {
+      const c = iso(0.5, 0.5);
+      g.rect(c.x - 13, c.y - 16, 4, 20).fill(0x8f8775).stroke({ width: 1, color: OUTLINE }); // left post
+      g.rect(c.x + 9, c.y - 16, 4, 20).fill(0x8f8775).stroke({ width: 1, color: OUTLINE }); // right post
+      g.rect(c.x - 10, c.y - 13, 20, 3).fill(0xb7bec4).stroke({ width: 1, color: OUTLINE }); // barrier (closed)
+      g.rect(c.x - 10, c.y - 7, 20, 3).fill(0xb7bec4).stroke({ width: 1, color: OUTLINE });
+    },
+    team: (g) => {
+      const c = iso(0.5, 0.5);
+      g.rect(c.x - 3, c.y - 20, 6, 3).fill(0xffffff);
     },
   },
 };
@@ -1041,6 +1058,22 @@ export function createTextures(renderer: Renderer): GameTextures {
   const walls = [1, 2, 3].map((lvl) => bakeWallLevel(renderer, lvl));
   buildings.WALL = walls[0]!;
 
+  // Open-gate variant: same posts, barrier folded aside.
+  const gob = new Graphics();
+  {
+    const c = iso(0.5, 0.5);
+    gob.rect(c.x - 13, c.y - 16, 4, 20).fill(0x8f8775).stroke({ width: 1, color: OUTLINE });
+    gob.rect(c.x + 9, c.y - 16, 4, 20).fill(0x8f8775).stroke({ width: 1, color: OUTLINE });
+    gob.rect(c.x - 12, c.y - 13, 3, 10).fill(0xb7bec4).stroke({ width: 1, color: OUTLINE }); // barrier folded left
+    gob.rect(c.x + 9, c.y - 13, 3, 10).fill(0xb7bec4).stroke({ width: 1, color: OUTLINE }); // folded right
+  }
+  const got = new Graphics();
+  {
+    const c = iso(0.5, 0.5);
+    got.rect(c.x - 3, c.y - 20, 6, 3).fill(0xffffff);
+  }
+  const gateOpen = bakeFootprint(renderer, gob, got, 1, 1, 22);
+
   const oreOverlay = new Graphics();
   oreOverlay.poly(diamondPath()).fill({ color: 0xc79a2a, alpha: 0.22 });
   for (const [x, y, r] of [
@@ -1137,5 +1170,6 @@ export function createTextures(renderer: Renderer): GameTextures {
     digits: [Texture.EMPTY, ...Array.from({ length: 9 }, (_, i) => bakeDigit(renderer, i + 1))],
     buildings,
     walls,
+    gateOpen,
   };
 }

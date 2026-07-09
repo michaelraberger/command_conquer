@@ -354,6 +354,13 @@
       "maxHp": 800,
       "power": -60,
       "sight": 4
+    },
+    "GATE": {
+      "cost": 150,
+      "buildTime": 20,
+      "maxHp": 400,
+      "power": 0,
+      "sight": 2
     }
   },
   "research": {

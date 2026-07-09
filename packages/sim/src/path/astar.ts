@@ -1,4 +1,4 @@
-import { isNavigableWater, isPassableTerrain, type GridView } from '../map.js';
+import { isNavigableWater, passableFor, type GridView } from '../map.js';
 import type { PathCell } from '../state.js';
 import { MinHeap } from './heap.js';
 
@@ -9,6 +9,8 @@ export interface PathOptions {
   selfId: number;
   /** Ships: traverse open water instead of walkable land. */
   water?: boolean;
+  /** Owner of the pathing unit — its own gates are passable, others block. */
+  owner?: number;
 }
 
 const COST_STRAIGHT = 10;
@@ -52,7 +54,11 @@ export function findPath(
   const closed = new Uint8Array(size);
   const open = new MinHeap();
 
-  const traversable = opts.water === true ? isNavigableWater : isPassableTerrain;
+  const owner = opts.owner ?? -1;
+  const traversable =
+    opts.water === true
+      ? isNavigableWater
+      : (grid: GridView, cx: number, cy: number): boolean => passableFor(grid, cx, cy, owner);
   const passable = (cx: number, cy: number): boolean => {
     if (!traversable(grid, cx, cy)) return false;
     if (opts.avoidUnits) {

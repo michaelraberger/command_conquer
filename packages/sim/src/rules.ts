@@ -814,6 +814,24 @@ export const BUILDING_RULES = {
     factions: null,
     sight: 1,
   },
+  GATE: {
+    name: 'Tor',
+    maxHp: 400,
+    cost: 150,
+    buildTime: 20,
+    power: 0,
+    width: 1,
+    height: 1,
+    armor: 'heavy',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    // Blocks like a wall, but opens for its owner's units (see gateOwner).
+    requires: ['BARRACKS'],
+    buildable: true,
+    factions: null,
+    sight: 2,
+  },
 } as const satisfies Record<string, BuildingRule>;
 
 export type BuildingType = keyof typeof BUILDING_RULES;

@@ -1,5 +1,5 @@
 import { cellCenter, distSq, facingFromDelta, isqrt } from '../fixed.js';
-import { isNavigableWater, isPassableTerrain } from '../map.js';
+import { isNavigableWater, passableFor } from '../map.js';
 import { findPath } from '../path/astar.js';
 import { unitRule } from '../rules.js';
 import type { GameState, Unit } from '../state.js';
@@ -39,7 +39,7 @@ export function movementSystem(state: GameState): void {
       }
       const traversable = isNaval(unit)
         ? isNavigableWater(state, wp.cx, wp.cy)
-        : isPassableTerrain(state, wp.cx, wp.cy);
+        : passableFor(state, wp.cx, wp.cy, unit.owner);
       if (!traversable) {
         stopUnit(unit);
         continue;
@@ -123,6 +123,7 @@ function handleBlocked(state: GameState, unit: Unit): void {
   const newPath = findPath(state, cx, cy, goal.cx, goal.cy, {
     avoidUnits: true,
     selfId: unit.id,
+    owner: unit.owner,
     water: isNaval(unit),
   });
   if (!newPath) {

@@ -91,6 +91,7 @@ function chaseBuilding(state: GameState, unit: Unit, target: { kind: 'building';
   const path = findPath(state, cx, cy, goal.x >> 8, goal.y >> 8, {
     avoidUnits: false,
     selfId: unit.id,
+    owner: unit.owner,
   });
   if (path) {
     unit.path = path;

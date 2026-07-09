@@ -172,6 +172,8 @@ export interface GameState {
   occupancy: Int32Array;
   /** Building id covering each cell, 0 = free. */
   structures: Int32Array;
+  /** Gate cells: owner id + 1 (0 = no gate). Own gates open for their owner. */
+  gateOwner: Int32Array;
   /** Per-player fog grids (see FOG_* constants). */
   fogs: Uint8Array[];
   /** Base/island centre cell per player id (camera home, victory context). */
@@ -251,7 +253,9 @@ export function constructBuilding(
   };
   for (let y = cy; y < cy + rule.height; y++) {
     for (let x = cx; x < cx + rule.width; x++) {
-      state.structures[cellIndex(state, x, y)] = building.id;
+      const idx = cellIndex(state, x, y);
+      state.structures[idx] = building.id;
+      if (type === 'GATE') state.gateOwner[idx] = owner + 1;
     }
   }
   state.buildings.push(building);
@@ -372,6 +376,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     resourceKind: new Uint8Array(size),
     occupancy: new Int32Array(size),
     structures: new Int32Array(size),
+    gateOwner: new Int32Array(size),
     fogs: Array.from({ length: playerCount }, () => new Uint8Array(size)),
     spawns,
     players: Array.from({ length: playerCount }, (_, id) => makePlayer(id)),
@@ -459,6 +464,7 @@ export function serialize(state: GameState): string {
     resourceKind: Array.from(state.resourceKind),
     occupancy: Array.from(state.occupancy),
     structures: Array.from(state.structures),
+    gateOwner: Array.from(state.gateOwner),
     fogs: state.fogs.map((f) => Array.from(f)),
   });
 }
@@ -470,6 +476,7 @@ export function deserialize(json: string): GameState {
     resourceKind: number[];
     occupancy: number[];
     structures: number[];
+    gateOwner: number[];
     fogs: number[][];
   };
   return {
@@ -479,6 +486,7 @@ export function deserialize(json: string): GameState {
     resourceKind: Uint8Array.from(raw.resourceKind),
     occupancy: Int32Array.from(raw.occupancy),
     structures: Int32Array.from(raw.structures),
+    gateOwner: Int32Array.from(raw.gateOwner),
     fogs: raw.fogs.map((f) => Uint8Array.from(f)),
   };
 }

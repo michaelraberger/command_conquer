@@ -11,6 +11,7 @@ function makeGrid(w: number, h: number, rocks: Array<[number, number]> = []): Gr
     terrain,
     occupancy: new Int32Array(w * h),
     structures: new Int32Array(w * h),
+    gateOwner: new Int32Array(w * h),
   };
 }
 

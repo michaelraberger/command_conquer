@@ -209,6 +209,7 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
           : findPath(state, cell.cx, cell.cy, producer.rallyCx, producer.rallyCy, {
               avoidUnits: false,
               selfId: unit.id,
+              owner: unit.owner,
               water: naval,
             });
         unit.pathIndex = 0;

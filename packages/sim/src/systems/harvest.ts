@@ -69,7 +69,7 @@ function handleHarvest(state: GameState, unit: Unit, cx: number, cy: number): vo
   if (unit.path === null) {
     const ucx = unit.cell % state.mapWidth;
     const ucy = (unit.cell - ucx) / state.mapWidth;
-    const path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id });
+    const path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id, owner: unit.owner });
     if (!path) {
       unit.order = null;
       return;
@@ -111,7 +111,7 @@ function handleReturn(state: GameState, unit: Unit, backCx: number, backCy: numb
   if (unit.path === null) {
     const ucx = unit.cell % state.mapWidth;
     const ucy = (unit.cell - ucx) / state.mapWidth;
-    const path = findPath(state, ucx, ucy, dock.cx, dock.cy, { avoidUnits: false, selfId: unit.id });
+    const path = findPath(state, ucx, ucy, dock.cx, dock.cy, { avoidUnits: false, selfId: unit.id, owner: unit.owner });
     if (!path) {
       unit.order = null;
       return;

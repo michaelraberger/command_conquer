@@ -55,7 +55,7 @@ export function transportSystem(state: GameState): void {
       const cy = (unit.cell - cx) / w;
       const tcx = transport.cell % w;
       const tcy = (transport.cell - tcx) / w;
-      const path = findPath(state, cx, cy, tcx, tcy, { avoidUnits: false, selfId: unit.id });
+      const path = findPath(state, cx, cy, tcx, tcy, { avoidUnits: false, selfId: unit.id, owner: unit.owner });
       if (path) {
         unit.path = path;
         unit.pathIndex = 0;
