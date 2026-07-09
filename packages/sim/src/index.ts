@@ -81,6 +81,7 @@ export {
   SUPERWEAPON_STATS,
   SUPERWEAPON_CHARGE_TICKS,
   SUPERWEAPON_TRAVEL_TICKS,
+  IRON_CURTAIN_TICKS,
   type UnitRule,
   type UnitType,
   type BuildingRule,

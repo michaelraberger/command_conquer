@@ -16,10 +16,12 @@ import {
   TECH_RULES,
   sellRefund,
   unitRule,
+  type Building,
   type BuildingType,
   type Command,
   type GameState,
   type ProductionCategory,
+  type SuperweaponKind,
   type TechId,
   type Unit,
   type UnitType,
@@ -62,9 +64,11 @@ export class Sidebar {
    *  states). Running these instead of rebuilding keeps buttons clickable. */
   private binfoUpdaters: Array<() => void> = [];
   private swEl = document.getElementById('superweapon')!;
-  private swFill = document.getElementById('sw-fill')!;
-  private swLabel = document.getElementById('sw-label')!;
-  private swButton = document.getElementById('sw-fire') as HTMLButtonElement;
+  /** One row (label + charge bar + fire button) per owned superweapon kind. */
+  private swRows = new Map<
+    SuperweaponKind,
+    { root: HTMLElement; fill: HTMLElement; label: HTMLElement; button: HTMLButtonElement }
+  >();
 
   constructor(
     private state: GameState,
@@ -90,24 +94,8 @@ export class Sidebar {
       this.tabsEl.appendChild(btn);
     }
     this.factionEl.textContent = FACTION_NAMES[this.player().faction];
-    this.swButton.addEventListener('click', () => {
-      const silo = this.chargingSilo();
-      if (silo && silo.charge >= SUPERWEAPON_CHARGE_TICKS) {
-        this.placement.activateStrike(buildingRule(silo.type).superweapon!);
-      }
-    });
     this.renderTabs();
     this.buildItems();
-  }
-
-  /** The player's first superweapon silo, if any. */
-  private chargingSilo() {
-    return (
-      this.state.buildings.find(
-        (b) =>
-          b.owner === session.localPlayer && buildingRule(b.type).superweapon !== null,
-      ) ?? null
-    );
   }
 
   private player() {
@@ -240,16 +228,25 @@ export class Sidebar {
       const tech = techFor(el.item);
       const techLocked =
         !player.motherload && tech !== undefined && !player.researched.includes(tech);
+      // Unique buildings (Eiserner Vorhang): one standing instance per player.
+      const uniqueBuilt =
+        isBuildingType(el.item) &&
+        buildingRule(el.item).unique === true &&
+        this.state.buildings.some(
+          (b) => b.owner === session.localPlayer && b.type === el.item,
+        );
       const isThis = q.item === el.item;
       const busy = q.item !== null && !isThis;
 
-      el.root.classList.toggle('disabled', !prereqsMet || techLocked || busy);
+      el.root.classList.toggle('disabled', !prereqsMet || techLocked || busy || uniqueBuilt);
       el.root.classList.toggle('ready', isThis && q.ready);
       el.progress.style.width =
         isThis && !q.ready ? `${Math.round((q.progress / rule.buildTime) * 100)}%` : '0%';
 
       let text = '';
-      if (!prereqsMet) {
+      if (uniqueBuilt) {
+        text = 'Nur einmal baubar – steht bereits';
+      } else if (!prereqsMet) {
         text = `braucht ${rule.requires
           .filter((r) => !this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === r))
           .map((r) => buildingRule(r as BuildingType).name)
@@ -270,25 +267,69 @@ export class Sidebar {
     this.updateSuperweapon();
   }
 
-  /** Charge bar + fire button for the player's superweapon. */
+  /** Charge bar + fire button per superweapon the player owns — Soviets can
+   *  field the Raketensilo AND the Eiserner Vorhang side by side. */
   private updateSuperweapon(): void {
-    const silo = this.chargingSilo();
-    if (!silo) {
-      if (this.swEl.style.display !== 'none') this.swEl.style.display = 'none';
-      return;
+    // Most-charged silo per kind (rebuilding after a loss keeps the fuller one).
+    const byKind = new Map<SuperweaponKind, Building>();
+    for (const b of this.state.buildings) {
+      if (b.owner !== session.localPlayer) continue;
+      const kind = buildingRule(b.type).superweapon;
+      if (kind === null) continue;
+      const cur = byKind.get(kind);
+      if (!cur || b.charge > cur.charge) byKind.set(kind, b);
     }
-    if (this.swEl.style.display !== 'block') this.swEl.style.display = 'block';
-    const kind = buildingRule(silo.type).superweapon!;
-    const pct = Math.min(100, Math.round((silo.charge / SUPERWEAPON_CHARGE_TICKS) * 100));
-    const ready = silo.charge >= SUPERWEAPON_CHARGE_TICKS;
-    this.swFill.style.width = `${pct}%`;
-    const label = ready
-      ? `${SUPERWEAPON_STATS[kind].name} BEREIT`
-      : `${SUPERWEAPON_STATS[kind].name} lädt … ${pct}%`;
-    if (this.swLabel.textContent !== label) this.swLabel.textContent = label;
-    this.swButton.disabled = !ready;
-    this.swButton.textContent =
-      this.placement.strike !== null ? 'Ziel anklicken …' : 'Ziel wählen';
+    for (const [kind, row] of this.swRows) {
+      if (!byKind.has(kind)) {
+        row.root.remove();
+        this.swRows.delete(kind);
+      }
+    }
+    const show = byKind.size > 0 ? 'block' : 'none';
+    if (this.swEl.style.display !== show) this.swEl.style.display = show;
+    for (const [kind, silo] of byKind) {
+      const row = this.swRows.get(kind) ?? this.createSwRow(kind);
+      const pct = Math.min(100, Math.round((silo.charge / SUPERWEAPON_CHARGE_TICKS) * 100));
+      const ready = silo.charge >= SUPERWEAPON_CHARGE_TICKS;
+      row.fill.style.width = `${pct}%`;
+      const label = ready
+        ? `${SUPERWEAPON_STATS[kind].name} BEREIT`
+        : `${SUPERWEAPON_STATS[kind].name} lädt … ${pct}%`;
+      if (row.label.textContent !== label) row.label.textContent = label;
+      row.button.disabled = !ready;
+      const btnText = this.placement.strike === kind ? 'Ziel anklicken …' : 'Ziel wählen';
+      if (row.button.textContent !== btnText) row.button.textContent = btnText;
+    }
+  }
+
+  private createSwRow(kind: SuperweaponKind) {
+    const root = document.createElement('div');
+    root.className = 'sw-row';
+    const label = document.createElement('div');
+    label.className = 'sw-label';
+    const bar = document.createElement('div');
+    bar.className = 'sw-bar';
+    const fill = document.createElement('div');
+    fill.className = 'sw-fill';
+    bar.appendChild(fill);
+    const button = document.createElement('button');
+    button.className = 'sw-fire';
+    button.disabled = true;
+    button.textContent = 'Ziel wählen';
+    button.addEventListener('click', () => {
+      const charged = this.state.buildings.some(
+        (b) =>
+          b.owner === session.localPlayer &&
+          buildingRule(b.type).superweapon === kind &&
+          b.charge >= SUPERWEAPON_CHARGE_TICKS,
+      );
+      if (charged) this.placement.activateStrike(kind);
+    });
+    root.append(label, bar, button);
+    this.swEl.appendChild(root);
+    const row = { root, fill, label, button };
+    this.swRows.set(kind, row);
+    return row;
   }
 
   /** Info panel for the selected own building (wall upgrades, rally hint). */

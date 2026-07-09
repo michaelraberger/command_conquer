@@ -114,7 +114,7 @@ export class PlacementMode {
   /** Attempt to place at the given cell. Returns true if the click was consumed. */
   place(cx: number, cy: number): boolean {
     if (this.strike) {
-      this.send({ type: 'FIRE_SUPERWEAPON', playerId: session.localPlayer, cx, cy });
+      this.send({ type: 'FIRE_SUPERWEAPON', playerId: session.localPlayer, cx, cy, kind: this.strike });
       this.cancel();
       return true;
     }

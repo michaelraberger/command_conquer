@@ -105,7 +105,8 @@ export class Effects {
           },
         );
       } else if (e.type === 'SUPERWEAPON') {
-        this.addSuperweapon(worldToScreen(e.x, e.y), e.kind === 'NUKE');
+        if (e.kind === 'CURTAIN') this.addIronCurtain(worldToScreen(e.x, e.y));
+        else this.addSuperweapon(worldToScreen(e.x, e.y), e.kind === 'NUKE');
       } else if (e.type === 'REPAIR') {
         const p = worldToScreen(e.x, e.y);
         this.add(
@@ -152,6 +153,34 @@ export class Effects {
         );
       }
     }
+  }
+
+  /** Iron curtain: a red energy beam sweeps down, then an expanding ring marks
+   *  the protected area — no fire, no smoke, pure crackling energy. */
+  private addIronCurtain(p: { x: number; y: number }): void {
+    this.add(
+      420,
+      (g) => {
+        g.rect(p.x - 6, p.y - 120, 12, 120).fill({ color: 0xff5540, alpha: 0.55 }); // beam
+        g.rect(p.x - 2, p.y - 120, 4, 120).fill({ color: 0xffd0c4, alpha: 0.9 }); // hot core
+        g.circle(p.x, p.y, 14).fill({ color: 0xff5540, alpha: 0.8 });
+      },
+      (g, t) => {
+        g.alpha = 1 - t;
+      },
+    );
+    this.add(
+      900,
+      (g) => {
+        g.ellipse(0, 0, 30, 15).stroke({ width: 3, color: 0xff5540, alpha: 0.9 });
+        g.ellipse(0, 0, 18, 9).stroke({ width: 1.5, color: 0xffd0c4, alpha: 0.8 });
+        g.position.set(p.x, p.y);
+      },
+      (g, t) => {
+        g.alpha = 0.9 * (1 - t);
+        g.scale.set(0.5 + t * 2.6); // ring expands over the protected area
+      },
+    );
   }
 
   /** Nuke: flash → fireball → shockwave ring → rising smoke column.

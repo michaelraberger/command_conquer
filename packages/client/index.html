@@ -613,24 +613,27 @@
         border-top: 1px solid #2c3a4a;
         padding: 8px 12px;
       }
-      #sw-label {
+      .sw-row + .sw-row {
+        margin-top: 10px;
+      }
+      .sw-label {
         font-size: 11px;
         color: #ff9a8a;
         margin-bottom: 4px;
       }
-      #sw-bar {
+      .sw-bar {
         height: 6px;
         background: #232b35;
         border-radius: 3px;
         overflow: hidden;
         margin-bottom: 6px;
       }
-      #sw-fill {
+      .sw-fill {
         height: 100%;
         width: 0;
         background: #ff4d4d;
       }
-      #sw-fire {
+      .sw-fire {
         width: 100%;
         background: #401f1f;
         border: 1px solid #e04a3a;
@@ -641,7 +644,7 @@
         border-radius: 4px;
         cursor: pointer;
       }
-      #sw-fire:disabled {
+      .sw-fire:disabled {
         opacity: 0.4;
         cursor: not-allowed;
       }
@@ -782,10 +785,7 @@
       <div id="tabs"></div>
       <div id="items"></div>
       <div id="binfo"></div>
-      <div id="superweapon">
-        <div id="sw-label">…</div>
-        <div id="sw-bar"><div id="sw-fill"></div></div>
-        <button id="sw-fire" disabled>Ziel wählen</button>
+      <div id="superweapon"><!-- one .sw-row per owned superweapon, built by sidebar.ts -->
       </div>
       <div id="minimap-wrap">
         <canvas id="minimap" width="64" height="64"></canvas>

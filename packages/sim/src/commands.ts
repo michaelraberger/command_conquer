@@ -5,6 +5,7 @@ import {
   CHEAT_MONEY,
   CHEAT_POWER,
   SUPERWEAPON_CHARGE_TICKS,
+  type SuperweaponKind,
   SUPERWEAPON_TRAVEL_TICKS,
   WALL_LEVELS,
   buildingRule,
@@ -41,7 +42,7 @@ export type Command =
   | { type: 'UPGRADE_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
-  | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number }
+  | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number; kind?: SuperweaponKind }
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
@@ -215,22 +216,25 @@ export function applyCommands(state: GameState, commands: Command[]): void {
       }
       case 'FIRE_SUPERWEAPON': {
         if (!inBounds(state, cmd.cx, cmd.cy)) break;
-        // Lowest-id charged silo fires (deterministic pick).
-        const silo = state.buildings.find(
-          (b) =>
-            b.owner === cmd.playerId &&
-            buildingRule(b.type).superweapon !== null &&
-            b.charge >= SUPERWEAPON_CHARGE_TICKS,
-        );
+        // Lowest-id charged silo fires (deterministic pick); `kind` narrows the
+        // choice when a player owns several superweapons (nuke + iron curtain).
+        const silo = state.buildings.find((b) => {
+          const kind = buildingRule(b.type).superweapon;
+          if (b.owner !== cmd.playerId || kind === null) return false;
+          if (cmd.kind !== undefined && kind !== cmd.kind) return false;
+          return b.charge >= SUPERWEAPON_CHARGE_TICKS;
+        });
         if (!silo) break;
         silo.charge = 0;
+        const kind = buildingRule(silo.type).superweapon!;
         state.strikes.push({
           id: state.nextEntityId++,
-          kind: buildingRule(silo.type).superweapon!,
+          kind,
           owner: cmd.playerId,
           x: cellCenter(cmd.cx),
           y: cellCenter(cmd.cy),
-          countdown: SUPERWEAPON_TRAVEL_TICKS,
+          // The iron curtain beams down instantly; warheads travel.
+          countdown: kind === 'CURTAIN' ? 1 : SUPERWEAPON_TRAVEL_TICKS,
         });
         break;
       }

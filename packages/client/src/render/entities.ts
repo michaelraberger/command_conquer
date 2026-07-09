@@ -31,6 +31,8 @@ interface UnitView {
   prevY: number;
   /** Aircraft fly at altitude and always draw above ground entities. */
   air: boolean;
+  /** Whether the iron-curtain red tint is currently applied. */
+  lastShielded: boolean;
 }
 
 interface BuildingView {
@@ -46,6 +48,8 @@ interface BuildingView {
   teamColor: number;
   /** Whether the building currently renders as power-starved (avoids redundant writes). */
   lastStarved: boolean;
+  /** Whether the iron-curtain red tint is currently applied. */
+  lastShielded: boolean;
   /** Gates only: whether currently drawn open (a friendly unit is near). */
   gateOpen: boolean;
 }
@@ -61,6 +65,8 @@ const BAR_HEIGHT = 3;
 const EMPTY_TAGS: ReadonlyMap<number, number> = new Map();
 /** Dark cold tint for own power-consuming buildings during a power deficit. */
 const OFFLINE_TINT = 0x424a55;
+/** Metallic red glow for entities protected by the iron curtain. */
+const CURTAIN_TINT = 0xff6a55;
 /** Screen-pixel lift for aircraft (body drawn this far above its ground shadow). */
 const AIR_ALTITUDE = 24;
 /** zIndex floor for aircraft so they always render above ground entities. */
@@ -133,6 +139,15 @@ export class EntityRenderer {
       const spr = this.spriteFor(unit);
       view.body.texture = spr.body;
       view.team.texture = spr.team;
+      // Iron curtain: protected units glow metallic red for the duration.
+      const shielded = unit.curtainTicks > 0;
+      if (shielded !== view.lastShielded) {
+        view.body.tint = shielded ? CURTAIN_TINT : 0xffffff;
+        view.team.tint = shielded
+          ? CURTAIN_TINT
+          : (this.playerColors.get(unit.owner) ?? 0xffffff);
+        view.lastShielded = shielded;
+      }
       view.sel.visible = selected.has(unit.id);
       this.updateUnitBar(unit, view, selected.has(unit.id));
 
@@ -290,10 +305,13 @@ export class EntityRenderer {
         building.owner === session.localPlayer &&
         localDeficit &&
         buildingRule(building.type).power < 0;
-      if (starved !== view.lastStarved) {
-        view.body.tint = starved ? OFFLINE_TINT : 0xffffff;
-        view.team.tint = starved ? OFFLINE_TINT : view.teamColor;
+      // Iron-curtain red overrides the power-starved grey while it lasts.
+      const shielded = building.curtainTicks > 0;
+      if (starved !== view.lastStarved || shielded !== view.lastShielded) {
+        view.body.tint = shielded ? CURTAIN_TINT : starved ? OFFLINE_TINT : 0xffffff;
+        view.team.tint = shielded ? CURTAIN_TINT : starved ? OFFLINE_TINT : view.teamColor;
         view.lastStarved = starved;
+        view.lastShielded = shielded;
       }
       this.updateBuildingBar(building, view);
     }
@@ -341,6 +359,7 @@ export class EntityRenderer {
       lastLevel: building.level,
       teamColor,
       lastStarved: false,
+      lastShielded: false,
       gateOpen: false,
     };
   }
@@ -411,6 +430,7 @@ export class EntityRenderer {
       prevX: unit.x,
       prevY: unit.y,
       air,
+      lastShielded: false,
     };
     this.views.set(unit.id, view);
     return view;

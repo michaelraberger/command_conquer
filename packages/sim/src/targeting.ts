@@ -117,6 +117,9 @@ export function targetDistSq(target: Target, fromX: number, fromY: number): numb
 
 /** Warhead-vs-armor damage (integer percent math, always at least 1). */
 export function damageTarget(state: GameState, target: Target, weapon: WeaponRule): void {
+  // Iron curtain: protected targets shrug off every hit while the effect lasts.
+  const shielded = target.kind === 'unit' ? target.unit.curtainTicks : target.building.curtainTicks;
+  if (shielded > 0) return;
   const armor =
     target.kind === 'unit' ? unitRule(target.unit.type).armor : buildingRule(target.building.type).armor;
   const dmg = Math.trunc((weapon.damage * weapon.vs[armor]) / 100);

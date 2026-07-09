@@ -62,6 +62,14 @@ export function startProduction(state: GameState, playerId: number, item: string
   const rule = isBuildingType(item) ? buildingRule(item) : isUnitType(item) ? unitRule(item) : null;
   if (rule === null) return;
   if (isBuildingType(item) && !buildingRule(item).buildable) return;
+  // Unique buildings (iron curtain): at most one standing instance per player.
+  if (
+    isBuildingType(item) &&
+    buildingRule(item).unique === true &&
+    state.buildings.some((b) => b.owner === playerId && b.type === item)
+  ) {
+    return;
+  }
   if (!availableToFaction(rule.factions, player.faction)) return;
   // Motherload cheat unlocks everything of the faction — skip prereq/tech gates.
   if (!player.motherload) {

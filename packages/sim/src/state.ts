@@ -65,6 +65,8 @@ export interface Unit {
   /** Ground units riding inside (transport ships only). They are removed from
    *  state.units while aboard and sink with the ship. */
   passengers: Unit[];
+  /** Iron curtain: remaining ticks of invulnerability (0 = none). */
+  curtainTicks: number;
 }
 
 export interface Building {
@@ -87,6 +89,8 @@ export interface Building {
   cooldown: number;
   /** Superweapon charge in ticks (silos only). */
   charge: number;
+  /** Iron curtain: remaining ticks of invulnerability (0 = none). */
+  curtainTicks: number;
 }
 
 /** A superweapon on its way to impact. */
@@ -224,6 +228,7 @@ export function spawnUnit(
     cooldown: 0,
     cargo: 0,
     passengers: [],
+    curtainTicks: 0,
   };
   if (!isAir) state.occupancy[cell] = unit.id;
   state.units.push(unit);
@@ -253,6 +258,7 @@ export function constructBuilding(
     level: 1,
     cooldown: 0,
     charge: 0,
+    curtainTicks: 0,
   };
   for (let y = cy; y < cy + rule.height; y++) {
     for (let x = cx; x < cx + rule.width; x++) {

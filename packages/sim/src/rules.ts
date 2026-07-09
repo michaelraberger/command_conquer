@@ -16,7 +16,7 @@ export type ProductionCategory = 'building' | UnitCategory;
 export type WeaponTargets = 'ground' | 'air' | 'both';
 export type Faction = 'ALLIES' | 'SOVIETS';
 
-export type SuperweaponKind = 'NUKE' | 'STORM';
+export type SuperweaponKind = 'NUKE' | 'STORM' | 'CURTAIN';
 export type AiDifficulty = 'easy' | 'normal' | 'hard';
 
 /** Researchable technologies. A unit/building with a `tech` is only buildable
@@ -547,6 +547,8 @@ export interface BuildingRule {
   onWater?: boolean;
   /** Only buildable once this technology is researched (undefined = immediate). */
   tech?: TechId;
+  /** At most one standing instance per player (iron curtain device). */
+  unique?: boolean;
 }
 
 export const BUILDING_RULES = {
@@ -801,6 +803,27 @@ export const BUILDING_RULES = {
     sight: 4,
     tech: 'super',
   },
+  IRONCURTAIN: {
+    name: 'Eiserner Vorhang',
+    maxHp: 900,
+    cost: 3500,
+    buildTime: 240,
+    power: -200,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: 'CURTAIN',
+    // "Battle Lab" gate: needs the Techzentrum standing plus the
+    // Superwaffen-Programm researched (same tech as the other superweapons).
+    requires: ['TECHCENTER'],
+    buildable: true,
+    factions: ['SOVIETS'],
+    sight: 4,
+    tech: 'super',
+    unique: true,
+  },
   WEATHER: {
     name: 'Wetterkontrolle',
     maxHp: 1000,
@@ -977,11 +1000,16 @@ export interface SuperweaponStats {
 export const SUPERWEAPON_STATS: Record<SuperweaponKind, SuperweaponStats> = {
   NUKE: { name: 'Atomrakete', radius: Math.round(3.5 * SUBCELL), damage: 1000 },
   STORM: { name: 'Wettersturm', radius: Math.round(4.5 * SUBCELL), damage: 550 },
+  // Iron curtain: no damage — everything caught in the radius becomes
+  // invulnerable for IRON_CURTAIN_TICKS instead (infantry and aircraft excluded).
+  CURTAIN: { name: 'Eiserner Vorhang', radius: Math.round(3 * SUBCELL), damage: 0 },
 };
 /** Ticks a silo needs to charge (2 minutes). */
 export const SUPERWEAPON_CHARGE_TICKS = 1800;
 /** Ticks between firing and impact. */
 export const SUPERWEAPON_TRAVEL_TICKS = 75;
+/** How long the iron curtain keeps vehicles/buildings invulnerable (10 s). */
+export const IRON_CURTAIN_TICKS = 150;
 
 /**
  * Selling refunds half of everything invested (classic C&C). For walls that

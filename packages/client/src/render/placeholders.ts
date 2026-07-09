@@ -415,6 +415,28 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 1, 1, 18),
   },
+  IRONCURTAIN: {
+    frameTop: 52,
+    fx: 0xff5540, // curtain-energy red
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      prismAt(g, 0.2, 0.9, 1.6, 0.9, 12, 0xa8a08c); // generator block
+      // Twin pylons with the crackling energy orb suspended between them.
+      const a = iso(0.55, 0.6);
+      const b = iso(1.55, 0.6);
+      for (const p of [a, b]) {
+        g.rect(p.x - 2.5, p.y - 40, 5, 36).fill(0x6f675a);
+        g.rect(p.x - 4.5, p.y - 42, 9, 4).fill(0x8f8775); // emitter head
+      }
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2 - 40;
+      g.moveTo(a.x, my).lineTo(b.x, my).stroke({ width: 1.5, color: fx, alpha: 0.7 }); // arc
+      g.circle(mx, my, 7).fill({ color: fx, alpha: 0.9 }); // energy orb
+      g.circle(mx - 2, my - 2, 2.5).fill(0xffd0c4); // hot core glint
+      g.circle(mx, my, 11).stroke({ width: 1, color: fx, alpha: 0.45 }); // halo
+    },
+    team: (g) => teamMark(g, 1, 1.7, 10),
+  },
   WEATHER: {
     frameTop: 44,
     fx: 0x7fd4ff,
