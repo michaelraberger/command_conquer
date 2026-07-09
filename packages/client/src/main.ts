@@ -13,6 +13,7 @@ import { FogRenderer } from './render/fog.js';
 import { OreRenderer } from './render/ore.js';
 import { PrismLinkOverlay } from './render/prismLinks.js';
 import { createTextures } from './render/placeholders.js';
+import { loadUnitSprites } from './render/unitSprites.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
 import { Alerts } from './ui/alerts.js';
@@ -111,6 +112,7 @@ async function boot(): Promise<void> {
   const { state, driver } = await setupFromChoice(choice);
 
   const textures = createTextures(app.renderer);
+  await loadUnitSprites(textures); // swaps in real sprite atlases where available
 
   const world = new Container();
   const terrainLayer = buildTerrainLayer(state, textures);
