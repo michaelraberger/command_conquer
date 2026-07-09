@@ -215,6 +215,7 @@ export class EntityRenderer {
       REPAIR: this.tex.repair,
       RIFLEMAN: this.tex.rifleman,
       ROCKETEER: this.tex.rocketeer,
+      SNIPER: this.tex.sniper,
       SPION: this.tex.spion,
       MCV: this.tex.mcv,
       SCOUT: this.tex.scout,

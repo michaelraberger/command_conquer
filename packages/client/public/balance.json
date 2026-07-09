@@ -61,6 +61,16 @@
       "speed": 20,
       "sight": 5
     },
+    "SNIPER": {
+      "cost": 800,
+      "buildTime": 70,
+      "maxHp": 90,
+      "speed": 16,
+      "sight": 10,
+      "damage": 150,
+      "rangeCells": 9,
+      "cooldown": 55
+    },
     "MCV": {
       "cost": 2500,
       "buildTime": 150,

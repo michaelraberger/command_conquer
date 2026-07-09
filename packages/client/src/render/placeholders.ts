@@ -52,6 +52,7 @@ export interface GameTextures {
   harvester: UnitSprite[];
   repair: UnitSprite[];
   rocketeer: UnitSprite[];
+  sniper: UnitSprite[];
   spion: UnitSprite[];
   mcv: UnitSprite[];
   scout: UnitSprite[];
@@ -661,6 +662,14 @@ function drawRocketeer(body: Graphics): void {
   body.circle(-1.4, 1.4, 1.8).fill(UNIFORM_HI);
 }
 
+function drawSniper(body: Graphics): void {
+  body.rect(2, -0.7, 16, 1.4).fill(GEAR); // very long rifle barrel
+  body.rect(17, -1, 3, 2).fill(METAL_DK); // muzzle
+  body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
+  body.rect(4, -1.8, 4, 1.3).fill(0x2a2a24); // scope
+  body.circle(-1.4, 1.4, 1.8).fill(UNIFORM_HI); // shoulder highlight
+}
+
 function drawFlamer(body: Graphics): void {
   body.roundRect(-6.5, -3, 5, 6, 1.5).fill(0x5f5f52).stroke({ width: 1, color: 0x2a2a24 }); // twin tanks
   body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
@@ -965,6 +974,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const harvester: UnitSprite[] = [];
   const repair: UnitSprite[] = [];
   const rocketeer: UnitSprite[] = [];
+  const sniper: UnitSprite[] = [];
   const spion: UnitSprite[] = [];
   const mcv: UnitSprite[] = [];
   const scout: UnitSprite[] = [];
@@ -999,6 +1009,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     transport.push(bakeVehicle(renderer, f, 28, drawTransportShip, teamTransportShip));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
+    sniper.push(bakeInfantry(renderer, f, drawSniper, teamHelmet));
     spion.push(bakeInfantry(renderer, f, drawSpion, teamHelmet));
     mcv.push(bakeVehicle(renderer, f, 30, drawMcv, teamMcv));
     flamer.push(bakeInfantry(renderer, f, drawFlamer, teamHelmet));
@@ -1078,6 +1089,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     mammoth,
     artillery,
     rifleman,
+    sniper,
     spion,
     mcv,
     harvester,

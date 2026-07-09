@@ -218,6 +218,25 @@ export const UNIT_RULES = {
     factions: null,
     sight: 5,
   },
+  SNIPER: {
+    name: 'Scharfschütze',
+    maxHp: 90,
+    speed: 16,
+    radius: 60,
+    armor: 'none',
+    // Extreme-range marksman that one-shots enemy INFANTRY from well outside
+    // their range, but can't touch vehicles or buildings. Slow to fire, fragile.
+    weapon: weapon(150, 9, 55, 0, { none: 100, light: 100, heavy: 100 }, 'BULLET'),
+    cost: 800,
+    buildTime: 70,
+    category: 'infantry',
+    // Needs the air command post (Flugplatz), like its inspiration — so it also
+    // sits behind the air-tech chain.
+    requires: ['BARRACKS', 'HELIPAD'],
+    factions: ['ALLIES'],
+    sight: 10,
+    antiInfantryOnly: true,
+  },
   SCOUT: {
     name: 'Späher',
     maxHp: 140,
