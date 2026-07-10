@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-10-ingenieur-bohrturm",
+    "date": "2026-07-10",
+    "title": "Ingenieur & Erz-Bohrturm",
+    "text": "Neue Einheit für beide Fraktionen: Der Ingenieur ($500, Kaserne) betritt jedes feindliche Gebäude und übernimmt es sofort — er wird dabei verbraucht, das Gebäude gehört danach dir. Lohnendstes Ziel: der neue Erz-Bohrturm, ein neutrales Gebäude auf Karten. Wer ihn per Ingenieur erobert, kassiert sofort 500 Credits und danach 10 Credits pro Sekunde, solange er ihn hält. Vorsicht: Auch die KI schickt Ingenieure los! Bohrtürme stehen jetzt auf Frosttal und Sackgasse und lassen sich im Karteneditor platzieren.",
+    "image": "changelog/ingenieur-bohrturm.png"
+  },
+  {
     "id": "2026-07-10-eis-wueste",
     "date": "2026-07-10",
     "title": "Neue Oberflächen: Eis und Wüste",
