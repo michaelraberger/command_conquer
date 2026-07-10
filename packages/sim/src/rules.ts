@@ -746,13 +746,15 @@ export const BUILDING_RULES = {
     produces: null,
     // Manned MG post: strong vs infantry and light vehicles, weak vs tanks.
     // Being manned, it keeps firing during a power deficit (see defenseSystem) —
-    // the one defense that still works while the base is dark.
-    weapon: weapon(12, 5, 5, 0, { none: 100, light: 60, heavy: 20 }, 'BULLET'),
+    // the one defense that still works while the base is dark. Long reach for
+    // its price (6.5 — between Pillbox 4.5 and Prisma 7); the build radius is
+    // a flat BUILD_ADJACENCY for every building, so range doesn't extend it.
+    weapon: weapon(12, 6.5, 5, 0, { none: 100, light: 60, heavy: 20 }, 'BULLET'),
     superweapon: null,
     requires: ['BARRACKS'],
     buildable: true,
     factions: null,
-    sight: 6,
+    sight: 7,
     manned: true,
   },
   PRISM: {

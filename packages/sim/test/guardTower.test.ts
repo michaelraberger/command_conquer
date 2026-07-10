@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BUILD_ADJACENCY,
   availableToFaction,
+  buildAdjacency,
   buildingRule,
   constructBuilding,
   createGame,
@@ -32,6 +34,19 @@ describe('Wachturm (guard tower)', () => {
     const before = rifleman.hp;
     for (let t = 0; t < 10; t++) tick(state, []);
     expect(rifleman.hp).toBeLessThan(before);
+  });
+
+  it('outranges the pillbox (6 cells) without extending the build radius', () => {
+    const { state } = withTower();
+    // 6 cells out: beyond the pillbox's 4.5, inside the tower's 6.5.
+    const rifleman = spawnUnit(state, 'RIFLEMAN', 1, 36, 30);
+    rifleman.order = null;
+    const before = rifleman.hp;
+    for (let t = 0; t < 10; t++) tick(state, []);
+    expect(rifleman.hp).toBeLessThan(before);
+    // Build radius stays the flat per-building adjacency, range-independent.
+    expect(buildAdjacency('GUARDTOWER')).toBe(BUILD_ADJACENCY);
+    expect(buildAdjacency('GUARDTOWER')).toBe(buildAdjacency('PILLBOX'));
   });
 
   it('keeps firing during a power deficit while the pillbox goes dark', () => {
