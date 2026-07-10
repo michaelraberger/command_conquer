@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-10-angriffsradius",
+    "date": "2026-07-10",
+    "title": "Bau- und Angriffsradius getrennt sichtbar",
+    "text": "Wählst du ein Verteidigungsgebäude aus, siehst du jetzt zwei Ringe: den blauen Bauradius (wie weit sich deine Basis dort ausdehnt) und die rote Angriffsreichweite (wie weit das Gebäude feuert). Bei Wachturm und Prisma-Turm ist die Reichweite deutlich größer als der Baubereich — so platzierst du Türme gezielt an der Verteidigungslinie.",
+    "image": "changelog/angriffsradius.png"
+  },
+  {
     "id": "2026-07-10-karteneditor",
     "date": "2026-07-10",
     "title": "Karteneditor: Baue deine eigenen Karten",
