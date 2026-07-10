@@ -166,17 +166,18 @@ export function aiSystem(state: GameState): void {
   }
 }
 
-/** Upgrade one building in place (same effect as the UPGRADE_BUILDING command). */
+/** Start a timed in-place upgrade (same effect as the UPGRADE_BUILDING command). */
 function upgradeOne(state: GameState, player: Player, from: BuildingType): boolean {
   const rule = buildingRule(from);
   const to = rule.upgradeTo as BuildingType | undefined;
   const cost = rule.upgradeCost;
   if (to === undefined || cost === undefined || player.credits < cost) return false;
-  const target = state.buildings.find((b) => b.owner === player.id && b.type === from);
+  const target = state.buildings.find(
+    (b) => b.owner === player.id && b.type === from && !b.upgrade,
+  );
   if (!target) return false;
   player.credits -= cost;
-  target.type = to;
-  target.hp = buildingRule(to).maxHp;
+  target.upgrade = { to, progress: 0 };
   return true;
 }
 

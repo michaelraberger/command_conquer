@@ -94,6 +94,10 @@ export interface Building {
   charge: number;
   /** Iron curtain: remaining ticks of invulnerability (0 = none). */
   curtainTicks: number;
+  /** In-place upgrade in progress (Wachturm → AGT, Kraftwerk → Fortschr.):
+   *  the building keeps working as its current type until `progress` reaches the
+   *  target's buildTime, then becomes `to`. null/absent = not upgrading. */
+  upgrade?: { to: BuildingType; progress: number } | null;
 }
 
 /** A superweapon on its way to impact. */

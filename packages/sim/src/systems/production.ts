@@ -196,6 +196,31 @@ export function productionSystem(state: GameState): void {
   }
 }
 
+/**
+ * Advances in-place building upgrades (Wachturm → AGT, Kraftwerk → Fortschr.):
+ * one tick of progress per pass toward the target's buildTime, then swaps the
+ * type at full HP. Like construction, a power deficit halves the speed. The
+ * cost was already paid when the upgrade started (see UPGRADE_BUILDING).
+ * Deterministic: buildings are iterated in their fixed ascending-id order.
+ */
+export function buildingUpgradeSystem(state: GameState): void {
+  const lowPower = state.players.map((p) => {
+    const { produced, used } = powerBalance(state, p.id);
+    return used > produced;
+  });
+  for (const building of state.buildings) {
+    const up = building.upgrade;
+    if (!up) continue;
+    if (lowPower[building.owner] && state.tick % 2 === 1) continue; // half speed
+    up.progress++;
+    if (up.progress >= buildingRule(up.to).buildTime) {
+      building.type = up.to;
+      building.hp = buildingRule(up.to).maxHp;
+      building.upgrade = null;
+    }
+  }
+}
+
 /** Spawns a finished unit next to its producing building; false if blocked. */
 function trySpawnProduced(state: GameState, player: Player, item: string): boolean {
   if (!isUnitType(item)) return false;

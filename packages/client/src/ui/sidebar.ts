@@ -386,6 +386,27 @@ export class Sidebar {
     this.binfoEl.append(btn);
   }
 
+  /** Shows an animated "Ausbau … X%" bar while an in-place upgrade runs. */
+  private appendUpgradeProgress(buildingId: number, targetName: string, buildTime: number): void {
+    const label = document.createElement('div');
+    label.className = 'bprog-label';
+    const bar = document.createElement('div');
+    bar.className = 'bprog-bar';
+    const fill = document.createElement('div');
+    fill.className = 'bprog-fill';
+    bar.append(fill);
+    this.binfoEl.append(label, bar);
+    const refresh = (): void => {
+      const b = this.state.buildings.find((x) => x.id === buildingId);
+      const prog = b?.upgrade?.progress ?? buildTime;
+      const pct = Math.min(100, Math.round((prog / buildTime) * 100));
+      label.textContent = `Ausbau → ${targetName} … ${pct}%`;
+      fill.style.width = `${pct}%`;
+    };
+    refresh();
+    this.binfoUpdaters.push(refresh);
+  }
+
   /** Info panel for the selected own building (wall upgrades, rally hint). */
   private updateBuildingInfo(): void {
     const id = this.controls.selectedBuilding;
@@ -402,7 +423,8 @@ export class Sidebar {
       building.type === 'TECHCENTER'
         ? `:${p.researched.join(',')}:${p.research ? p.research.tech : '-'}`
         : '';
-    const key = `${building.id}:${building.type}:${building.hp}:${building.level}${researchKey}`;
+    const upgKey = building.upgrade ? `:up→${building.upgrade.to}` : '';
+    const key = `${building.id}:${building.type}:${building.hp}:${building.level}${upgKey}${researchKey}`;
     if (key === this.lastBinfoKey) {
       for (const update of this.binfoUpdaters) update();
       return;
@@ -422,7 +444,11 @@ export class Sidebar {
     hp.textContent = `HP ${building.hp} / ${buildingMaxHp(building)}`;
     this.binfoEl.append(title, hp);
 
-    if (building.type === 'WALL' && building.level < WALL_LEVELS.length) {
+    if (building.upgrade) {
+      // Upgrade running: animate a progress bar in place until it finishes.
+      const target = buildingRule(building.upgrade.to);
+      this.appendUpgradeProgress(building.id, target.name, target.buildTime);
+    } else if (building.type === 'WALL' && building.level < WALL_LEVELS.length) {
       const next = WALL_LEVELS[building.level]!;
       this.appendUpgradeButton(
         building.id,

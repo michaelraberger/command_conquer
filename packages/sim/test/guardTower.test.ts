@@ -6,8 +6,10 @@ import {
   buildingRule,
   constructBuilding,
   createGame,
+  deserialize,
   hashState,
   powerBalance,
+  serialize,
   spawnUnit,
   tick,
   type Command,
@@ -85,21 +87,43 @@ describe('Wachturm (guard tower)', () => {
 
 describe('Fortschr. Wachturm (AGT-Upgrade)', () => {
   const upgrade = (id: number): Command => ({ type: 'UPGRADE_BUILDING', playerId: 0, buildingId: id });
+  const AGT_TIME = buildingRule('AGT').buildTime;
+  /** Ticks a guard-tower upgrade to completion (needs power for the unmanned AGT). */
+  function upgradedAgt(seed = 7) {
+    const state = createGame(seed);
+    constructBuilding(state, 'POWER', 0, 26, 26);
+    const tower = constructBuilding(state, 'GUARDTOWER', 0, 30, 30);
+    state.players[0]!.credits = 1000;
+    tick(state, [upgrade(tower.id)]);
+    for (let t = 0; t < AGT_TIME; t++) tick(state, []);
+    return { state, id: tower.id };
+  }
 
-  it('Wachturm can be upgraded to the AGT in place, paying the difference', () => {
-    const { state, tower } = withTower();
+  it('Wachturm upgrades to the AGT in place — timed, not instant, paying the difference', () => {
+    // Powered base so the upgrade runs at full speed (a deficit halves it).
+    const state = createGame(7);
+    constructBuilding(state, 'POWER', 0, 26, 26);
+    const tower = constructBuilding(state, 'GUARDTOWER', 0, 30, 30);
     const rule = buildingRule('GUARDTOWER');
     expect(rule.upgradeTo).toBe('AGT');
     state.players[0]!.credits = 1000;
     const cx = tower.cx, cy = tower.cy;
 
-    tick(state, [upgrade(tower.id)]);
-    const now = state.buildings.find((b) => b.id === tower.id)!;
+    tick(state, [upgrade(tower.id)]); // pays upfront, advances progress to 1
+    expect(state.players[0]!.credits).toBe(1000 - (rule.upgradeCost ?? 0));
+    let now = state.buildings.find((b) => b.id === tower.id)!;
+    expect(now.type).toBe('GUARDTOWER'); // still a Wachturm during the conversion
+    expect(now.upgrade?.to).toBe('AGT');
+
+    for (let t = 0; t < AGT_TIME - 2; t++) tick(state, []);
+    expect(state.buildings.find((b) => b.id === tower.id)!.type).toBe('GUARDTOWER'); // not done yet
+    tick(state, []); // completing tick (progress reaches buildTime)
+    now = state.buildings.find((b) => b.id === tower.id)!;
     expect(now.type).toBe('AGT');
     expect(now.cx).toBe(cx); // same footprint / position
     expect(now.cy).toBe(cy);
     expect(now.hp).toBe(buildingRule('AGT').maxHp);
-    expect(state.players[0]!.credits).toBe(1000 - (rule.upgradeCost ?? 0));
+    expect(now.upgrade == null).toBe(true);
   });
 
   it('is not directly buildable (upgrade-only) and hits air + ground', () => {
@@ -110,40 +134,33 @@ describe('Fortschr. Wachturm (AGT-Upgrade)', () => {
   });
 
   it('has a dead zone: it cannot hit an adjacent unit but hits one further out', () => {
-    const mk = () => {
-      const state = createGame(7);
-      // The AGT is unmanned — it needs power to fire, so give the base a plant.
-      constructBuilding(state, 'POWER', 0, 26, 26);
-      const t = constructBuilding(state, 'GUARDTOWER', 0, 30, 30);
-      state.players[0]!.credits = 1000;
-      tick(state, [upgrade(t.id)]);
-      return state;
-    };
     // Adjacent enemy (1 cell away) — inside the minRange dead zone.
-    const closeState = mk();
-    const adjacent = spawnUnit(closeState, 'RIFLEMAN', 1, 31, 30);
+    const close = upgradedAgt();
+    const adjacent = spawnUnit(close.state, 'RIFLEMAN', 1, 31, 30);
     adjacent.order = null;
     const adjHp = adjacent.hp;
-    for (let t = 0; t < 15; t++) tick(closeState, []);
+    for (let t = 0; t < 15; t++) tick(close.state, []);
     expect(adjacent.hp).toBe(adjHp); // never fired at the point-blank target
 
     // Enemy at ~5 cells — outside the dead zone, inside range.
-    const farState = mk();
-    const outside = spawnUnit(farState, 'RIFLEMAN', 1, 35, 30);
+    const far = upgradedAgt();
+    const outside = spawnUnit(far.state, 'RIFLEMAN', 1, 35, 30);
     outside.order = null;
     const outHp = outside.hp;
-    for (let t = 0; t < 15; t++) tick(farState, []);
+    for (let t = 0; t < 15; t++) tick(far.state, []);
     expect(outside.hp).toBeLessThan(outHp);
   });
 
-  it('AGT upgrade round-trips through serialize and stays deterministic', () => {
+  it('AGT upgrade round-trips through serialize mid-upgrade and stays deterministic', () => {
     const run = () => {
       const { state, tower } = withTower();
       state.players[0]!.credits = 1000;
       tick(state, [upgrade(tower.id)]);
-      spawnUnit(state, 'RIFLEMAN', 1, 35, 30);
-      for (let t = 0; t < 60; t++) tick(state, []);
-      return hashState(state);
+      // Serialize while the upgrade is still in progress, then keep evolving.
+      const restored = deserialize(serialize(state));
+      spawnUnit(restored, 'RIFLEMAN', 1, 35, 30);
+      for (let t = 0; t < 120; t++) tick(restored, []);
+      return hashState(restored);
     };
     expect(run()).toBe(run());
   });

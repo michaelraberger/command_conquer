@@ -197,15 +197,15 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           building.hp = next.maxHp; // upgrading fully repairs the wall
           break;
         }
-        // In-place type upgrade (Wachturm → AGT): same footprint, keep the
-        // cell, pay the difference, rebuild at full HP of the new type.
+        // In-place type upgrade (Wachturm → AGT): pay upfront and start a timed
+        // conversion. The building keeps working as its current type until the
+        // upgrade finishes (see buildingUpgradeSystem). One at a time.
+        if (building.upgrade) break;
         const rule = buildingRule(building.type);
         if (rule.upgradeTo === undefined || rule.upgradeCost === undefined) break;
         if (player.credits < rule.upgradeCost) break;
-        const target = rule.upgradeTo as BuildingType;
         player.credits -= rule.upgradeCost;
-        building.type = target;
-        building.hp = buildingRule(target).maxHp;
+        building.upgrade = { to: rule.upgradeTo as BuildingType, progress: 0 };
         break;
       }
       case 'SELL_BUILDING': {
