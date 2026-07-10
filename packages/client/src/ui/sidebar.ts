@@ -11,6 +11,7 @@ import {
   buildingRule,
   isBuildingType,
   powerBalance,
+  satisfiesRequirement,
   storageCapacity,
   techFor,
   techRule,
@@ -227,7 +228,9 @@ export class Sidebar {
       const prereqsMet =
         player.motherload ||
         rule.requires.every((req) =>
-          this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === req),
+          this.state.buildings.some(
+            (b) => b.owner === session.localPlayer && satisfiesRequirement(b.type, req),
+          ),
         );
       const tech = techFor(el.item);
       const techLocked =
@@ -252,7 +255,12 @@ export class Sidebar {
         text = 'Nur einmal baubar – steht bereits';
       } else if (!prereqsMet) {
         text = `braucht ${rule.requires
-          .filter((r) => !this.state.buildings.some((b) => b.owner === session.localPlayer && b.type === r))
+          .filter(
+            (r) =>
+              !this.state.buildings.some(
+                (b) => b.owner === session.localPlayer && satisfiesRequirement(b.type, r),
+              ),
+          )
           .map((r) => buildingRule(r as BuildingType).name)
           .join(', ')}`;
       } else if (techLocked) {

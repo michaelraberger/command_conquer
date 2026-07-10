@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildingRule,
+  satisfiesRequirement,
+  startProduction,
   constructBuilding,
   createGame,
   hashState,
@@ -60,5 +62,20 @@ describe('Fortschr. Kraftwerk (Advanced Power Plant)', () => {
       return hashState(state);
     };
     expect(run()).toBe(run());
+  });
+it('still counts as a Kraftwerk for prerequisites after the upgrade', () => {
+    const state = createGame(11);
+    const plant = constructBuilding(state, 'POWER', 0, 20, 20);
+    state.players[0]!.credits = 5000;
+    tick(state, [upgrade(plant.id)]);
+    for (let t = 0; t < ADV_TIME + 1; t++) tick(state, []);
+    expect(state.buildings.some((b) => b.owner === 0 && b.type === 'POWER')).toBe(false);
+    expect(satisfiesRequirement('ADVPOWER', 'POWER')).toBe(true);
+    expect(satisfiesRequirement('POWER', 'ADVPOWER')).toBe(false); // nur aufwaerts
+    expect(satisfiesRequirement('AGT', 'GUARDTOWER')).toBe(true);
+
+    // Ohne den Fix waere die Raffinerie hier gesperrt (requires: ['POWER']).
+    startProduction(state, 0, 'REFINERY');
+    expect(state.players[0]!.queues.building.item).toBe('REFINERY');
   });
 });

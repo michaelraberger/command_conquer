@@ -6,6 +6,7 @@ import {
   isBuildingType,
   isTechId,
   isUnitType,
+  satisfiesRequirement,
   techRule,
   unitRule,
   MOTHERLOAD_CREDITS,
@@ -31,8 +32,9 @@ export function powerBalance(state: GameState, playerId: number): { produced: nu
 }
 
 function prereqsMet(state: GameState, playerId: number, requires: readonly string[]): boolean {
+  // satisfiesRequirement: upgraded buildings still count as their base type.
   return requires.every((req) =>
-    state.buildings.some((b) => b.owner === playerId && b.type === req),
+    state.buildings.some((b) => b.owner === playerId && satisfiesRequirement(b.type, req)),
   );
 }
 

@@ -1112,6 +1112,29 @@ export function isUnitType(item: string): item is UnitType {
   return item in UNIT_RULES;
 }
 
+/** Base type each upgrade target came from (ADVPOWER → POWER, AGT → GUARDTOWER). */
+const UPGRADE_BASE: Partial<Record<BuildingType, BuildingType>> = (() => {
+  const map: Partial<Record<BuildingType, BuildingType>> = {};
+  for (const type of Object.keys(BUILDING_RULES) as BuildingType[]) {
+    const to = buildingRule(type).upgradeTo;
+    if (to !== undefined && isBuildingType(to)) map[to] = type;
+  }
+  return map;
+})();
+
+/** True when a standing building of `type` satisfies the prerequisite `req`.
+ *  Upgraded buildings keep counting as their base type — a Fortschr. Kraftwerk
+ *  is still a Kraftwerk as far as requirements are concerned, so upgrading
+ *  your only power plant never locks you out of the tech tree. */
+export function satisfiesRequirement(type: BuildingType, req: string): boolean {
+  let t: BuildingType | undefined = type;
+  while (t !== undefined) {
+    if (t === req) return true;
+    t = UPGRADE_BASE[t];
+  }
+  return false;
+}
+
 export interface TechRule {
   name: string;
   cost: number;

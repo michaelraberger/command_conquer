@@ -1,4 +1,4 @@
-import { techRule, type GameState, type TechId } from '@cac/sim';
+import { satisfiesRequirement, techRule, type GameState, type TechId } from '@cac/sim';
 import { session } from '../session.js';
 import { computeTechTree, TILE_H, TILE_W, type TreeNode } from './techTreeLayout.js';
 
@@ -152,8 +152,10 @@ export class TechTreeOverlay {
   private refreshStatuses(): void {
     const local = session.localPlayer;
     const player = this.state.players[local]!;
+    // satisfiesRequirement: upgraded buildings still count as their base type
+    // (ein Fortschr. Kraftwerk hält den Kraftwerk-Knoten grün).
     const standing = (type: string): boolean =>
-      this.state.buildings.some((b) => b.owner === local && b.type === type);
+      this.state.buildings.some((b) => b.owner === local && satisfiesRequirement(b.type, type));
 
     for (const ref of this.refs.values()) {
       const { node } = ref;

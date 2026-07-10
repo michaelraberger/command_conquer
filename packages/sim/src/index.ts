@@ -47,6 +47,7 @@ export {
   buildingRule,
   isBuildingType,
   isUnitType,
+  satisfiesRequirement,
   availableToFaction,
   TECH_RULES,
   techRule,
@@ -164,6 +165,6 @@ export { fnv1a, hashState } from './hash.js';
 export { findPath, type PathOptions } from './path/astar.js';
 export { applyCommands, unloadTransport, type Command } from './commands.js';
 export { canPlaceBuilding } from './systems/placement.js';
-export { powerBalance } from './systems/production.js';
+export { powerBalance, startProduction } from './systems/production.js';
 export { aiSystem } from './ai/controller.js';
 export { tick, TICKS_PER_SECOND, TICK_MS } from './tick.js';
