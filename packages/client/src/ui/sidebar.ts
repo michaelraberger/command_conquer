@@ -66,9 +66,10 @@ export class Sidebar {
   private binfoUpdaters: Array<() => void> = [];
   private swEl = document.getElementById('superweapon')!;
   /** One row (label + charge bar + fire button) per owned support power:
-   *  superweapon silos plus the paradrop (keyed 'PARADROP'). */
+   *  one per superweapon SILO (keyed `sw:<buildingId>`, so two Raketensilos
+   *  charge and fire independently) plus the paradrop (keyed 'PARADROP'). */
   private swRows = new Map<
-    StrikeKind,
+    string,
     { root: HTMLElement; fill: HTMLElement; label: HTMLElement; button: HTMLButtonElement }
   >();
 
@@ -270,46 +271,59 @@ export class Sidebar {
     this.updateSuperweapon();
   }
 
-  /** Charge bar + fire button per superweapon the player owns — Soviets can
-   *  field the Raketensilo AND the Eiserner Vorhang side by side. */
+  /** Charge bar + fire button per superweapon SILO the player owns — two
+   *  Raketensilos charge and fire independently (each gets its own row), and
+   *  Soviets can field Raketensilo AND Eiserner Vorhang side by side. */
   private updateSuperweapon(): void {
-    // Most-charged silo per kind (rebuilding after a loss keeps the fuller one).
-    const byKind = new Map<SuperweaponKind, Building>();
+    const silos: Building[] = [];
     for (const b of this.state.buildings) {
       if (b.owner !== session.localPlayer) continue;
-      const kind = buildingRule(b.type).superweapon;
-      if (kind === null) continue;
-      const cur = byKind.get(kind);
-      if (!cur || b.charge > cur.charge) byKind.set(kind, b);
+      if (buildingRule(b.type).superweapon === null) continue;
+      silos.push(b);
     }
+    silos.sort((a, b) => a.id - b.id); // stable row order
     // Paradrop row: shown while a Flugplatz stands (per-player cooldown).
     const hasAirfield = this.state.buildings.some(
       (b) => b.owner === session.localPlayer && b.type === 'HELIPAD',
     );
-    for (const [kind, row] of this.swRows) {
-      const stale = kind === 'PARADROP' ? !hasAirfield : !byKind.has(kind);
+    const liveKeys = new Set(silos.map((s) => `sw:${s.id}`));
+    for (const [key, row] of this.swRows) {
+      const stale = key === 'PARADROP' ? !hasAirfield : !liveKeys.has(key);
       if (stale) {
         row.root.remove();
-        this.swRows.delete(kind);
+        this.swRows.delete(key);
       }
     }
-    const show = byKind.size > 0 || hasAirfield ? 'block' : 'none';
+    const show = silos.length > 0 || hasAirfield ? 'block' : 'none';
     if (this.swEl.style.display !== show) this.swEl.style.display = show;
-    for (const [kind, silo] of byKind) {
-      const row = this.swRows.get(kind) ?? this.createSwRow(kind);
+    // Number rows only when a kind exists more than once ("Atomrakete 2").
+    const kindCounts = new Map<SuperweaponKind, number>();
+    for (const silo of silos) {
+      const kind = buildingRule(silo.type).superweapon!;
+      kindCounts.set(kind, (kindCounts.get(kind) ?? 0) + 1);
+    }
+    const kindSeen = new Map<SuperweaponKind, number>();
+    for (const silo of silos) {
+      const kind = buildingRule(silo.type).superweapon!;
+      const nth = (kindSeen.get(kind) ?? 0) + 1;
+      kindSeen.set(kind, nth);
+      const row = this.swRows.get(`sw:${silo.id}`) ?? this.createSwRow(`sw:${silo.id}`, kind);
       const pct = Math.min(100, Math.round((silo.charge / SUPERWEAPON_CHARGE_TICKS) * 100));
       const ready = silo.charge >= SUPERWEAPON_CHARGE_TICKS;
       row.fill.style.width = `${pct}%`;
-      const label = ready
-        ? `${SUPERWEAPON_STATS[kind].name} BEREIT`
-        : `${SUPERWEAPON_STATS[kind].name} lädt … ${pct}%`;
+      const name =
+        (kindCounts.get(kind) ?? 1) > 1
+          ? `${SUPERWEAPON_STATS[kind].name} ${nth}`
+          : SUPERWEAPON_STATS[kind].name;
+      const label = ready ? `${name} BEREIT` : `${name} lädt … ${pct}%`;
       if (row.label.textContent !== label) row.label.textContent = label;
       row.button.disabled = !ready;
-      const btnText = this.placement.strike === kind ? 'Ziel anklicken …' : 'Ziel wählen';
+      const btnText =
+        this.placement.strike === kind && ready ? 'Ziel anklicken …' : 'Ziel wählen';
       if (row.button.textContent !== btnText) row.button.textContent = btnText;
     }
     if (hasAirfield) {
-      const row = this.swRows.get('PARADROP') ?? this.createSwRow('PARADROP');
+      const row = this.swRows.get('PARADROP') ?? this.createSwRow('PARADROP', 'PARADROP');
       const cd = this.player().paradropCooldown;
       const pct = Math.round(((PARADROP_COOLDOWN_TICKS - cd) / PARADROP_COOLDOWN_TICKS) * 100);
       const ready = cd === 0;
@@ -322,7 +336,7 @@ export class Sidebar {
     }
   }
 
-  private createSwRow(kind: StrikeKind) {
+  private createSwRow(key: string, kind: StrikeKind) {
     const root = document.createElement('div');
     root.className = 'sw-row';
     const label = document.createElement('div');
@@ -352,7 +366,7 @@ export class Sidebar {
     root.append(label, bar, button);
     this.swEl.appendChild(root);
     const row = { root, fill, label, button };
-    this.swRows.set(kind, row);
+    this.swRows.set(key, row);
     return row;
   }
 
