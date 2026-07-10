@@ -1,6 +1,7 @@
 import {
   RESOURCE_GEMS,
   RESOURCE_ORE,
+  TERRAIN_BRIDGE,
   TERRAIN_DIRT,
   TERRAIN_GRASS,
   TERRAIN_ICE,
@@ -47,6 +48,7 @@ const TERRAIN_BY_KEY: Record<string, number> = {
   tree: TERRAIN_TREE,
   ice: TERRAIN_ICE,
   sand: TERRAIN_SAND,
+  bridge: TERRAIN_BRIDGE,
 };
 
 /**

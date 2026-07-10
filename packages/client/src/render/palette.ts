@@ -1,5 +1,6 @@
 import {
   RESOURCE_GEMS,
+  TERRAIN_BRIDGE,
   TERRAIN_GRASS,
   TERRAIN_ICE,
   TERRAIN_ROCK,
@@ -22,7 +23,9 @@ export function terrainRgb(kind: number): readonly [number, number, number] {
             ? [188, 219, 233]
             : kind === TERRAIN_SAND
               ? [214, 189, 130]
-              : [138, 111, 77]; // dirt / default
+              : kind === TERRAIN_BRIDGE
+                ? [166, 124, 71]
+                : [138, 111, 77]; // dirt / default
 }
 
 export const ORE_CSS = '#d9a62e';

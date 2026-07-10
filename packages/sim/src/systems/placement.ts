@@ -1,4 +1,4 @@
-import { cellIndex, inBounds, isBuildableTerrain, isNavigableWater } from '../map.js';
+import { cellIndex, inBounds, isBuildableTerrain, isOpenWater } from '../map.js';
 import { buildAdjacency, buildingRule, type BuildingType } from '../rules.js';
 import type { GameState } from '../state.js';
 
@@ -19,8 +19,10 @@ export function canPlaceBuilding(
   for (let y = cy; y < cy + rule.height; y++) {
     for (let x = cx; x < cx + rule.width; x++) {
       if (!inBounds(state, x, y)) return false;
+      // Shipyards need genuinely open water — the passage under a bridge is
+      // navigable for ships but not a construction site.
       const buildableHere =
-        rule.onWater === true ? isNavigableWater(state, x, y) : isBuildableTerrain(state, x, y);
+        rule.onWater === true ? isOpenWater(state, x, y) : isBuildableTerrain(state, x, y);
       if (!buildableHere) return false;
       const idx = cellIndex(state, x, y);
       if (state.occupancy[idx] !== 0) return false;

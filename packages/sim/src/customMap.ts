@@ -2,7 +2,7 @@ import {
   RESOURCE_GEMS,
   RESOURCE_NONE,
   TERRAIN_DIRT,
-  TERRAIN_SAND,
+  TERRAIN_BRIDGE,
   TERRAIN_WATER,
   isBuildableKind,
   isPassableKind,
@@ -105,7 +105,7 @@ export function validateCustomMap(map: CustomMapData): CustomMapValidation {
   let waterCells = 0;
   for (let i = 0; i < size; i++) {
     const t = map.terrain[i]!;
-    if (!isInt(t) || t < TERRAIN_DIRT || t > TERRAIN_SAND) {
+    if (!isInt(t) || t < TERRAIN_DIRT || t > TERRAIN_BRIDGE) {
       errors.push('Ungültiger Geländewert in den Kartendaten.');
       return { ok: false, errors, warnings, mapType: 'BADLANDS' };
     }

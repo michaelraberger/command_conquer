@@ -41,6 +41,7 @@ export interface GameTextures {
   sand: Texture[];
   water: Texture;
   ice: Texture;
+  bridge: Texture;
   /** 3D rock outcrop variants, drawn in the entity layer like trees. */
   rocks: Texture[];
   ore: Texture;
@@ -72,6 +73,7 @@ export interface GameTextures {
   gunboat: UnitSprite[];
   destroyer: UnitSprite[];
   sub: UnitSprite[];
+  missilesub: UnitSprite[];
   transport: UnitSprite[];
   projectile: Texture;
   selectSmall: Texture;
@@ -1058,6 +1060,23 @@ function teamSub(g: Graphics): void {
   g.roundRect(-5, -2, 8, 4, 1).fill(0xffffff); // tower top
 }
 
+// ── Missile submarine: longer hull, aft tower, missile hatches fore ──
+function drawMissileSub(g: Graphics): void {
+  g.ellipse(0, 0, 24, 6).fill(HULL_LO).stroke({ width: 1, color: OUTLINE }); // hull
+  g.ellipse(10, 0, 9, 3.4).fill(HULL); // fore deck
+  g.roundRect(-9, -3.2, 10, 6.4, 2.5).fill(0x4b545d).stroke({ width: 1, color: OUTLINE }); // tower (aft)
+  g.rect(-5, -6.5, 1.6, 4).fill(METAL_DK); // periscope
+  // Vertical launch hatches on the fore deck.
+  for (const ox of [7, 12, 17]) {
+    g.circle(ox, -1.8, 1.5).fill(METAL_DK).stroke({ width: 0.8, color: OUTLINE });
+    g.circle(ox, 1.8, 1.5).fill(METAL_DK).stroke({ width: 0.8, color: OUTLINE });
+  }
+  g.ellipse(-21, 0, 4, 2.4).fill(0x4b545d); // stern planes
+}
+function teamMissileSub(g: Graphics): void {
+  g.roundRect(-8, -2, 8, 4, 1).fill(0xffffff); // tower top
+}
+
 // ── Transport: broad hull, cargo well, bow loading ramp ──
 function drawTransportShip(g: Graphics): void {
   g.poly([20, 0, 14, -8, -18, -8, -22, 0, -18, 8, 14, 8]).fill(HULL).stroke({ width: 1.2, color: OUTLINE });
@@ -1189,6 +1208,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const gunboat: UnitSprite[] = [];
   const destroyer: UnitSprite[] = [];
   const sub: UnitSprite[] = [];
+  const missilesub: UnitSprite[] = [];
   const transport: UnitSprite[] = [];
   for (let f = 0; f < FACING_COUNT; f++) {
     tank.push(bakeVehicle(renderer, f, 28, drawTank, teamTank));
@@ -1209,6 +1229,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     gunboat.push(bakeVehicle(renderer, f, 24, drawGunboat, teamGunboat));
     destroyer.push(bakeVehicle(renderer, f, 32, drawDestroyer, teamDestroyer));
     sub.push(bakeVehicle(renderer, f, 28, drawSub, teamSub));
+    missilesub.push(bakeVehicle(renderer, f, 32, drawMissileSub, teamMissileSub));
     transport.push(bakeVehicle(renderer, f, 28, drawTransportShip, teamTransportShip));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
@@ -1281,6 +1302,21 @@ export function createTextures(renderer: Renderer): GameTextures {
   water.moveTo(30, 21).quadraticCurveTo(38, 18, 46, 21).stroke({ width: 1.5, color: 0x4a83b3, alpha: 0.6 });
   water.poly(diamondPath()).stroke({ width: 1, color: 0x1d4266, alpha: 0.5 });
 
+  // Bridge deck: water peeking out at the corners, wooden planks across the
+  // middle band and two darker bearer beams along the edges.
+  const bridge = new Graphics().poly(diamondPath()).fill(0x2b5d8a);
+  bridge.poly([TILE_W / 2, 4, TILE_W - 8, TILE_H / 2, TILE_W / 2, TILE_H - 4, 8, TILE_H / 2]).fill(0x9a7648);
+  for (let i = 1; i < 5; i++) {
+    const t = i / 5;
+    const ax = 8 + (TILE_W / 2 - 8) * t;
+    const bx = TILE_W / 2 + (TILE_W / 2 - 8) * t;
+    bridge.moveTo(ax, TILE_H / 2 + (4 - TILE_H / 2) * t).lineTo(bx, TILE_H - 4 + (TILE_H / 2 - (TILE_H - 4)) * t)
+      .stroke({ width: 1, color: 0x77582f, alpha: 0.8 });
+  }
+  bridge
+    .poly([TILE_W / 2, 4, TILE_W - 8, TILE_H / 2, TILE_W / 2, TILE_H - 4, 8, TILE_H / 2])
+    .stroke({ width: 1.5, color: 0x5f4526, alpha: 0.95 });
+
   // Frozen surface: pale blue sheet with angular cracks and a cool outline.
   const ice = new Graphics().poly(diamondPath()).fill(0xbcdbe9);
   ice.moveTo(14, 15).lineTo(24, 12).lineTo(31, 16).stroke({ width: 1, color: 0x8fb8cc, alpha: 0.8 });
@@ -1304,6 +1340,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     ],
     water: bakeTile(renderer, water),
     ice: bakeTile(renderer, ice),
+    bridge: bakeTile(renderer, bridge),
     rocks: [bakeRock(renderer, 0), bakeRock(renderer, 1), bakeRock(renderer, 2)],
     ore: bakeTile(renderer, oreOverlay),
     gems: bakeTile(renderer, gemOverlay),
@@ -1342,6 +1379,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     gunboat,
     destroyer,
     sub,
+    missilesub,
     transport,
     projectile: renderer.generateTexture({
       target: shell,

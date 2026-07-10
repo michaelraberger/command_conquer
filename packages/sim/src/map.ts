@@ -1,9 +1,11 @@
 import { nextInt, type RngCarrier } from './rng.js';
 
-/** Terrain kinds. Dirt, grass, ice and sand are passable, the rest blocks
- *  movement. Ice is a frozen surface: ground units walk over it, but nothing
- *  can be built on it and ships cannot sail through it. Sand is a plain
- *  ground variant like dirt/grass (walkable and buildable). */
+/** Terrain kinds. Dirt, grass, ice, sand and bridges are passable, the rest
+ *  blocks movement. Ice is a frozen surface: ground units cross it slowly,
+ *  nothing can be built on it and ships cannot sail through it. Sand is a
+ *  plain ground variant like dirt/grass (walkable and buildable). Bridges
+ *  span water: ground units drive over them at full speed while ships pass
+ *  beneath — but nothing can be built on them. Map/editor content only. */
 export const TERRAIN_DIRT = 0;
 export const TERRAIN_WATER = 1;
 export const TERRAIN_ROCK = 2;
@@ -11,6 +13,7 @@ export const TERRAIN_TREE = 3;
 export const TERRAIN_GRASS = 4;
 export const TERRAIN_ICE = 5;
 export const TERRAIN_SAND = 6;
+export const TERRAIN_BRIDGE = 7;
 
 /** Resource field kinds (per cell, permanent — fields regrow on them). */
 export const RESOURCE_NONE = 0;
@@ -41,7 +44,11 @@ export function inBounds(grid: GridView, cx: number, cy: number): boolean {
 
 export function isPassableKind(kind: number): boolean {
   return (
-    kind === TERRAIN_DIRT || kind === TERRAIN_GRASS || kind === TERRAIN_ICE || kind === TERRAIN_SAND
+    kind === TERRAIN_DIRT ||
+    kind === TERRAIN_GRASS ||
+    kind === TERRAIN_ICE ||
+    kind === TERRAIN_SAND ||
+    kind === TERRAIN_BRIDGE
   );
 }
 
@@ -77,8 +84,16 @@ export function passableFor(grid: GridView, cx: number, cy: number, owner: numbe
   return grid.gateOwner[idx] === owner + 1;
 }
 
-/** Sailable for ships: open water without a structure (shipyard blocks). */
+/** Sailable for ships: water or the passage under a bridge, no structure. */
 export function isNavigableWater(grid: GridView, cx: number, cy: number): boolean {
+  if (!inBounds(grid, cx, cy)) return false;
+  const idx = cellIndex(grid, cx, cy);
+  const t = grid.terrain[idx];
+  return (t === TERRAIN_WATER || t === TERRAIN_BRIDGE) && grid.structures[idx] === 0;
+}
+
+/** Open water for placing water buildings (shipyard): bridges don't count. */
+export function isOpenWater(grid: GridView, cx: number, cy: number): boolean {
   if (!inBounds(grid, cx, cy)) return false;
   const idx = cellIndex(grid, cx, cy);
   return grid.terrain[idx] === TERRAIN_WATER && grid.structures[idx] === 0;
