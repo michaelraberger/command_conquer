@@ -1,5 +1,5 @@
 import { cellCenter, distSq, facingFromDelta, isqrt } from '../fixed.js';
-import { isNavigableWater, passableFor } from '../map.js';
+import { TERRAIN_ICE, isNavigableWater, passableFor } from '../map.js';
 import { findPath } from '../path/astar.js';
 import { unitRule } from '../rules.js';
 import type { GameState, Unit } from '../state.js';
@@ -9,6 +9,8 @@ import { isNaval } from '../targeting.js';
 const BLOCKED_TICKS_BEFORE_REPATH = 8;
 /** Failed repaths before a unit gives up (classic C&C traffic-jam behavior). */
 const MAX_REPATHS = 3;
+/** Ground speed multiplier on ice, in 1/256 (154/256 ≈ 60 %). Integer-only. */
+const ICE_SPEED_NUM = 154;
 
 /**
  * Cell-reservation movement: a unit occupies exactly one cell (the one it has
@@ -56,7 +58,12 @@ export function movementSystem(state: GameState): void {
     const dy = wy - unit.y;
     if (dx !== 0 || dy !== 0) {
       unit.facing = facingFromDelta(dx, dy);
-      const speed = unitRule(unit.type).speed;
+      let speed = unitRule(unit.type).speed;
+      // On ice ground units slip: 60 % speed. unit.cell is the reserved
+      // waypoint cell, so entering ice already slows the unit down.
+      if (state.terrain[unit.cell] === TERRAIN_ICE) {
+        speed = Math.max(1, (speed * ICE_SPEED_NUM) >> 8);
+      }
       const dist = isqrt(distSq(dx, dy));
       if (dist <= speed) {
         unit.x = wx;

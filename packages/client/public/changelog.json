@@ -3,7 +3,7 @@
     "id": "2026-07-10-eis-wueste",
     "date": "2026-07-10",
     "title": "Neue Oberflächen: Eis und Wüste",
-    "text": "Der Karteneditor kennt zwei neue Untergründe. Eis ist begehbar, aber nicht bebaubar — und Schiffe kommen nicht hindurch: Zugefrorene Flussstellen wirken wie natürliche Furten, über die deine Panzer rollen, während die Marine außen vor bleibt. Wüste ist normaler Boden in Sandoptik, begehbar und bebaubar, für ganze Wüstenkarten. Die Galerie-Karte „Frosttal (RA-Klassiker)“ nutzt die neuen Eis-Furten bereits.",
+    "text": "Der Karteneditor kennt zwei neue Untergründe. Eis ist begehbar, aber rutschig (Einheiten fahren mit 60 % Tempo), nicht bebaubar — und Schiffe kommen nicht hindurch: Zugefrorene Flussstellen wirken wie natürliche Furten, über die deine Panzer rollen, während die Marine außen vor bleibt. Wüste ist normaler Boden in Sandoptik, begehbar und bebaubar, für ganze Wüstenkarten. Die Galerie-Karte „Frosttal (RA-Klassiker)“ nutzt die neuen Eis-Furten bereits.",
     "image": "changelog/eis-wueste.png"
   },
   {

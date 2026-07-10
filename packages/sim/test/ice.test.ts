@@ -9,8 +9,10 @@ import {
   findPath,
   isBuildableKind,
   isPassableKind,
+  tick,
   validateCustomMap,
   type CustomMapData,
+  type GameState,
 } from '../src/index.js';
 
 /** 48×48 dirt map with a vertical water channel at x=20..22 splitting the
@@ -69,6 +71,32 @@ describe('Eis (TERRAIN_ICE)', () => {
     // before the ice instead of sailing through it.
     const naval = findPath(state, 21, 10, 21, 40, { avoidUnits: false, selfId: 0, water: true });
     expect(naval === null || naval.every((c) => c.cy < 24)).toBe(true);
+  });
+
+  it('slows ground units to ~60 % while crossing ice', () => {
+    // Plain dirt map with an all-ice row at y=20; same straight run measured
+    // once on dirt (y=24) and once on ice.
+    const map = emptyCustomMap(48, 48, 'Eistempo');
+    for (let x = 8; x <= 34; x++) map.terrain[20 * 48 + x] = TERRAIN_ICE;
+    const state = createGame(7, { customMap: map });
+    const tankId = state.units.find((u) => u.owner === 0 && u.type === 'TANK')!.id;
+
+    const moveAndCount = (s: GameState, cx: number, cy: number): number => {
+      tick(s, [{ type: 'MOVE', playerId: 0, unitIds: [tankId], cx, cy }]);
+      for (let t = 1; t < 600; t++) {
+        if (s.units.find((u) => u.id === tankId)!.path === null) return t;
+        tick(s);
+      }
+      throw new Error('unit still moving after 600 ticks');
+    };
+
+    moveAndCount(state, 10, 24);
+    const dirtTicks = moveAndCount(state, 30, 24); // 20 Zellen Erde
+    moveAndCount(state, 10, 20);
+    const iceTicks = moveAndCount(state, 30, 20); // 20 Zellen Eis
+    // 60 % Tempo → ~1,66× so lange; großzügige Schranken gegen Rundungsrauschen.
+    expect(iceTicks).toBeGreaterThan(dirtTicks * 1.4);
+    expect(iceTicks).toBeLessThan(dirtTicks * 2);
   });
 
   it('blocks building placement on ice', () => {
