@@ -28,7 +28,8 @@ function prismLinks(state: GameState, tower: Building): number {
 
 /**
  * Auto-firing base defenses (Tesla coil, pillbox, flak tower, prism tower).
- * Classic rule: defenses go OFFLINE while the owner has a power deficit. Flak
+ * Classic rule: defenses go OFFLINE while the owner has a power deficit —
+ * except manned ones (Wachturm), which keep firing in a blackout. Flak
  * towers only hit aircraft; ground defenses only hit ground (per weapon.targets).
  * Towers deliberately IGNORE wall cover (losBlockedByWall): they are elevated,
  * so the classic wall-ring-plus-towers base keeps working while attackers on
@@ -41,10 +42,12 @@ export function defenseSystem(state: GameState): void {
   });
 
   for (const building of state.buildings) {
-    const weapon = buildingRule(building.type).weapon;
+    const rule = buildingRule(building.type);
+    const weapon = rule.weapon;
     if (!weapon) continue;
     if (building.cooldown > 0) building.cooldown--;
-    if (lowPower[building.owner]!) continue; // offline
+    // Manned defenses (Wachturm) stay operational in a blackout.
+    if (lowPower[building.owner]! && rule.manned !== true) continue; // offline
     if (building.cooldown > 0) continue;
 
     // Threat priority: armed attackers soak tower fire before a harvester

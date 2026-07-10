@@ -571,6 +571,8 @@ export interface BuildingRule {
   tech?: TechId;
   /** At most one standing instance per player (iron curtain device). */
   unique?: boolean;
+  /** Manned defense: keeps firing during a power deficit (guard tower). */
+  manned?: boolean;
 }
 
 export const BUILDING_RULES = {
@@ -731,6 +733,27 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: ['ALLIES'],
     sight: 6,
+  },
+  GUARDTOWER: {
+    name: 'Wachturm',
+    maxHp: 500,
+    cost: 500,
+    buildTime: 55,
+    power: -10,
+    width: 1,
+    height: 1,
+    armor: 'light',
+    produces: null,
+    // Manned MG post: strong vs infantry and light vehicles, weak vs tanks.
+    // Being manned, it keeps firing during a power deficit (see defenseSystem) —
+    // the one defense that still works while the base is dark.
+    weapon: weapon(12, 5, 5, 0, { none: 100, light: 60, heavy: 20 }, 'BULLET'),
+    superweapon: null,
+    requires: ['BARRACKS'],
+    buildable: true,
+    factions: null,
+    sight: 6,
+    manned: true,
   },
   PRISM: {
     name: 'Prisma-Turm',

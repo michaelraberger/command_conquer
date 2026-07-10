@@ -353,6 +353,30 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 0.5, 0.5, 15),
   },
+  GUARDTOWER: {
+    frameTop: 50,
+    fx: 0xcfd6dc,
+    body: (g, _w, _h, fx) => {
+      concretePlate(g, 1, 1);
+      const c = iso(0.5, 0.5);
+      // Four stilt legs carrying the elevated platform.
+      g.poly([c.x - 14, c.y + 2, c.x - 11, c.y + 2, c.x - 5, c.y - 30, c.x - 8, c.y - 30]).fill(0x6f675a);
+      g.poly([c.x + 11, c.y + 2, c.x + 14, c.y + 2, c.x + 8, c.y - 30, c.x + 5, c.y - 30]).fill(0x5e564b);
+      g.poly([c.x - 7, c.y - 4, c.x - 4, c.y - 4, c.x - 2, c.y - 30, c.x - 5, c.y - 30]).fill(0x655d51);
+      g.poly([c.x + 4, c.y - 4, c.x + 7, c.y - 4, c.x + 5, c.y - 30, c.x + 2, c.y - 30]).fill(0x554e44);
+      g.rect(c.x - 10, c.y - 18, 20, 2).fill(0x5e564b); // cross brace
+      // Platform with sandbag parapet and manned MG post.
+      g.ellipse(c.x, c.y - 32, 16, 8).fill(0x8f8775).stroke({ width: 1, color: 0x4a443a });
+      g.ellipse(c.x, c.y - 35, 12, 6).fill(0xa8a08c);
+      g.rect(c.x - 4, c.y - 46, 8, 10).fill(0x7d7568).stroke({ width: 1, color: 0x4a443a }); // cabin
+      g.rect(c.x - 3, c.y - 44, 6, 2.5).fill(0x3a352c); // viewing slit
+      g.rect(c.x + 3, c.y - 42, 12, 2).fill(0x4a4a4a); // MG barrel
+      g.circle(c.x + 15, c.y - 41, 1.4).fill(fx); // muzzle
+      g.rect(c.x - 5, c.y - 52, 1.5, 7).fill(0x6f675a); // flag pole
+      g.poly([c.x - 3.5, c.y - 52, c.x + 3, c.y - 50.5, c.x - 3.5, c.y - 49]).fill(0xc23b2e);
+    },
+    team: (g) => teamMark(g, 0.5, 0.5, 12),
+  },
   PRISM: {
     frameTop: 54,
     fx: 0xa7f0ff,

@@ -93,12 +93,13 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
 /** Desired base, in build order. Duplicate entries raise the target count. */
 const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   SOVIETS: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'RADAR', 'TECHCENTER', 'TESLA', 'POWER',
-    'TESLA', 'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'RADAR', 'TECHCENTER',
+    'TESLA', 'POWER', 'TESLA', 'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
   ],
   ALLIES: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'PILLBOX', 'POWER', 'PILLBOX',
-    'WERKSTATT', 'HELIPAD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER', 'PRISM', 'WEATHER',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'TECHCENTER', 'PILLBOX',
+    'POWER', 'PILLBOX', 'WERKSTATT', 'HELIPAD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER', 'PRISM',
+    'WEATHER',
   ],
 };
 
