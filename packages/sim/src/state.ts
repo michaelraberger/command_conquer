@@ -116,6 +116,10 @@ export interface Projectile {
   x: number;
   y: number;
   targetId: number;
+  /** Launch position — where defenders rally to when the shot lands (AGGRO).
+   *  Optional so pre-existing saves without it still deserialize. */
+  sx?: number;
+  sy?: number;
 }
 
 export interface ProductionQueue {

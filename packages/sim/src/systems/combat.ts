@@ -2,6 +2,7 @@ import { SUBCELL, facingFromDelta } from '../fixed.js';
 import { findPath } from '../path/astar.js';
 import { buildingRule, unitRule, type UnitRule, type WeaponRule } from '../rules.js';
 import {
+  aggroKindOfType,
   aimPoint,
   damageTarget,
   findTarget,
@@ -288,7 +289,7 @@ function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRul
   unit.cooldown = weapon.cooldown;
   state.events.push({ type: 'SHOT', x: unit.x, y: unit.y, tx: aim.x, ty: aim.y, fx: weapon.fx });
   if (weapon.projectileSpeed === 0) {
-    damageTarget(state, target, weapon);
+    damageTarget(state, target, weapon, { x: unit.x, y: unit.y, kind: aggroKindOfType(unit.type) });
   } else {
     state.projectiles.push({
       id: state.nextEntityId++,
@@ -297,6 +298,8 @@ function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRul
       x: unit.x,
       y: unit.y,
       targetId: target.kind === 'unit' ? target.unit.id : target.building.id,
+      sx: unit.x,
+      sy: unit.y,
     });
   }
 }

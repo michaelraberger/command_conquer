@@ -1,6 +1,6 @@
 import { distSq, isqrt } from '../fixed.js';
 import { unitRule } from '../rules.js';
-import { aimPoint, damageTarget, findTarget } from '../targeting.js';
+import { aggroKindOfType, aimPoint, damageTarget, findTarget } from '../targeting.js';
 import type { GameState, Projectile } from '../state.js';
 
 /**
@@ -24,7 +24,12 @@ export function projectileSystem(state: GameState): void {
     const d2 = distSq(dx, dy);
     const speed = weapon.projectileSpeed;
     if (d2 <= speed * speed) {
-      damageTarget(state, target, weapon);
+      // Rally point for defenders = launch position (old saves lack it).
+      damageTarget(state, target, weapon, {
+        x: p.sx ?? p.x,
+        y: p.sy ?? p.y,
+        kind: aggroKindOfType(p.srcType),
+      });
       continue;
     }
     const dist = isqrt(d2);

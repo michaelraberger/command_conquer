@@ -3,6 +3,7 @@ import { applyCommands, type Command } from './commands.js';
 import type { GameState } from './state.js';
 import { combatSystem } from './systems/combat.js';
 import { deathSystem } from './systems/death.js';
+import { defenseReactionSystem } from './systems/defenseReaction.js';
 import { defenseSystem } from './systems/defense.js';
 import { fogSystem } from './systems/fog.js';
 import { harvestSystem } from './systems/harvest.js';
@@ -48,6 +49,9 @@ export function tick(state: GameState, commands: Command[] = []): void {
   // arrival, which is paradropSystem's drop/despawn signal.
   paradropSystem(state);
   projectileSystem(state);
+  // After every damage source (combat, towers, projectiles): rally idle
+  // defenders toward whoever just hit friendly units or buildings.
+  defenseReactionSystem(state);
   repairSystem(state);
   deathSystem(state);
   victorySystem(state);

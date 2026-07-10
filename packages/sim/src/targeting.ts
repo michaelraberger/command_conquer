@@ -1,5 +1,6 @@
+import type { AggroKind } from './events.js';
 import { SUBCELL, distSq } from './fixed.js';
-import { WALL_LEVELS, buildingRule, unitRule, type WeaponRule } from './rules.js';
+import { WALL_LEVELS, buildingRule, unitRule, type UnitType, type WeaponRule } from './rules.js';
 import { areEnemies, type Building, type GameState, type Unit } from './state.js';
 
 /** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
@@ -115,8 +116,23 @@ export function targetDistSq(target: Target, fromX: number, fromY: number): numb
   return distSq(p.x - fromX, p.y - fromY);
 }
 
-/** Warhead-vs-armor damage (integer percent math, always at least 1). */
-export function damageTarget(state: GameState, target: Target, weapon: WeaponRule): void {
+/** AGGRO descriptor for a firing unit type (see defenseReactionSystem). */
+export function aggroKindOfType(type: UnitType): AggroKind {
+  const rule = unitRule(type);
+  if (rule.air === true) return 'air';
+  if (rule.category === 'naval') return 'naval';
+  return rule.category === 'infantry' ? 'infantry' : 'vehicle';
+}
+
+/** Warhead-vs-armor damage (integer percent math, always at least 1). When the
+ *  attacker's position is passed, an AGGRO event rallies idle defenders (see
+ *  defenseReactionSystem); superweapon blasts bypass this on purpose. */
+export function damageTarget(
+  state: GameState,
+  target: Target,
+  weapon: WeaponRule,
+  attacker?: { x: number; y: number; kind: AggroKind },
+): void {
   // Iron curtain: protected targets shrug off every hit while the effect lasts.
   const shielded = target.kind === 'unit' ? target.unit.curtainTicks : target.building.curtainTicks;
   if (shielded > 0) return;
@@ -124,12 +140,19 @@ export function damageTarget(state: GameState, target: Target, weapon: WeaponRul
     target.kind === 'unit' ? unitRule(target.unit.type).armor : buildingRule(target.building.type).armor;
   const dmg = Math.trunc((weapon.damage * weapon.vs[armor]) / 100);
   const applied = dmg < 1 ? 1 : dmg;
-  if (target.kind === 'unit') {
-    target.unit.hp -= applied;
-    state.events.push({ type: 'HIT', x: target.unit.x, y: target.unit.y });
-  } else {
-    target.building.hp -= applied;
-    state.events.push({ type: 'HIT', x: target.building.x, y: target.building.y });
+  const victim = target.kind === 'unit' ? target.unit : target.building;
+  victim.hp -= applied;
+  state.events.push({ type: 'HIT', x: victim.x, y: victim.y });
+  if (attacker) {
+    state.events.push({
+      type: 'AGGRO',
+      owner: victim.owner,
+      x: victim.x,
+      y: victim.y,
+      ax: attacker.x,
+      ay: attacker.y,
+      akind: attacker.kind,
+    });
   }
 }
 

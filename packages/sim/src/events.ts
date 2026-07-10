@@ -1,5 +1,8 @@
 import type { SuperweaponKind, WeaponFx } from './rules.js';
 
+/** What kind of attacker dealt the damage (drives who bothers to respond). */
+export type AggroKind = 'infantry' | 'vehicle' | 'air' | 'naval' | 'building';
+
 /**
  * Transient per-tick events for presentation (tracers, explosions, …).
  * They are cleared at the START of every tick and re-filled by systems, so
@@ -9,6 +12,10 @@ import type { SuperweaponKind, WeaponFx } from './rules.js';
 export type SimEvent =
   | { type: 'SHOT'; x: number; y: number; tx: number; ty: number; fx: WeaponFx }
   | { type: 'HIT'; x: number; y: number }
+  /** Something of `owner` at (x,y) took damage from an attacker of kind
+   *  `akind` at (ax,ay) — consumed by defenseReactionSystem to rally idle
+   *  defenders that are actually able to fight that attacker. */
+  | { type: 'AGGRO'; owner: number; x: number; y: number; ax: number; ay: number; akind: AggroKind }
   | { type: 'DEATH'; x: number; y: number; big: boolean }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
   | { type: 'REPAIR'; x: number; y: number }

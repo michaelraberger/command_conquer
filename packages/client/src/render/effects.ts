@@ -141,7 +141,7 @@ export class Effects {
             g.position.y = p.y - 12 - t * 14; // floats up
           },
         );
-      } else {
+      } else if (e.type === 'DEATH') {
         const p = worldToScreen(e.x, e.y);
         const r = e.big ? 22 : 13;
         this.add(
