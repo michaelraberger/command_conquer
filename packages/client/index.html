@@ -142,6 +142,179 @@
       #help #tour-open:hover {
         background: #24361f;
       }
+      /* Tech-tree toggle button, stacked below the "?" button. */
+      #techtree-btn {
+        position: fixed;
+        top: 48px;
+        left: 10px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(16, 20, 26, 0.9);
+        border: 1px solid #2c3a4a;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 15px;
+        cursor: pointer;
+        z-index: 7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #techtree-btn:hover {
+        border-color: #4da6ff;
+      }
+      /* Tech-tree overlay: TS-poster-style tier diagram, scrollable card. */
+      #techtree {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 9, 12, 0.55);
+        z-index: 8;
+      }
+      #techtree.open {
+        display: flex;
+      }
+      #techtree .tt-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: rgba(16, 20, 26, 0.97);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 16px 18px;
+        width: min(92vw, 1100px);
+        max-height: 86vh;
+        color: #d7e0ea;
+        font-size: 13px;
+      }
+      #techtree h2 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+      #techtree .tt-legend {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: #8fa1b3;
+      }
+      #techtree .tt-legend .chip::before {
+        content: '';
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        margin-right: 5px;
+        border: 1px solid #2c3a4a;
+        background: rgba(20, 26, 34, 0.95);
+        vertical-align: -1px;
+      }
+      #techtree .tt-legend .chip.built::before {
+        border-color: #53c94f;
+      }
+      #techtree .tt-legend .chip.available::before {
+        border-color: #4da6ff;
+      }
+      #techtree .tt-legend .chip.locked::before {
+        opacity: 0.4;
+      }
+      #techtree .tt-scroll {
+        overflow: auto;
+        flex: 1;
+        border: 1px solid #223041;
+        border-radius: 6px;
+        background: rgba(8, 11, 15, 0.9);
+      }
+      #tt-content {
+        position: relative;
+      }
+      #tt-content .tt-edges {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .tt-edge {
+        stroke: #2c3a4a;
+        stroke-width: 1.5;
+        fill: none;
+        shape-rendering: crispEdges;
+      }
+      .tt-edge.available {
+        stroke: #34618f;
+      }
+      .tt-edge.built {
+        stroke: #3c7a3a;
+      }
+      .tt-edge.upgrade {
+        stroke-dasharray: 4 3;
+      }
+      .tt-node {
+        position: absolute;
+        box-sizing: border-box;
+        background: rgba(20, 26, 34, 0.95);
+        border: 1px solid #2c3a4a;
+        border-radius: 4px;
+        padding: 5px 6px;
+        font-size: 10px;
+        line-height: 1.4;
+        overflow: hidden;
+      }
+      .tt-node .tt-name {
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tt-node .tt-meta {
+        display: flex;
+        gap: 7px;
+        color: #8fa1b3;
+      }
+      .tt-node .tt-cost {
+        color: #ffd94d;
+      }
+      .tt-node .tt-tech {
+        font-size: 9px;
+        color: #8fa1b3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tt-node .tt-tech.researched {
+        color: #53c94f;
+      }
+      .tt-node.built {
+        border-color: #53c94f;
+        box-shadow: 0 0 6px rgba(83, 201, 79, 0.25);
+      }
+      .tt-node.built .tt-name {
+        color: #8aff8a;
+      }
+      .tt-node.available {
+        border-color: #4da6ff;
+      }
+      .tt-node.locked {
+        opacity: 0.4;
+        filter: grayscale(0.6);
+      }
+      #techtree .tt-close {
+        margin-top: 10px;
+        width: 100%;
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        padding: 8px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #techtree .tt-close:hover {
+        background: #2d5175;
+      }
       /* Onboarding tour: dim backdrop + moving spotlight + fixed bottom card. */
       #tour {
         position: fixed;
@@ -1246,6 +1419,20 @@
     <div id="attack"><strong>⚠ EINHEITEN WERDEN ANGEGRIFFEN</strong></div>
     <div id="groups"></div>
     <button id="help-btn" title="Tastenkürzel (F1)">?</button>
+    <button id="techtree-btn" title="Technologiebaum (T)">🧬</button>
+    <div id="techtree">
+      <div class="tt-card">
+        <h2>Technologiebaum</h2>
+        <div class="tt-legend">
+          <span class="chip built">steht</span>
+          <span class="chip available">baubar</span>
+          <span class="chip locked">gesperrt</span>
+          <span>🔬 braucht Forschung · gestrichelt = Ausbau</span>
+        </div>
+        <div class="tt-scroll"><div id="tt-content"></div></div>
+        <button id="techtree-close" class="tt-close">Schließen (Esc)</button>
+      </div>
+    </div>
     <div id="help">
       <div class="help-card">
         <h2>Steuerung</h2>
@@ -1281,6 +1468,7 @@
           <h3>Spiel</h3>
           <dl>
             <dt>P</dt><dd>Pause</dd>
+            <dt>T</dt><dd>Technologiebaum öffnen / schließen</dd>
             <dt>F1</dt><dd>Dieses Menü öffnen / schließen</dd>
           </dl>
         </div>

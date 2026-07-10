@@ -23,6 +23,7 @@ import { PlacementMode } from './ui/placement.js';
 import { showEndScreen, showStartScreen, type StartAction, type StartChoice } from './ui/screens.js';
 import { GroupBar } from './ui/groupBar.js';
 import { HelpMenu } from './ui/help.js';
+import { TechTreeOverlay } from './ui/techTree.js';
 import { OnboardingTour } from './ui/tour.js';
 import { Sidebar } from './ui/sidebar.js';
 
@@ -225,6 +226,7 @@ export async function startGame(
   );
   const alerts = new Alerts();
   new HelpMenu();
+  new TechTreeOverlay(state);
   const tour = new OnboardingTour();
   tour.maybeShowOnFirstRun();
   const { initSaveDialog } = await import('./ui/saveDialog.js');
