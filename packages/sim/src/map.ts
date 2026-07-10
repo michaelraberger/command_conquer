@@ -1,11 +1,16 @@
 import { nextInt, type RngCarrier } from './rng.js';
 
-/** Terrain kinds. Dirt and grass are passable, the rest blocks movement. */
+/** Terrain kinds. Dirt, grass, ice and sand are passable, the rest blocks
+ *  movement. Ice is a frozen surface: ground units walk over it, but nothing
+ *  can be built on it and ships cannot sail through it. Sand is a plain
+ *  ground variant like dirt/grass (walkable and buildable). */
 export const TERRAIN_DIRT = 0;
 export const TERRAIN_WATER = 1;
 export const TERRAIN_ROCK = 2;
 export const TERRAIN_TREE = 3;
 export const TERRAIN_GRASS = 4;
+export const TERRAIN_ICE = 5;
+export const TERRAIN_SAND = 6;
 
 /** Resource field kinds (per cell, permanent — fields regrow on them). */
 export const RESOURCE_NONE = 0;
@@ -35,7 +40,14 @@ export function inBounds(grid: GridView, cx: number, cy: number): boolean {
 }
 
 export function isPassableKind(kind: number): boolean {
-  return kind === TERRAIN_DIRT || kind === TERRAIN_GRASS;
+  return (
+    kind === TERRAIN_DIRT || kind === TERRAIN_GRASS || kind === TERRAIN_ICE || kind === TERRAIN_SAND
+  );
+}
+
+/** Ground that supports structures: passable minus ice (nothing builds on ice). */
+export function isBuildableKind(kind: number): boolean {
+  return kind === TERRAIN_DIRT || kind === TERRAIN_GRASS || kind === TERRAIN_SAND;
 }
 
 /** Statically passable: walkable terrain and no building on the cell. */
@@ -43,6 +55,13 @@ export function isPassableTerrain(grid: GridView, cx: number, cy: number): boole
   if (!inBounds(grid, cx, cy)) return false;
   const idx = cellIndex(grid, cx, cy);
   return isPassableKind(grid.terrain[idx]!) && grid.structures[idx] === 0;
+}
+
+/** Like isPassableTerrain, but for placing structures (excludes ice). */
+export function isBuildableTerrain(grid: GridView, cx: number, cy: number): boolean {
+  if (!inBounds(grid, cx, cy)) return false;
+  const idx = cellIndex(grid, cx, cy);
+  return isBuildableKind(grid.terrain[idx]!) && grid.structures[idx] === 0;
 }
 
 /**

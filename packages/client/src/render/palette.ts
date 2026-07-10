@@ -1,7 +1,9 @@
 import {
   RESOURCE_GEMS,
   TERRAIN_GRASS,
+  TERRAIN_ICE,
   TERRAIN_ROCK,
+  TERRAIN_SAND,
   TERRAIN_TREE,
   TERRAIN_WATER,
 } from '@cac/sim';
@@ -16,7 +18,11 @@ export function terrainRgb(kind: number): readonly [number, number, number] {
         ? [46, 74, 30]
         : kind === TERRAIN_GRASS
           ? [77, 122, 53]
-          : [138, 111, 77]; // dirt / default
+          : kind === TERRAIN_ICE
+            ? [188, 219, 233]
+            : kind === TERRAIN_SAND
+              ? [214, 189, 130]
+              : [138, 111, 77]; // dirt / default
 }
 
 export const ORE_CSS = '#d9a62e';

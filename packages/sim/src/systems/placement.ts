@@ -1,4 +1,4 @@
-import { cellIndex, inBounds, isNavigableWater, isPassableTerrain } from '../map.js';
+import { cellIndex, inBounds, isBuildableTerrain, isNavigableWater } from '../map.js';
 import { buildAdjacency, buildingRule, type BuildingType } from '../rules.js';
 import type { GameState } from '../state.js';
 
@@ -20,7 +20,7 @@ export function canPlaceBuilding(
     for (let x = cx; x < cx + rule.width; x++) {
       if (!inBounds(state, x, y)) return false;
       const buildableHere =
-        rule.onWater === true ? isNavigableWater(state, x, y) : isPassableTerrain(state, x, y);
+        rule.onWater === true ? isNavigableWater(state, x, y) : isBuildableTerrain(state, x, y);
       if (!buildableHere) return false;
       const idx = cellIndex(state, x, y);
       if (state.occupancy[idx] !== 0) return false;

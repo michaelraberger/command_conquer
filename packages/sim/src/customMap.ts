@@ -2,8 +2,9 @@ import {
   RESOURCE_GEMS,
   RESOURCE_NONE,
   TERRAIN_DIRT,
-  TERRAIN_GRASS,
+  TERRAIN_SAND,
   TERRAIN_WATER,
+  isBuildableKind,
   isPassableKind,
   type MapType,
 } from './map.js';
@@ -104,7 +105,7 @@ export function validateCustomMap(map: CustomMapData): CustomMapValidation {
   let waterCells = 0;
   for (let i = 0; i < size; i++) {
     const t = map.terrain[i]!;
-    if (!isInt(t) || t < TERRAIN_DIRT || t > TERRAIN_GRASS) {
+    if (!isInt(t) || t < TERRAIN_DIRT || t > TERRAIN_SAND) {
       errors.push('Ungültiger Geländewert in den Kartendaten.');
       return { ok: false, errors, warnings, mapType: 'BADLANDS' };
     }
@@ -149,7 +150,9 @@ export function validateCustomMap(map: CustomMapData): CustomMapValidation {
     let blocked = false;
     for (let y = sy - SPAWN_CLEAR_RADIUS; y <= sy + SPAWN_CLEAR_RADIUS && !blocked; y++) {
       for (let x = sx - SPAWN_CLEAR_RADIUS; x <= sx + SPAWN_CLEAR_RADIUS && !blocked; x++) {
-        if (!isPassableKind(map.terrain[y * map.width + x]!)) blocked = true;
+        // Buildable, not just passable: the Bauhof and first base need solid
+        // ground, so a spawn area on ice is rejected.
+        if (!isBuildableKind(map.terrain[y * map.width + x]!)) blocked = true;
       }
     }
     if (blocked) {

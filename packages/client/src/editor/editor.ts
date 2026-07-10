@@ -3,7 +3,9 @@ import {
   RESOURCE_ORE,
   TERRAIN_DIRT,
   TERRAIN_GRASS,
+  TERRAIN_ICE,
   TERRAIN_ROCK,
+  TERRAIN_SAND,
   TERRAIN_TREE,
   TERRAIN_WATER,
   createGame,
@@ -43,6 +45,8 @@ const TERRAIN_BY_KEY: Record<string, number> = {
   water: TERRAIN_WATER,
   rock: TERRAIN_ROCK,
   tree: TERRAIN_TREE,
+  ice: TERRAIN_ICE,
+  sand: TERRAIN_SAND,
 };
 
 /**

@@ -38,7 +38,9 @@ export interface UnitSprite {
 export interface GameTextures {
   dirt: Texture[];
   grass: Texture[];
+  sand: Texture[];
   water: Texture;
+  ice: Texture;
   /** 3D rock outcrop variants, drawn in the entity layer like trees. */
   rocks: Texture[];
   ore: Texture;
@@ -1279,6 +1281,14 @@ export function createTextures(renderer: Renderer): GameTextures {
   water.moveTo(30, 21).quadraticCurveTo(38, 18, 46, 21).stroke({ width: 1.5, color: 0x4a83b3, alpha: 0.6 });
   water.poly(diamondPath()).stroke({ width: 1, color: 0x1d4266, alpha: 0.5 });
 
+  // Frozen surface: pale blue sheet with angular cracks and a cool outline.
+  const ice = new Graphics().poly(diamondPath()).fill(0xbcdbe9);
+  ice.moveTo(14, 15).lineTo(24, 12).lineTo(31, 16).stroke({ width: 1, color: 0x8fb8cc, alpha: 0.8 });
+  ice.moveTo(24, 12).lineTo(27, 8).stroke({ width: 1, color: 0x8fb8cc, alpha: 0.6 });
+  ice.moveTo(33, 22).lineTo(42, 19).lineTo(49, 23).stroke({ width: 1, color: 0x9fc4d6, alpha: 0.7 });
+  ice.moveTo(20, 20).lineTo(26, 24).stroke({ width: 1, color: 0xdfeef5, alpha: 0.9 });
+  ice.poly(diamondPath()).stroke({ width: 1, color: 0x7fa9bf, alpha: 0.5 });
+
   return {
     dirt: [
       groundTile(renderer, 0x8a6f4d, 7, 0x6e5539, 0),
@@ -1288,7 +1298,12 @@ export function createTextures(renderer: Renderer): GameTextures {
       groundTile(renderer, 0x4d7a35, 6, 0x3a5c27, 5),
       groundTile(renderer, 0x487233, 7, 0x5c8a42, 17),
     ],
+    sand: [
+      groundTile(renderer, 0xd6bd82, 6, 0xbaa065, 9),
+      groundTile(renderer, 0xcfb478, 7, 0xe4d3a0, 21),
+    ],
     water: bakeTile(renderer, water),
+    ice: bakeTile(renderer, ice),
     rocks: [bakeRock(renderer, 0), bakeRock(renderer, 1), bakeRock(renderer, 2)],
     ore: bakeTile(renderer, oreOverlay),
     gems: bakeTile(renderer, gemOverlay),

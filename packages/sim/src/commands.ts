@@ -1,4 +1,11 @@
-import { cellIndex, cellsAroundRect, inBounds, isNavigableWater, isPassableTerrain } from './map.js';
+import {
+  cellIndex,
+  cellsAroundRect,
+  inBounds,
+  isBuildableTerrain,
+  isNavigableWater,
+  isPassableTerrain,
+} from './map.js';
 import { findPath } from './path/astar.js';
 import { cellCenter } from './fixed.js';
 import {
@@ -147,7 +154,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           let clear = true;
           for (let y = by; y < by + 3 && clear; y++) {
             for (let x = bx; x < bx + 3; x++) {
-              if (!inBounds(state, x, y) || !isPassableTerrain(state, x, y)) { clear = false; break; }
+              if (!inBounds(state, x, y) || !isBuildableTerrain(state, x, y)) { clear = false; break; }
               const idx = cellIndex(state, x, y);
               const occ = state.occupancy[idx];
               if (state.structures[idx] !== 0 || (occ !== 0 && occ !== unit.id)) { clear = false; break; }

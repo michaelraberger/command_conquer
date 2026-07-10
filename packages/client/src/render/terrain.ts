@@ -1,7 +1,9 @@
 import {
   SUBCELL,
   TERRAIN_GRASS,
+  TERRAIN_ICE,
   TERRAIN_ROCK,
+  TERRAIN_SAND,
   TERRAIN_TREE,
   TERRAIN_WATER,
   cellCenter,
@@ -26,9 +28,13 @@ export function buildTerrainLayer(state: GameState, tex: GameTextures): Containe
       const texture =
         t === TERRAIN_WATER
           ? tex.water
-          : t === TERRAIN_GRASS
-            ? tex.grass[variant]!
-            : tex.dirt[variant]!;
+          : t === TERRAIN_ICE
+            ? tex.ice
+            : t === TERRAIN_GRASS
+              ? tex.grass[variant]!
+              : t === TERRAIN_SAND
+                ? tex.sand[variant]!
+                : tex.dirt[variant]!;
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       const { x, y } = cellToScreen(cx, cy);
