@@ -1,4 +1,4 @@
-import { WALL_LEVELS, unitRule, type Command, type GameState } from '@cac/sim';
+import { WALL_LEVELS, buildingRule, unitRule, type Command, type GameState } from '@cac/sim';
 import { worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { Camera } from './camera.js';
@@ -169,13 +169,17 @@ export class Hotkeys {
     this.overlay.style.display = this.paused ? 'flex' : 'none';
   }
 
-  /** Upgrade the selected own building if it has a next tier (walls today). */
+  /** Upgrade the selected own building: walls to the next tier, or a building
+   *  with an in-place upgrade target (Wachturm → AGT). */
   private tryUpgrade(): void {
     const id = this.controls.selectedBuilding;
     if (id === null) return;
     const building = this.state.buildings.find((b) => b.id === id);
     if (!building || building.owner !== session.localPlayer) return;
-    if (building.type === 'WALL' && building.level < WALL_LEVELS.length) {
+    const upgradable =
+      (building.type === 'WALL' && building.level < WALL_LEVELS.length) ||
+      buildingRule(building.type).upgradeTo !== undefined;
+    if (upgradable) {
       this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId: id });
     }
   }

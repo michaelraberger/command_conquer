@@ -65,6 +65,11 @@ export interface WeaponRule {
   antiSub: boolean;
   /** Lobbed trajectory (artillery/V3): fires over walls; direct fire cannot. */
   arcing?: boolean;
+  /** Minimum firing distance in sub-cells — targets closer than this are in a
+   *  dead zone and cannot be hit (Advanced Guard Tower's missiles). 0 = none. */
+  minRange?: number;
+  /** Squared minimum range, precomputed for the targeting loop. */
+  minRangeSq?: number;
 }
 
 export interface UnitRule {
@@ -114,9 +119,23 @@ function weapon(
   fx: WeaponFx,
   targets: WeaponTargets = 'ground',
   antiSub = false,
+  minRangeCells = 0,
 ): WeaponRule {
   const range = Math.round(rangeCells * SUBCELL);
-  return { damage, range, rangeSq: range * range, cooldown, projectileSpeed, vs, fx, targets, antiSub };
+  const minRange = Math.round(minRangeCells * SUBCELL);
+  return {
+    damage,
+    range,
+    rangeSq: range * range,
+    cooldown,
+    projectileSpeed,
+    vs,
+    fx,
+    targets,
+    antiSub,
+    minRange,
+    minRangeSq: minRange * minRange,
+  };
 }
 
 export const UNIT_RULES = {
@@ -573,6 +592,12 @@ export interface BuildingRule {
   unique?: boolean;
   /** Manned defense: keeps firing during a power deficit (guard tower). */
   manned?: boolean;
+  /** In-place upgrade target: this building can be rebuilt into `upgradeTo`
+   *  for `upgradeCost` credits, keeping its position (Wachturm → AGT). Both
+   *  must share the same footprint. Typed `string` (like `requires`) to avoid
+   *  a circular reference through BuildingType. */
+  upgradeTo?: string;
+  upgradeCost?: number;
 }
 
 export const BUILDING_RULES = {
@@ -756,6 +781,29 @@ export const BUILDING_RULES = {
     factions: null,
     sight: 7,
     manned: true,
+    upgradeTo: 'AGT',
+    upgradeCost: 500,
+  },
+  AGT: {
+    name: 'Fortschr. Wachturm',
+    maxHp: 800,
+    cost: 1000,
+    buildTime: 90,
+    power: -20,
+    width: 1,
+    height: 1,
+    armor: 'heavy',
+    produces: null,
+    // Advanced Guard Tower: Tomahawk missiles hit ground AND air at long range,
+    // but there is a dead zone up close (minRange 2) — back it up with a plain
+    // Wachturm for adjacent attackers. NOT manned: it deactivates on low power.
+    // Reached only by upgrading a Wachturm, so it's not in the build menu.
+    weapon: weapon(45, 8.5, 22, 220, { none: 90, light: 110, heavy: 80 }, 'ROCKET', 'both', false, 2),
+    superweapon: null,
+    requires: ['BARRACKS'],
+    buildable: false,
+    factions: null,
+    sight: 8,
   },
   PRISM: {
     name: 'Prisma-Turm',

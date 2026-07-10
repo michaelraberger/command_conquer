@@ -155,6 +155,7 @@ export function aiSystem(state: GameState): void {
     if (state.tick % params.interval !== 0) continue;
     player.credits += params.incomeBonus;
     manageConstruction(state, player, params);
+    manageUpgrades(state, player, params);
     manageResearch(state, player, params);
     manageMcv(state, player);
     manageTraining(state, player, params);
@@ -163,6 +164,24 @@ export function aiSystem(state: GameState): void {
     manageSuperweapon(state, player, params);
     manageParadrop(state, player, params);
   }
+}
+
+/**
+ * Upgrade a Wachturm to an Advanced Guard Tower once the economy can spare it.
+ * Deterministic: upgrades the lowest-id guard tower, one per pass. Applies the
+ * effect directly (same as the UPGRADE_BUILDING command) — the AI already
+ * mutates state in place for construction. Only normal/hard bother.
+ */
+function manageUpgrades(state: GameState, player: Player, params: AiParams): void {
+  if (!params.useHighTech) return; // easy AI keeps plain guard towers
+  const rule = buildingRule('GUARDTOWER');
+  const cost = rule.upgradeCost ?? 0;
+  if (player.credits < cost + 1500) return; // keep a buffer for production
+  const tower = state.buildings.find((b) => b.owner === player.id && b.type === 'GUARDTOWER');
+  if (!tower) return;
+  player.credits -= cost;
+  tower.type = 'AGT';
+  tower.hp = buildingRule('AGT').maxHp;
 }
 
 function countBuildings(state: GameState, owner: number, type: BuildingType): number {

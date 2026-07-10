@@ -5,6 +5,7 @@ import {
   buildingRule,
   unitRule,
 } from '../rules.js';
+import { distSq } from '../fixed.js';
 import { damageTarget, nearestEnemyUnit, weaponAcceptsUnit } from '../targeting.js';
 import type { Building, GameState } from '../state.js';
 import { powerBalance } from './production.js';
@@ -52,7 +53,11 @@ export function defenseSystem(state: GameState): void {
 
     // Threat priority: armed attackers soak tower fire before a harvester
     // that merely trundles past (same rule as unit auto-acquisition).
+    // The AGT has a dead zone up close (minRangeSq): adjacent units can't be hit.
     const accept = weaponAcceptsUnit(weapon);
+    const minSq = weapon.minRangeSq ?? 0;
+    const outOfDeadZone = (u: { x: number; y: number }): boolean =>
+      minSq === 0 || distSq(u.x - building.x, u.y - building.y) >= minSq;
     const target =
       nearestEnemyUnit(
         state,
@@ -60,8 +65,16 @@ export function defenseSystem(state: GameState): void {
         building.x,
         building.y,
         weapon.rangeSq,
-        (u) => accept(u) && unitRule(u.type).weapon !== null,
-      ) ?? nearestEnemyUnit(state, building.owner, building.x, building.y, weapon.rangeSq, accept);
+        (u) => accept(u) && outOfDeadZone(u) && unitRule(u.type).weapon !== null,
+      ) ??
+      nearestEnemyUnit(
+        state,
+        building.owner,
+        building.x,
+        building.y,
+        weapon.rangeSq,
+        (u) => accept(u) && outOfDeadZone(u),
+      );
     if (!target) continue;
     building.cooldown = weapon.cooldown;
     state.events.push({

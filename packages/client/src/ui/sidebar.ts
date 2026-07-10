@@ -370,6 +370,22 @@ export class Sidebar {
     return row;
   }
 
+  /** Appends an "Ausbauen" button that stays affordability-gated in place. */
+  private appendUpgradeButton(buildingId: number, label: string, cost: number): void {
+    const btn = document.createElement('button');
+    btn.className = 'bupgrade';
+    btn.textContent = label;
+    const affordable = (): void => {
+      btn.disabled = this.player().credits < cost;
+    };
+    affordable();
+    this.binfoUpdaters.push(affordable);
+    btn.addEventListener('click', () => {
+      this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId });
+    });
+    this.binfoEl.append(btn);
+  }
+
   /** Info panel for the selected own building (wall upgrades, rally hint). */
   private updateBuildingInfo(): void {
     const id = this.controls.selectedBuilding;
@@ -386,7 +402,7 @@ export class Sidebar {
       building.type === 'TECHCENTER'
         ? `:${p.researched.join(',')}:${p.research ? p.research.tech : '-'}`
         : '';
-    const key = `${building.id}:${building.hp}:${building.level}${researchKey}`;
+    const key = `${building.id}:${building.type}:${building.hp}:${building.level}${researchKey}`;
     if (key === this.lastBinfoKey) {
       for (const update of this.binfoUpdaters) update();
       return;
@@ -408,18 +424,14 @@ export class Sidebar {
 
     if (building.type === 'WALL' && building.level < WALL_LEVELS.length) {
       const next = WALL_LEVELS[building.level]!;
-      const btn = document.createElement('button');
-      btn.className = 'bupgrade';
-      btn.textContent = `Ausbauen → Stufe ${building.level + 1} ($${next.upgradeCost})`;
-      const affordable = (): void => {
-        btn.disabled = this.player().credits < next.upgradeCost;
-      };
-      affordable();
-      this.binfoUpdaters.push(affordable);
-      btn.addEventListener('click', () => {
-        this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId: building.id });
-      });
-      this.binfoEl.append(btn);
+      this.appendUpgradeButton(
+        building.id,
+        `Ausbauen → Stufe ${building.level + 1} ($${next.upgradeCost})`,
+        next.upgradeCost,
+      );
+    } else if (rule.upgradeTo !== undefined && rule.upgradeCost !== undefined) {
+      const targetName = buildingRule(rule.upgradeTo as BuildingType).name;
+      this.appendUpgradeButton(building.id, `Ausbauen → ${targetName} ($${rule.upgradeCost})`, rule.upgradeCost);
     }
     if (rule.produces !== null) {
       const hint = document.createElement('div');

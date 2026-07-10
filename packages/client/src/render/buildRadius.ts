@@ -49,18 +49,24 @@ export class BuildRadiusOverlay {
     else if (sel) {
       this.drawCircle(sel, 0x53a0ff, 0.12, 0.9, 2);
       const weapon = buildingRule(sel.type).weapon;
-      if (weapon) this.drawAttackRange(sel, weapon.range);
+      if (weapon) {
+        this.drawRangeRing(sel, weapon.range, 0xff3b30, 0.04, 0.85);
+        // Dead zone up close (AGT): a thin inner ring marks where it can't fire.
+        if (weapon.minRange && weapon.minRange > 0) {
+          this.drawRangeRing(sel, weapon.minRange, 0xff3b30, 0, 0.5);
+        }
+      }
     }
   }
 
-  /** Attack radius (red) — measured from the building centre like the sim does. */
-  private drawAttackRange(b: Building, range: number): void {
+  /** A range ring (red) — measured from the building centre like the sim does. */
+  private drawRangeRing(b: Building, range: number, color: number, fillAlpha: number, strokeAlpha: number): void {
     const radiusCells = range / SUBCELL;
     const c = worldToScreen(b.x, b.y);
     this.g
       .ellipse(c.x, c.y, radiusCells * 32 * K, radiusCells * 16 * K)
-      .fill({ color: 0xff3b30, alpha: 0.04 })
-      .stroke({ width: 2, color: 0xff3b30, alpha: 0.85 });
+      .fill({ color, alpha: fillAlpha })
+      .stroke({ width: 2, color, alpha: strokeAlpha });
   }
 
   private drawCircle(

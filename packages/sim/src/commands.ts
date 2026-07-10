@@ -11,6 +11,7 @@ import {
   buildingRule,
   sellRefund,
   unitRule,
+  type BuildingType,
   type ProductionCategory,
 } from './rules.js';
 import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
@@ -186,13 +187,25 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         const building = state.buildings.find(
           (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
         );
-        if (!player || !building || building.type !== 'WALL') break;
-        if (building.level >= WALL_LEVELS.length) break;
-        const next = WALL_LEVELS[building.level]!;
-        if (player.credits < next.upgradeCost) break;
-        player.credits -= next.upgradeCost;
-        building.level++;
-        building.hp = next.maxHp; // upgrading fully repairs the wall
+        if (!player || !building) break;
+        if (building.type === 'WALL') {
+          if (building.level >= WALL_LEVELS.length) break;
+          const next = WALL_LEVELS[building.level]!;
+          if (player.credits < next.upgradeCost) break;
+          player.credits -= next.upgradeCost;
+          building.level++;
+          building.hp = next.maxHp; // upgrading fully repairs the wall
+          break;
+        }
+        // In-place type upgrade (Wachturm → AGT): same footprint, keep the
+        // cell, pay the difference, rebuild at full HP of the new type.
+        const rule = buildingRule(building.type);
+        if (rule.upgradeTo === undefined || rule.upgradeCost === undefined) break;
+        if (player.credits < rule.upgradeCost) break;
+        const target = rule.upgradeTo as BuildingType;
+        player.credits -= rule.upgradeCost;
+        building.type = target;
+        building.hp = buildingRule(target).maxHp;
         break;
       }
       case 'SELL_BUILDING': {

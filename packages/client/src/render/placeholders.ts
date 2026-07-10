@@ -377,6 +377,29 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 0.5, 0.5, 12),
   },
+  AGT: {
+    frameTop: 62,
+    fx: 0xffb24a,
+    body: (g, _w, _h, fx) => {
+      concretePlate(g, 1, 1);
+      const c = iso(0.5, 0.5);
+      // Heavy armoured concrete shaft instead of stilts.
+      g.poly([c.x - 12, c.y + 2, c.x + 12, c.y + 2, c.x + 9, c.y - 34, c.x - 9, c.y - 34]).fill(0x6b6f73);
+      g.poly([c.x - 12, c.y + 2, c.x - 9, c.y - 34, c.x - 2, c.y - 34, c.x - 2, c.y + 2]).fill(0x585c60);
+      g.rect(c.x - 10, c.y - 14, 20, 2.5).fill(0x4a4e52); // reinforcing band
+      g.rect(c.x - 10, c.y - 26, 20, 2.5).fill(0x4a4e52);
+      // Rotating missile turret on top.
+      g.ellipse(c.x, c.y - 38, 15, 8).fill(0x7d8288).stroke({ width: 1, color: 0x3a3e42 });
+      g.ellipse(c.x, c.y - 42, 11, 6).fill(0x9aa0a6);
+      // Twin Tomahawk missile tubes, angled up.
+      g.rect(c.x - 8, c.y - 58, 5, 18).fill(0x5a5e62).stroke({ width: 1, color: 0x2b2f33 });
+      g.rect(c.x + 3, c.y - 58, 5, 18).fill(0x4a4e52).stroke({ width: 1, color: 0x2b2f33 });
+      g.poly([c.x - 8, c.y - 58, c.x - 3, c.y - 58, c.x - 5.5, c.y - 64]).fill(0xc23b2e); // nose cones
+      g.poly([c.x + 3, c.y - 58, c.x + 8, c.y - 58, c.x + 5.5, c.y - 64]).fill(0xc23b2e);
+      g.circle(c.x, c.y - 42, 2.5).fill(fx); // targeting optic
+    },
+    team: (g) => teamMark(g, 0.5, 0.5, 11),
+  },
   PRISM: {
     frameTop: 54,
     fx: 0xa7f0ff,

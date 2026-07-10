@@ -10,6 +10,7 @@ import {
   powerBalance,
   spawnUnit,
   tick,
+  type Command,
 } from '../src/index.js';
 
 /** Fresh 2-player game with a guard tower for player 0 near the middle. */
@@ -75,6 +76,72 @@ describe('Wachturm (guard tower)', () => {
     const run = () => {
       const { state } = withTower();
       spawnUnit(state, 'RIFLEMAN', 1, 32, 30);
+      for (let t = 0; t < 60; t++) tick(state, []);
+      return hashState(state);
+    };
+    expect(run()).toBe(run());
+  });
+});
+
+describe('Fortschr. Wachturm (AGT-Upgrade)', () => {
+  const upgrade = (id: number): Command => ({ type: 'UPGRADE_BUILDING', playerId: 0, buildingId: id });
+
+  it('Wachturm can be upgraded to the AGT in place, paying the difference', () => {
+    const { state, tower } = withTower();
+    const rule = buildingRule('GUARDTOWER');
+    expect(rule.upgradeTo).toBe('AGT');
+    state.players[0]!.credits = 1000;
+    const cx = tower.cx, cy = tower.cy;
+
+    tick(state, [upgrade(tower.id)]);
+    const now = state.buildings.find((b) => b.id === tower.id)!;
+    expect(now.type).toBe('AGT');
+    expect(now.cx).toBe(cx); // same footprint / position
+    expect(now.cy).toBe(cy);
+    expect(now.hp).toBe(buildingRule('AGT').maxHp);
+    expect(state.players[0]!.credits).toBe(1000 - (rule.upgradeCost ?? 0));
+  });
+
+  it('is not directly buildable (upgrade-only) and hits air + ground', () => {
+    const rule = buildingRule('AGT');
+    expect(rule.buildable).toBe(false);
+    expect(rule.weapon!.targets).toBe('both');
+    expect(rule.manned).not.toBe(true); // deactivates on low power
+  });
+
+  it('has a dead zone: it cannot hit an adjacent unit but hits one further out', () => {
+    const mk = () => {
+      const state = createGame(7);
+      // The AGT is unmanned — it needs power to fire, so give the base a plant.
+      constructBuilding(state, 'POWER', 0, 26, 26);
+      const t = constructBuilding(state, 'GUARDTOWER', 0, 30, 30);
+      state.players[0]!.credits = 1000;
+      tick(state, [upgrade(t.id)]);
+      return state;
+    };
+    // Adjacent enemy (1 cell away) — inside the minRange dead zone.
+    const closeState = mk();
+    const adjacent = spawnUnit(closeState, 'RIFLEMAN', 1, 31, 30);
+    adjacent.order = null;
+    const adjHp = adjacent.hp;
+    for (let t = 0; t < 15; t++) tick(closeState, []);
+    expect(adjacent.hp).toBe(adjHp); // never fired at the point-blank target
+
+    // Enemy at ~5 cells — outside the dead zone, inside range.
+    const farState = mk();
+    const outside = spawnUnit(farState, 'RIFLEMAN', 1, 35, 30);
+    outside.order = null;
+    const outHp = outside.hp;
+    for (let t = 0; t < 15; t++) tick(farState, []);
+    expect(outside.hp).toBeLessThan(outHp);
+  });
+
+  it('AGT upgrade round-trips through serialize and stays deterministic', () => {
+    const run = () => {
+      const { state, tower } = withTower();
+      state.players[0]!.credits = 1000;
+      tick(state, [upgrade(tower.id)]);
+      spawnUnit(state, 'RIFLEMAN', 1, 35, 30);
       for (let t = 0; t < 60; t++) tick(state, []);
       return hashState(state);
     };
