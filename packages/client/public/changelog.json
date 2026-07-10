@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-10-karteneditor",
+    "date": "2026-07-10",
+    "title": "Karteneditor: Baue deine eigenen Karten",
+    "text": "Der neue Karteneditor (Button auf dem Startbildschirm) macht dich zum Kartendesigner: Male Erde, Gras, Wasser, Felsen und Wald, platziere Erz- und Edelsteinfelder und bis zu 6 Startpunkte — in drei Größen bis 96×96. „Prüfen“ validiert die Karte, „Testspiel“ startet sie sofort gegen die KI. Mit Konto speicherst du Karten in der Cloud und kannst sie veröffentlichen: Öffentliche Karten kann jeder im neuen Karten-Tab spielen.",
+    "image": "changelog/karteneditor.png"
+  },
+  {
     "id": "2026-07-09-luftlandung",
     "date": "2026-07-09",
     "title": "Luftlandung (beide Fraktionen)",
