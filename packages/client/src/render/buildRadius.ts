@@ -1,4 +1,4 @@
-import { buildingRule, type Building, type GameState } from '@cac/sim';
+import { SUBCELL, buildingRule, type Building, type GameState } from '@cac/sim';
 import { Graphics, type Container } from 'pixi.js';
 import { session } from '../session.js';
 import { worldToScreen, TILE_H, TILE_W } from './iso.js';
@@ -7,12 +7,15 @@ import { worldToScreen, TILE_H, TILE_W } from './iso.js';
 const K = Math.SQRT2;
 
 /**
- * Build-radius indicator. Two layers, both inscribed in the true chebyshev
- * region so nothing over-promises:
- *  - Total buildable area: a faint circle around every own REAL building
+ * Build/attack-radius indicator, inscribed in the true chebyshev region so
+ * nothing over-promises:
+ *  - Total buildable area: a faint blue circle around every own REAL building
  *    (their union is where new buildings may go). Shown when a building is
  *    selected OR the R-hotkey toggle is on.
- *  - Selected building: its own radius, brighter, on top.
+ *  - Selected building: its own build radius, brighter blue, on top.
+ *  - Selected defense (Wachturm, Prisma, …): additionally its ATTACK radius
+ *    in red — deliberately distinct from the build radius, since the two
+ *    differ (a Prisma shoots further than it extends the base).
  *
  * Walls never open buildable area, so they contribute no circle; a selected
  * wall just highlights its own block.
@@ -43,7 +46,21 @@ export class BuildRadiusOverlay {
       for (const b of own) if (b.type !== 'WALL') this.drawCircle(b, 0x53a0ff, 0.05, 0.4, 1);
     }
     if (sel && selIsWall) this.drawFootprint(sel, 0xff3b30);
-    else if (sel) this.drawCircle(sel, 0xff3b30, 0.12, 0.9, 2);
+    else if (sel) {
+      this.drawCircle(sel, 0x53a0ff, 0.12, 0.9, 2);
+      const weapon = buildingRule(sel.type).weapon;
+      if (weapon) this.drawAttackRange(sel, weapon.range);
+    }
+  }
+
+  /** Attack radius (red) — measured from the building centre like the sim does. */
+  private drawAttackRange(b: Building, range: number): void {
+    const radiusCells = range / SUBCELL;
+    const c = worldToScreen(b.x, b.y);
+    this.g
+      .ellipse(c.x, c.y, radiusCells * 32 * K, radiusCells * 16 * K)
+      .fill({ color: 0xff3b30, alpha: 0.04 })
+      .stroke({ width: 2, color: 0xff3b30, alpha: 0.85 });
   }
 
   private drawCircle(
