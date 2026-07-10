@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NEUTRAL_OWNER,
   RESOURCE_ORE,
   TERRAIN_DIRT,
   TERRAIN_GRASS,
@@ -178,5 +179,57 @@ describe('createGame with customMap', () => {
       tick(restored, []);
     }
     expect(hashState(restored)).toBe(hashState(original));
+  });
+});
+
+describe('neutralBuildings (Erz-Bohrturm)', () => {
+  it('accepts a valid tower and createGame constructs it with owner -1', () => {
+    const map = makeMap();
+    map.neutralBuildings = [{ type: 'ERZ_BOHRTURM', cx: 22, cy: 22 }];
+    expect(validateCustomMap(map).ok).toBe(true);
+
+    const state = createGame(7, { customMap: map });
+    const spike = state.buildings.find((b) => b.type === 'ERZ_BOHRTURM');
+    expect(spike).toBeDefined();
+    expect(spike!.owner).toBe(NEUTRAL_OWNER);
+    // Footprint stamped into the structures grid like any building.
+    expect(state.structures[22 * map.width + 22]).toBe(spike!.id);
+  });
+
+  it('rejects unknown types, out-of-bounds and blocked ground', () => {
+    const base = makeMap();
+
+    const unknown = { ...base, neutralBuildings: [{ type: 'NUKESILO', cx: 22, cy: 22 }] };
+    expect(validateCustomMap(unknown).ok).toBe(false);
+
+    const outside = { ...base, neutralBuildings: [{ type: 'ERZ_BOHRTURM', cx: 47, cy: 22 }] };
+    expect(validateCustomMap(outside).ok).toBe(false);
+
+    const wet = makeMap();
+    wet.terrain[22 * wet.width + 22] = TERRAIN_WATER;
+    wet.neutralBuildings = [{ type: 'ERZ_BOHRTURM', cx: 22, cy: 22 }];
+    expect(validateCustomMap(wet).ok).toBe(false);
+  });
+
+  it('rejects overlap with each other and with spawn clear zones', () => {
+    const overlapping = makeMap();
+    overlapping.neutralBuildings = [
+      { type: 'ERZ_BOHRTURM', cx: 22, cy: 22 },
+      { type: 'ERZ_BOHRTURM', cx: 23, cy: 23 },
+    ];
+    expect(validateCustomMap(overlapping).ok).toBe(false);
+
+    const inSpawnZone = makeMap();
+    const [sx, sy] = inSpawnZone.spawns[0]!;
+    inSpawnZone.neutralBuildings = [{ type: 'ERZ_BOHRTURM', cx: sx + 2, cy: sy + 2 }];
+    expect(validateCustomMap(inSpawnZone).ok).toBe(false);
+  });
+
+  it('maps without the field stay valid (backward compatible)', () => {
+    const map = makeMap();
+    expect('neutralBuildings' in map).toBe(false);
+    expect(validateCustomMap(map).ok).toBe(true);
+    const state = createGame(7, { customMap: map });
+    expect(state.buildings.every((b) => b.owner >= 0)).toBe(true);
   });
 });

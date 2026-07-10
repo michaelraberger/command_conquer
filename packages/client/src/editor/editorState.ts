@@ -15,6 +15,8 @@ export interface EditorDraft {
   ore: Uint16Array;
   resourceKind: Uint8Array;
   spawns: [number, number][];
+  /** Neutral structures (Erz-Bohrtürme), (cx, cy) = footprint top-left. */
+  neutralBuildings: Array<{ type: string; cx: number; cy: number }>;
   /** Cloud row id when the draft was loaded from / saved to the gallery. */
   cloudId: string | null;
 }
@@ -35,6 +37,7 @@ export function fromCustomMapData(map: CustomMapData, cloudId: string | null): E
     ore: Uint16Array.from(map.ore),
     resourceKind: Uint8Array.from(map.resourceKind),
     spawns: map.spawns.map(([x, y]) => [x, y]),
+    neutralBuildings: (map.neutralBuildings ?? []).map((b) => ({ ...b })),
     cloudId,
   };
 }
@@ -51,6 +54,7 @@ export function toCustomMapData(draft: EditorDraft): CustomMapData {
     resourceKind: Array.from(draft.resourceKind),
     spawns: draft.spawns.map(([x, y]) => [x, y]),
     mapType: 'BADLANDS',
+    neutralBuildings: draft.neutralBuildings.map((b) => ({ ...b })),
   };
   const check = validateCustomMap(map);
   if (check.ok) map.mapType = check.mapType;
@@ -82,6 +86,10 @@ export function resizeDraft(draft: EditorDraft, width: number, height: number): 
     ore,
     resourceKind,
     spawns: draft.spawns.map(([x, y]) => [Math.min(x, width - 6), Math.min(y, height - 6)]),
+    // Neutral buildings whose 2×2 footprint no longer fits are dropped.
+    neutralBuildings: draft.neutralBuildings
+      .filter((b) => b.cx + 2 <= width && b.cy + 2 <= height)
+      .map((b) => ({ ...b })),
   };
 }
 
@@ -97,6 +105,7 @@ export const cloneDraft = (d: EditorDraft): EditorDraft => ({
   ore: d.ore.slice(),
   resourceKind: d.resourceKind.slice(),
   spawns: d.spawns.map(([x, y]) => [x, y]),
+  neutralBuildings: d.neutralBuildings.map((b) => ({ ...b })),
 });
 
 export function pushUndo(stack: UndoStack, draft: EditorDraft): void {

@@ -13,9 +13,10 @@ import { aimPoint, targetDistSq } from '../targeting.js';
 
 /** Re-path toward a moving/blocked target every N ticks (staggered by id). */
 const REPATH_INTERVAL = 10;
-/** How close the spy must get to the building footprint to slip inside. */
+/** How close a unit must get to the building footprint to slip inside —
+ *  shared by spies (INFILTRATE) and engineers (CAPTURE, see capture.ts). */
 const REACH = Math.round(1.5 * SUBCELL);
-const REACH_SQ = REACH * REACH;
+export const REACH_SQ = REACH * REACH;
 
 /** The enemy storage building this spy still targets, or null if it's gone. */
 function infiltrateTarget(state: GameState, unit: Unit): Building | null {
@@ -78,7 +79,7 @@ export function spySystem(state: GameState): void {
   }
 }
 
-function chaseBuilding(state: GameState, unit: Unit, target: { kind: 'building'; building: Building }): void {
+export function chaseBuilding(state: GameState, unit: Unit, target: { kind: 'building'; building: Building }): void {
   if (unit.path && (state.tick + unit.id) % REPATH_INTERVAL !== 0) return;
   const cx = unit.cell % state.mapWidth;
   const cy = (unit.cell - cx) / state.mapWidth;

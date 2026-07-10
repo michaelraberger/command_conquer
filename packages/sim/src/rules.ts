@@ -103,6 +103,9 @@ export interface UnitRule {
   /** Spy: walks into an enemy storage building (INFILTRATE) to steal its stored
    *  ore, then is consumed. Has no weapon. */
   infiltrator?: boolean;
+  /** Engineer: walks into any enemy or neutral building (CAPTURE) and converts
+   *  it to his owner, consumed doing so. Has no weapon. */
+  captures?: boolean;
   /** Only buildable once this technology is researched (undefined = immediate). */
   tech?: TechId;
   /** Internal scripted unit (paradrop plane): never in build menus, never
@@ -553,6 +556,24 @@ export const UNIT_RULES = {
     infiltrator: true,
     tech: 'spy',
   },
+  ENGINEER: {
+    name: 'Ingenieur',
+    maxHp: 100,
+    speed: 16,
+    radius: 60,
+    armor: 'none',
+    // Unarmed capture specialist: walks into any enemy or neutral building
+    // (CAPTURE) and converts it to his owner — consumed doing so, classic
+    // C&C style. Slow and defenceless; escort required.
+    weapon: null,
+    cost: 500,
+    buildTime: 70,
+    category: 'infantry',
+    requires: ['BARRACKS'],
+    factions: null,
+    sight: 4,
+    captures: true,
+  },
   MCV: {
     name: 'Baufahrzeug',
     maxHp: 800,
@@ -605,6 +626,11 @@ export interface BuildingRule {
   storage?: number;
   /** Footprint must sit on open water instead of buildable land (shipyard). */
   onWater?: boolean;
+  /** Passive credits per second while a real player owns this building
+   *  (Erz-Bohrturm). Paid unconditionally — no storage cap. */
+  income?: number;
+  /** One-time credits granted to the player whose engineer captures this. */
+  captureBonus?: number;
   /** Only buildable once this technology is researched (undefined = immediate). */
   tech?: TechId;
   /** At most one standing instance per player (iron curtain device). */
@@ -1012,6 +1038,28 @@ export const BUILDING_RULES = {
     // The radar sweep: by far the widest sight in the game — the tower itself
     // uncovers a huge patch of map. Also the launch key for the V3 (requires).
     sight: 11,
+  },
+  ERZ_BOHRTURM: {
+    name: 'Erz-Bohrturm',
+    maxHp: 600,
+    // Cost only feeds the sell refund — the tower is never in a build queue.
+    // It starts NEUTRAL (owner -1) on authored maps and is taken by engineers:
+    // +captureBonus once, then +income credits per second while owned.
+    cost: 1000,
+    buildTime: 100,
+    power: 0,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: [],
+    buildable: false,
+    factions: null,
+    sight: 3,
+    income: 10,
+    captureBonus: 500,
   },
   WALL: {
     name: 'Mauer',

@@ -8,7 +8,7 @@ import type { EditorDraft } from './editorState.js';
 /** Ore/gem fields are stamped with this amount (cf. stampResourcePatch: 400–699). */
 export const RESOURCE_STAMP_AMOUNT = 500;
 
-export type ToolId = 'terrain' | 'resource' | 'eraser' | 'fill' | 'spawn';
+export type ToolId = 'terrain' | 'resource' | 'eraser' | 'fill' | 'spawn' | 'building';
 
 /** Round-ish brush: all cells within `size/2` (Euclidean, like stampResourcePatch). */
 function forBrush(
@@ -107,4 +107,29 @@ export function toggleSpawn(draft: EditorDraft, cx: number, cy: number): void {
     return;
   }
   if (draft.spawns.length < 6) draft.spawns.push([cx, cy]);
+}
+
+/** Footprint side length of the placeable neutral building (Erz-Bohrturm). */
+const NEUTRAL_SIZE = 2;
+
+/** Index of the neutral building whose footprint covers (cx, cy), or -1. */
+export function neutralBuildingAt(draft: EditorDraft, cx: number, cy: number): number {
+  return draft.neutralBuildings.findIndex(
+    (b) => cx >= b.cx && cx < b.cx + NEUTRAL_SIZE && cy >= b.cy && cy < b.cy + NEUTRAL_SIZE,
+  );
+}
+
+/** Building tool click: on a tower → remove it; else place one, clamped so
+ *  the footprint stays in bounds (validation flags bad ground on save/test). */
+export function toggleNeutralBuilding(draft: EditorDraft, cx: number, cy: number): void {
+  const hit = neutralBuildingAt(draft, cx, cy);
+  if (hit >= 0) {
+    draft.neutralBuildings.splice(hit, 1);
+    return;
+  }
+  draft.neutralBuildings.push({
+    type: 'ERZ_BOHRTURM',
+    cx: Math.max(0, Math.min(cx, draft.width - NEUTRAL_SIZE)),
+    cy: Math.max(0, Math.min(cy, draft.height - NEUTRAL_SIZE)),
+  });
 }

@@ -202,6 +202,9 @@ export async function startGame(
   );
   app.stage.addChild(world);
 
+  // Dev aid: expose the live sim state for console inspection (dev only).
+  if (import.meta.env.DEV) (window as unknown as { __cacState?: unknown }).__cacState = state;
+
   const camera = new Camera(state);
   camera.attach(app.canvas);
   const entities = new EntityRenderer(entityLayer, textures, state);

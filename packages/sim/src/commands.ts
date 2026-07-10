@@ -56,6 +56,7 @@ export type Command =
   | { type: 'LOAD'; playerId: number; unitIds: number[]; transportId: number }
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'CAPTURE'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'DEPLOY'; playerId: number; unitIds: number[] }
   | { type: 'RESEARCH_START'; playerId: number; tech: string }
   | { type: 'RESEARCH_CANCEL'; playerId: number }
@@ -308,6 +309,24 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           if (unitRule(unit.type).infiltrator !== true) continue;
           unit.order = { kind: 'INFILTRATE', targetId: cmd.targetId };
           unit.path = null; // the spy system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'CAPTURE': {
+        // An engineer takes over any ENEMY or NEUTRAL building (never own/allied).
+        const target = state.buildings.find((b) => b.id === cmd.targetId);
+        if (
+          !target ||
+          target.owner === cmd.playerId ||
+          (target.owner >= 0 && !areEnemies(state, cmd.playerId, target.owner))
+        ) {
+          break;
+        }
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unitRule(unit.type).captures !== true) continue;
+          unit.order = { kind: 'CAPTURE', targetId: cmd.targetId };
+          unit.path = null; // the capture system takes over pathing (chase)
           unit.pathIndex = 0;
         }
         break;

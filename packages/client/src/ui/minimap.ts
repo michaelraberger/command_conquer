@@ -59,9 +59,11 @@ export class Minimap {
       ctx.fillStyle = resourceCss(state.resourceKind[i]!);
       ctx.fillRect(i % w, Math.floor(i / w), 1, 1);
     }
-    // Team colors follow the faction (Allies blue, Soviets red).
+    // Team colors follow the faction (Allies blue, Soviets red); neutral
+    // structures (Erz-Bohrturm, owner -1) show as gray.
     for (const b of state.buildings) {
-      ctx.fillStyle = colorCss(state.players[b.owner]!.color);
+      const owner = state.players[b.owner];
+      ctx.fillStyle = owner ? colorCss(owner.color) : '#9aa0a6';
       ctx.fillRect(b.cx, b.cy, 2, 2);
     }
     for (const u of state.units) {

@@ -8,6 +8,7 @@ import {
   isPassableKind,
   type MapType,
 } from './map.js';
+import { buildingRule, isBuildingType } from './rules.js';
 
 /** Legal side lengths for hand-authored maps (square not required). */
 export const CUSTOM_MAP_SIZES: readonly number[] = [48, 64, 96];
@@ -40,7 +41,13 @@ export interface CustomMapData {
   spawns: [number, number][];
   /** Derived from the layout (see validateCustomMap) — the AI reads this. */
   mapType: MapType;
+  /** Neutral (owner -1) structures authored into the map, e.g. Erz-Bohrtürme.
+   *  (cx, cy) is the footprint's top-left cell. Older maps lack the field. */
+  neutralBuildings?: Array<{ type: string; cx: number; cy: number }>;
 }
+
+/** Building types a map author may place as neutral structures. */
+export const NEUTRAL_BUILDING_TYPES: ReadonlySet<string> = new Set(['ERZ_BOHRTURM']);
 
 export interface CustomMapValidation {
   ok: boolean;
@@ -159,6 +166,67 @@ export function validateCustomMap(map: CustomMapData): CustomMapValidation {
       errors.push(
         `Um Startpunkt ${i + 1} muss ein Bereich von ${SPAWN_CLEAR_RADIUS} Feldern frei sein (nur Erde/Gras).`,
       );
+    }
+  }
+
+  // Neutral structures (Erz-Bohrtürme): known type, footprint in bounds on
+  // clear buildable ground, no overlap with each other or spawn clear zones.
+  const neutrals = map.neutralBuildings ?? [];
+  for (let i = 0; i < neutrals.length; i++) {
+    const nb = neutrals[i]!;
+    if (!NEUTRAL_BUILDING_TYPES.has(nb.type) || !isBuildingType(nb.type)) {
+      errors.push(`Neutrales Gebäude ${i + 1} hat einen unbekannten Typ.`);
+      continue;
+    }
+    const rule = buildingRule(nb.type);
+    if (
+      !isInt(nb.cx) ||
+      !isInt(nb.cy) ||
+      nb.cx < 0 ||
+      nb.cy < 0 ||
+      nb.cx + rule.width > map.width ||
+      nb.cy + rule.height > map.height
+    ) {
+      errors.push(`${rule.name} ${i + 1} liegt außerhalb der Karte.`);
+      continue;
+    }
+    let blockedCell = false;
+    for (let y = nb.cy; y < nb.cy + rule.height && !blockedCell; y++) {
+      for (let x = nb.cx; x < nb.cx + rule.width && !blockedCell; x++) {
+        const idx = y * map.width + x;
+        if (!isBuildableKind(map.terrain[idx]!) || map.ore[idx]! > 0 || map.resourceKind[idx]! !== RESOURCE_NONE) {
+          blockedCell = true;
+        }
+      }
+    }
+    if (blockedCell) {
+      errors.push(`${rule.name} ${i + 1} braucht freien, bebaubaren Boden ohne Rohstoffe.`);
+      continue;
+    }
+    for (let j = 0; j < i; j++) {
+      const other = neutrals[j]!;
+      if (!isBuildingType(other.type)) continue;
+      const otherRule = buildingRule(other.type);
+      if (
+        nb.cx < other.cx + otherRule.width &&
+        other.cx < nb.cx + rule.width &&
+        nb.cy < other.cy + otherRule.height &&
+        other.cy < nb.cy + rule.height
+      ) {
+        errors.push(`Neutrale Gebäude ${j + 1} und ${i + 1} überlappen sich.`);
+      }
+    }
+    for (let s = 0; s < map.spawns.length; s++) {
+      const [sx, sy] = map.spawns[s]!;
+      if (!isInt(sx) || !isInt(sy)) continue;
+      if (
+        nb.cx <= sx + SPAWN_CLEAR_RADIUS &&
+        sx - SPAWN_CLEAR_RADIUS <= nb.cx + rule.width - 1 &&
+        nb.cy <= sy + SPAWN_CLEAR_RADIUS &&
+        sy - SPAWN_CLEAR_RADIUS <= nb.cy + rule.height - 1
+      ) {
+        errors.push(`${rule.name} ${i + 1} liegt in der Freizone von Startpunkt ${s + 1}.`);
+      }
     }
   }
 

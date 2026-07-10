@@ -251,26 +251,45 @@ export class Controls {
     }
     const unitIds = [...this.selected].sort((x, y) => x - y);
 
-    // Spy right-clicking an enemy storage building (refinery/silo) → infiltrate
-    // it. Must come before ATTACK, since the weaponless spy can't fire.
+    // Specialists right-clicking a foreign building — engineers capture any
+    // enemy/neutral building, spies infiltrate enemy storage. Must come before
+    // ATTACK, since both are weaponless.
     if (!e.ctrlKey && inBounds(this.state, cx, cy)) {
       const structId = this.state.structures[cellIndex(this.state, cx, cy)]!;
       const building = structId !== 0 ? this.state.buildings.find((b) => b.id === structId) : undefined;
-      if (
-        building &&
-        building.owner !== session.localPlayer &&
-        (buildingRule(building.type).storage ?? 0) > 0
-      ) {
+      if (building && building.owner !== session.localPlayer) {
         const unitById = new Map(this.state.units.map((u) => [u.id, u]));
-        const spies = unitIds.filter((id) => unitById.get(id)?.type === 'SPION');
-        if (spies.length > 0) {
+        const special = new Set<number>();
+
+        const engineers = unitIds.filter((id) => {
+          const unit = unitById.get(id);
+          return unit !== undefined && unitRule(unit.type).captures === true;
+        });
+        if (engineers.length > 0) {
           this.send({
-            type: 'INFILTRATE',
+            type: 'CAPTURE',
             playerId: session.localPlayer,
-            unitIds: spies,
+            unitIds: engineers,
             targetId: building.id,
           });
-          const rest = unitIds.filter((id) => unitById.get(id)?.type !== 'SPION');
+          for (const id of engineers) special.add(id);
+        }
+
+        if ((buildingRule(building.type).storage ?? 0) > 0) {
+          const spies = unitIds.filter((id) => unitById.get(id)?.type === 'SPION');
+          if (spies.length > 0) {
+            this.send({
+              type: 'INFILTRATE',
+              playerId: session.localPlayer,
+              unitIds: spies,
+              targetId: building.id,
+            });
+            for (const id of spies) special.add(id);
+          }
+        }
+
+        if (special.size > 0) {
+          const rest = unitIds.filter((id) => !special.has(id));
           if (rest.length > 0) {
             this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
           }

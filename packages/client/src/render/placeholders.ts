@@ -53,6 +53,7 @@ export interface GameTextures {
   artillery: UnitSprite[];
   v3: UnitSprite[];
   rifleman: UnitSprite[];
+  ingenieur: UnitSprite[];
   harvester: UnitSprite[];
   repair: UnitSprite[];
   rocketeer: UnitSprite[];
@@ -347,6 +348,25 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.circle(r.x, r.y - 18, 7).stroke({ width: 1, color: fx, alpha: 0.4 });
     },
     team: (g) => teamMark(g, 0.75, 1.7, 14),
+  },
+  ERZ_BOHRTURM: {
+    frameTop: 58,
+    fx: 0xdba832, // ore amber
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      const m = iso(1, 1);
+      cylinder(g, m.x, m.y - 2, 12, 12, 0x8d857a); // drill housing base
+      // Segmented mast: stacked drill sections, slimmer toward the top.
+      cylinder(g, m.x, m.y - 16, 7, 12, 0x6f675a);
+      cylinder(g, m.x, m.y - 30, 6, 12, 0x7b7366);
+      cylinder(g, m.x, m.y - 43, 5, 11, 0x6f675a);
+      g.rect(m.x - 1.5, m.y - 56, 3, 6).fill(0x50565e); // drill tip
+      // Ore pile at the foot + status light (fx).
+      const p = iso(1.55, 1.4);
+      g.ellipse(p.x, p.y - 3, 7, 3.5).fill(fx);
+      g.circle(m.x + 8, m.y - 34, 2.2).fill(fx);
+    },
+    team: (g) => teamMark(g, 1, 1.85, 10),
   },
   TESLA: {
     frameTop: 52,
@@ -823,6 +843,12 @@ function drawRifleman(body: Graphics): void {
   body.circle(-1.4, -1.4, 2).fill(UNIFORM_HI); // shoulder highlight
 }
 
+function drawIngenieur(body: Graphics): void {
+  body.rect(2, -1.6, 6, 4.2).fill(0xc9b06a).stroke({ width: 0.8, color: 0x6e5a2e }); // toolbox
+  body.circle(0, 0, 5).fill(UNIFORM).stroke({ width: 1, color: 0x2a2a24 });
+  body.circle(-1.4, -1.4, 2).fill(0xe8d9a0); // hard-hat highlight
+}
+
 function drawRocketeer(body: Graphics): void {
   body.rect(1, -2.6, 13, 3.6).fill(0x4a4a42); // launcher tube
   body.circle(14, -0.8, 1.9).fill(0xc0673a); // warhead tip
@@ -1188,6 +1214,7 @@ export function createTextures(renderer: Renderer): GameTextures {
   const artillery: UnitSprite[] = [];
   const v3: UnitSprite[] = [];
   const rifleman: UnitSprite[] = [];
+  const ingenieur: UnitSprite[] = [];
   const harvester: UnitSprite[] = [];
   const repair: UnitSprite[] = [];
   const rocketeer: UnitSprite[] = [];
@@ -1232,6 +1259,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     missilesub.push(bakeVehicle(renderer, f, 32, drawMissileSub, teamMissileSub));
     transport.push(bakeVehicle(renderer, f, 28, drawTransportShip, teamTransportShip));
     rifleman.push(bakeInfantry(renderer, f, drawRifleman, teamHelmet));
+    ingenieur.push(bakeInfantry(renderer, f, drawIngenieur, teamHelmet));
     rocketeer.push(bakeInfantry(renderer, f, drawRocketeer, teamHelmet));
     sniper.push(bakeInfantry(renderer, f, drawSniper, teamHelmet));
     spion.push(bakeInfantry(renderer, f, drawSpion, teamHelmet));
@@ -1359,6 +1387,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     artillery,
     v3,
     rifleman,
+    ingenieur,
     sniper,
     spion,
     mcv,

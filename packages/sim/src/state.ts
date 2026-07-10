@@ -42,6 +42,7 @@ export type UnitOrder =
   | { kind: 'REPAIR_UNIT'; targetId: number }
   | { kind: 'BOARD'; targetId: number }
   | { kind: 'INFILTRATE'; targetId: number }
+  | { kind: 'CAPTURE'; targetId: number }
   | { kind: 'PARADROP'; cx: number; cy: number };
 
 export interface Unit {
@@ -353,12 +354,18 @@ export interface GameOptions {
   customMap?: CustomMapData | undefined;
 }
 
-/** Two owners are enemies unless they share a team (self is never an enemy). */
+/** Owner id of neutral map structures (Erz-Bohrturm): no Player record exists
+ *  for it, so it never counts for victory, fog, power or storage. */
+export const NEUTRAL_OWNER = -1;
+
+/** Two owners are enemies unless they share a team (self is never an enemy).
+ *  A missing player record (neutral structures, owner -1) is hostile to NO
+ *  one — auto-targeting ignores neutrals; only explicit attacks touch them. */
 export function areEnemies(state: GameState, a: number, b: number): boolean {
   if (a === b) return false;
   const pa = state.players[a];
   const pb = state.players[b];
-  if (!pa || !pb) return true;
+  if (!pa || !pb) return false;
   return pa.team !== pb.team;
 }
 
@@ -535,6 +542,12 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     spawnUnit(state, 'RIFLEMAN', id, cx - 1, cy + 3);
     spawnUnit(state, 'RIFLEMAN', id, cx, cy + 3);
     spawnUnit(state, 'HARVESTER', id, cx + 3, cy + 2);
+  }
+
+  // Neutral structures authored into the map (Erz-Bohrturm): owner -1, no
+  // player record — capturable by engineers, ignored by auto-targeting.
+  for (const nb of customMap?.neutralBuildings ?? []) {
+    constructBuilding(state, nb.type as BuildingType, NEUTRAL_OWNER, nb.cx, nb.cy);
   }
 
   return state;

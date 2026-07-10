@@ -46,6 +46,8 @@ interface BuildingView {
   lastLevel: number;
   /** Last rendered building type — swaps the sprite on in-place upgrades. */
   lastType: Building['type'];
+  /** Last rendered owner — re-tints the accent when an engineer captures. */
+  lastOwner: number;
   /** The owner's faction colour (applied to the team accent). */
   teamColor: number;
   /** Whether the building currently renders as power-starved (avoids redundant writes). */
@@ -234,6 +236,7 @@ export class EntityRenderer {
       HARVESTER: this.tex.harvester,
       REPAIR: this.tex.repair,
       RIFLEMAN: this.tex.rifleman,
+      ENGINEER: this.tex.ingenieur,
       ROCKETEER: this.tex.rocketeer,
       SNIPER: this.tex.sniper,
       SPION: this.tex.spion,
@@ -313,6 +316,16 @@ export class EntityRenderer {
           view.gateOpen = open;
         }
       }
+      // Captured buildings switch sides at runtime — re-tint the accent.
+      if (building.owner !== view.lastOwner) {
+        view.lastOwner = building.owner;
+        view.teamColor = this.playerColors.get(building.owner) ?? 0xffffff;
+        view.team.tint = view.lastShielded
+          ? CURTAIN_TINT
+          : view.lastStarved
+            ? OFFLINE_TINT
+            : view.teamColor;
+      }
       // Own power-consuming buildings darken while starved of power.
       const starved =
         building.owner === session.localPlayer &&
@@ -371,6 +384,7 @@ export class EntityRenderer {
       lastHp: -1,
       lastLevel: building.level,
       lastType: building.type,
+      lastOwner: building.owner,
       teamColor,
       lastStarved: false,
       lastShielded: false,

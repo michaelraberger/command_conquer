@@ -159,6 +159,7 @@ export function aiSystem(state: GameState): void {
     manageResearch(state, player, params);
     manageMcv(state, player);
     manageTraining(state, player, params);
+    manageCapture(state, player);
     manageInvasion(state, player, params);
     manageArmy(state, player, params);
     manageSuperweapon(state, player, params);
@@ -280,9 +281,24 @@ function manageMcv(state: GameState, player: Player): void {
   }
 }
 
+/** Neutral map structures worth taking (Erz-Bohrtürme). */
+function neutralCapturables(state: GameState): Building[] {
+  return state.buildings.filter((b) => {
+    if (b.owner >= 0) return false;
+    const rule = buildingRule(b.type);
+    return (rule.income ?? 0) > 0 || (rule.captureBonus ?? 0) > 0;
+  });
+}
+
 function manageTraining(state: GameState, player: Player, params: AiParams): void {
   if (player.queues.infantry.item === null) {
-    if (countUnits(state, player.id, 'RIFLEMAN') < params.riflemenCap) {
+    // A free Bohrturm on the map is worth an engineer before anything else —
+    // one at a time; once every tower is taken the condition stays false.
+    const wantEngineer =
+      neutralCapturables(state).length > 0 && countUnits(state, player.id, 'ENGINEER') === 0;
+    if (wantEngineer) {
+      startProduction(state, player.id, 'ENGINEER');
+    } else if (countUnits(state, player.id, 'RIFLEMAN') < params.riflemenCap) {
       startProduction(state, player.id, 'RIFLEMAN');
     } else if (countUnits(state, player.id, 'ROCKETEER') < Math.ceil(params.riflemenCap / 2)) {
       // Anti-armor backbone once the rifle line is filled.
@@ -371,6 +387,36 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
         startProduction(state, player.id, want);
       }
     }
+  }
+}
+
+/** Sends an idle engineer to the nearest neutral Bohrturm. Deterministic:
+ *  lowest-id idle engineer, nearest target by squared cell distance with the
+ *  lower building id breaking ties. Enemy buildings are never captured. */
+function manageCapture(state: GameState, player: Player): void {
+  const targets = neutralCapturables(state);
+  if (targets.length === 0) return;
+  const engineer = state.units.find(
+    (u) => u.owner === player.id && u.type === 'ENGINEER' && u.order === null,
+  );
+  if (!engineer) return;
+  const ecx = engineer.cell % state.mapWidth;
+  const ecy = (engineer.cell - ecx) / state.mapWidth;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of targets) {
+    const dx = b.cx - ecx;
+    const dy = b.cy - ecy;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  if (best) {
+    applyCommands(state, [
+      { type: 'CAPTURE', playerId: player.id, unitIds: [engineer.id], targetId: best.id },
+    ]);
   }
 }
 

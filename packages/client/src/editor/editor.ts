@@ -36,6 +36,7 @@ import {
   paintResource,
   paintTerrain,
   spawnAt,
+  toggleNeutralBuilding,
   toggleSpawn,
   type ToolId,
 } from './tools.js';
@@ -117,6 +118,26 @@ export async function openEditor(
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(base, panX, panY, draft.width * zoom, draft.height * zoom);
+
+    // Neutral buildings (Erz-Bohrtürme): footprint box + amber drill marker.
+    for (const nb of draft.neutralBuildings) {
+      const px = panX + nb.cx * zoom;
+      const py = panY + nb.cy * zoom;
+      ctx.fillStyle = 'rgba(219,168,50,0.35)';
+      ctx.strokeStyle = '#dba832';
+      ctx.lineWidth = 2;
+      ctx.fillRect(px, py, 2 * zoom, 2 * zoom);
+      ctx.strokeRect(px, py, 2 * zoom, 2 * zoom);
+      ctx.fillStyle = '#dba832';
+      ctx.beginPath();
+      ctx.arc(px + zoom, py + zoom, Math.max(5, zoom * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a1408';
+      ctx.font = `bold ${Math.max(9, zoom * 0.9)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('B', px + zoom, py + zoom + 1);
+    }
 
     // Spawn markers with player numbers.
     for (let i = 0; i < draft.spawns.length; i++) {
@@ -203,6 +224,11 @@ export async function openEditor(
         commit();
       }
       render();
+      return;
+    }
+    if (tool === 'building') {
+      toggleNeutralBuilding(draft, cx, cy);
+      commit();
       return;
     }
     if (tool === 'fill') {
