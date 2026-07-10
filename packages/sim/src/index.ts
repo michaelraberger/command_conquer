@@ -100,6 +100,16 @@ export {
   type SuperweaponStats,
   type AiDifficulty,
 } from './rules.js';
+export {
+  CUSTOM_MAP_SIZES,
+  SPAWN_EDGE_MARGIN,
+  SPAWN_MIN_DISTANCE,
+  SPAWN_CLEAR_RADIUS,
+  validateCustomMap,
+  emptyCustomMap,
+  type CustomMapData,
+  type CustomMapValidation,
+} from './customMap.js';
 export type { SimEvent } from './events.js';
 export {
   createGame,

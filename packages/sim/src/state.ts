@@ -1,3 +1,4 @@
+import { validateCustomMap, type CustomMapData } from './customMap.js';
 import type { SimEvent } from './events.js';
 import { cellCenter, SUBCELL } from './fixed.js';
 import {
@@ -335,6 +336,12 @@ export interface GameOptions {
   mapHeight?: number;
   /** Balance overrides (balance.json) applied to the rules for this game. */
   balance?: BalanceConfig | undefined;
+  /**
+   * Hand-authored map (editor). When set, terrain/ore/spawns come from the map
+   * instead of the procedural generator; mapType/mapWidth/mapHeight are ignored
+   * and the opponent count is capped at `customMap.spawns.length - 1`.
+   */
+  customMap?: CustomMapData | undefined;
 }
 
 /** Two owners are enemies unless they share a team (self is never an enemy). */
@@ -374,13 +381,21 @@ export function storedInBuilding(state: GameState, building: Building): number {
 
 export function createGame(seed: number, options: GameOptions = {}): GameState {
   applyBalance(options.balance); // resets to defaults when no config is given
-  const mapWidth = options.mapWidth ?? 64;
-  const mapHeight = options.mapHeight ?? 64;
+  const customMap = options.customMap;
+  if (customMap) {
+    const check = validateCustomMap(customMap);
+    if (!check.ok) throw new Error(`Ungültige Karte: ${check.errors.join(' ')}`);
+  }
+  const mapWidth = customMap?.width ?? options.mapWidth ?? 64;
+  const mapHeight = customMap?.height ?? options.mapHeight ?? 64;
   const size = mapWidth * mapHeight;
-  const mapType = options.mapType ?? 'BADLANDS';
+  const mapType = customMap?.mapType ?? options.mapType ?? 'BADLANDS';
 
-  const playerCount = Math.max(2, Math.min(6, 1 + (options.opponents ?? 1)));
-  const spawns = spawnCenters(playerCount, mapWidth, mapHeight);
+  const maxPlayers = customMap ? customMap.spawns.length : 6;
+  const playerCount = Math.max(2, Math.min(maxPlayers, 1 + (options.opponents ?? 1)));
+  const spawns = customMap
+    ? customMap.spawns.slice(0, playerCount).map(([x, y]) => [x, y] as const)
+    : spawnCenters(playerCount, mapWidth, mapHeight);
   const humanFaction = options.factions?.[0] ?? 'ALLIES';
   // AIs alternate factions for variety; team 1 gangs up on the human (team 0).
   const factionFor = (id: number): Faction =>
@@ -436,10 +451,20 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     events: [],
   };
 
-  state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType, spawns);
-  for (const [sx, sy] of spawns) clearArea(state.terrain, mapWidth, sx, sy, 4);
+  if (customMap) {
+    // Authored map: copy the layers (createGame mutates terrain when placing
+    // buildings, so never alias the source) and skip generation/stamping
+    // entirely — the author's layout is used verbatim. clearArea is skipped
+    // too: validateCustomMap already guarantees open ground around spawns.
+    state.terrain = Uint8Array.from(customMap.terrain);
+    state.ore = Uint16Array.from(customMap.ore);
+    state.resourceKind = Uint8Array.from(customMap.resourceKind);
+  } else {
+    state.terrain = generateTerrain(mapWidth, mapHeight, state, mapType, spawns);
+    for (const [sx, sy] of spawns) clearArea(state.terrain, mapWidth, sx, sy, 4);
+  }
 
-  if (playerCount === 2 && mapWidth === 64 && mapHeight === 64) {
+  if (!customMap && playerCount === 2 && mapWidth === 64 && mapHeight === 64) {
     // Classic hand-tuned 1v1 setup (kept byte-for-byte so existing maps/tests
     // are unchanged); the N-player generator below runs for 3+ players or any
     // non-default map size.
@@ -471,23 +496,25 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     return state;
   }
 
-  // 3+ players (or any non-default map size): one ore field beside each base,
-  // biased toward the contested middle, plus a central prize and two gem fields.
-  // All anchors scale with the map size (64² reference).
-  const midX = Math.round(mapWidth / 2);
-  const midY = Math.round(mapHeight / 2);
-  const offX = Math.max(3, Math.round((mapWidth * 5) / 64));
-  const offY = Math.max(3, Math.round((mapHeight * 5) / 64));
-  const toward = (v: number, mid: number, off: number): number =>
-    v === mid ? off : Math.sign(mid - v) * off;
-  for (const [cx, cy] of spawns) {
-    stampResourcePatch(state, state, cx + toward(cx, midX, offX), cy + toward(cy, midY, offY), 2, RESOURCE_ORE);
-  }
-  const centreTaken = spawns.some(([x, y]) => Math.abs(x - midX) <= 8 && Math.abs(y - midY) <= 8);
-  stampResourcePatch(state, state, midX, midY, mapType === 'ISLANDS' ? 2 : 3, RESOURCE_ORE);
-  if (!centreTaken || mapType !== 'ISLANDS') {
-    stampResourcePatch(state, state, Math.round((mapWidth * 29) / 64), Math.round((mapHeight * 35) / 64), 1, RESOURCE_GEMS);
-    stampResourcePatch(state, state, Math.round((mapWidth * 35) / 64), Math.round((mapHeight * 29) / 64), 1, RESOURCE_GEMS);
+  if (!customMap) {
+    // 3+ players (or any non-default map size): one ore field beside each base,
+    // biased toward the contested middle, plus a central prize and two gem fields.
+    // All anchors scale with the map size (64² reference).
+    const midX = Math.round(mapWidth / 2);
+    const midY = Math.round(mapHeight / 2);
+    const offX = Math.max(3, Math.round((mapWidth * 5) / 64));
+    const offY = Math.max(3, Math.round((mapHeight * 5) / 64));
+    const toward = (v: number, mid: number, off: number): number =>
+      v === mid ? off : Math.sign(mid - v) * off;
+    for (const [cx, cy] of spawns) {
+      stampResourcePatch(state, state, cx + toward(cx, midX, offX), cy + toward(cy, midY, offY), 2, RESOURCE_ORE);
+    }
+    const centreTaken = spawns.some(([x, y]) => Math.abs(x - midX) <= 8 && Math.abs(y - midY) <= 8);
+    stampResourcePatch(state, state, midX, midY, mapType === 'ISLANDS' ? 2 : 3, RESOURCE_ORE);
+    if (!centreTaken || mapType !== 'ISLANDS') {
+      stampResourcePatch(state, state, Math.round((mapWidth * 29) / 64), Math.round((mapHeight * 35) / 64), 1, RESOURCE_GEMS);
+      stampResourcePatch(state, state, Math.round((mapWidth * 35) / 64), Math.round((mapHeight * 29) / 64), 1, RESOURCE_GEMS);
+    }
   }
 
   // Construction yard, harvester and a small guard force at each base.
