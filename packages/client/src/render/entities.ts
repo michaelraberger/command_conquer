@@ -44,6 +44,8 @@ interface BuildingView {
   bar: Graphics;
   lastHp: number;
   lastLevel: number;
+  /** Last rendered building type — swaps the sprite on in-place upgrades. */
+  lastType: Building['type'];
   /** The owner's faction colour (applied to the team accent). */
   teamColor: number;
   /** Whether the building currently renders as power-starved (avoids redundant writes). */
@@ -282,6 +284,15 @@ export class EntityRenderer {
         view.team.anchor.set(def.anchorX, def.anchorY);
         view.lastLevel = building.level;
       }
+      // In-place upgrade (Wachturm → AGT, Kraftwerk → Fortschr.): swap the sprite.
+      if (building.type !== view.lastType && building.type !== 'WALL') {
+        const def = this.tex.buildings[building.type];
+        view.body.texture = def.texture;
+        view.body.anchor.set(def.anchorX, def.anchorY);
+        view.team.texture = def.team;
+        view.team.anchor.set(def.anchorX, def.anchorY);
+        view.lastType = building.type;
+      }
       // Gates open when a friendly unit is within ~2.5 cells (cosmetic only).
       if (building.type === 'GATE') {
         const open = state.units.some((u) => {
@@ -358,6 +369,7 @@ export class EntityRenderer {
       bar,
       lastHp: -1,
       lastLevel: building.level,
+      lastType: building.type,
       teamColor,
       lastStarved: false,
       lastShielded: false,

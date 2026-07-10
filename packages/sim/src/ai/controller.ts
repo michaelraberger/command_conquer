@@ -166,22 +166,32 @@ export function aiSystem(state: GameState): void {
   }
 }
 
+/** Upgrade one building in place (same effect as the UPGRADE_BUILDING command). */
+function upgradeOne(state: GameState, player: Player, from: BuildingType): boolean {
+  const rule = buildingRule(from);
+  const to = rule.upgradeTo as BuildingType | undefined;
+  const cost = rule.upgradeCost;
+  if (to === undefined || cost === undefined || player.credits < cost) return false;
+  const target = state.buildings.find((b) => b.owner === player.id && b.type === from);
+  if (!target) return false;
+  player.credits -= cost;
+  target.type = to;
+  target.hp = buildingRule(to).maxHp;
+  return true;
+}
+
 /**
- * Upgrade a Wachturm to an Advanced Guard Tower once the economy can spare it.
- * Deterministic: upgrades the lowest-id guard tower, one per pass. Applies the
- * effect directly (same as the UPGRADE_BUILDING command) — the AI already
- * mutates state in place for construction. Only normal/hard bother.
+ * In-place upgrades once the economy can spare it. First a power plant when the
+ * base runs a deficit (advanced plant = double output keeps defenses online),
+ * then a Wachturm to an Advanced Guard Tower. Deterministic: lowest-id target,
+ * one per pass. Only normal/hard bother.
  */
 function manageUpgrades(state: GameState, player: Player, params: AiParams): void {
-  if (!params.useHighTech) return; // easy AI keeps plain guard towers
-  const rule = buildingRule('GUARDTOWER');
-  const cost = rule.upgradeCost ?? 0;
-  if (player.credits < cost + 1500) return; // keep a buffer for production
-  const tower = state.buildings.find((b) => b.owner === player.id && b.type === 'GUARDTOWER');
-  if (!tower) return;
-  player.credits -= cost;
-  tower.type = 'AGT';
-  tower.hp = buildingRule('AGT').maxHp;
+  if (!params.useHighTech) return; // easy AI keeps basic structures
+  if (player.credits < 1500) return; // keep a buffer for production
+  const { produced, used } = powerBalance(state, player.id);
+  if (used > produced && upgradeOne(state, player, 'POWER')) return;
+  upgradeOne(state, player, 'GUARDTOWER');
 }
 
 function countBuildings(state: GameState, owner: number, type: BuildingType): number {

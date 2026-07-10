@@ -213,6 +213,25 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 1, 1.75, 12),
   },
+  ADVPOWER: {
+    frameTop: 54,
+    fx: 0xffe066,
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      prismAt(g, 0.15, 0.15, 1.7, 1.7, 16, 0xb0a794);
+      // Three taller turbines + a glowing reactor core (double output).
+      const t1 = iso(0.55, 1.05);
+      const t2 = iso(1.2, 1.4);
+      const t3 = iso(1.55, 0.75);
+      cylinder(g, t1.x, t1.y - 10, 9, 32, 0xd0c7b3);
+      cylinder(g, t2.x, t2.y - 10, 9, 32, 0xc4bba8);
+      cylinder(g, t3.x, t3.y - 10, 9, 32, 0xd0c7b3);
+      const core = iso(1.0, 1.0);
+      g.circle(core.x, core.y - 30, 6).fill(fx).stroke({ width: 1, color: 0xfff3b0 });
+      g.circle(core.x, core.y - 30, 10).stroke({ width: 1, color: fx, alpha: 0.5 });
+    },
+    team: (g) => teamMark(g, 1, 1.75, 12),
+  },
   REFINERY: {
     frameTop: 40,
     fx: 0xffb02e,

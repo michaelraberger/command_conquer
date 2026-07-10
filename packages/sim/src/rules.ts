@@ -635,6 +635,27 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 4,
+    upgradeTo: 'ADVPOWER',
+    upgradeCost: 200,
+  },
+  ADVPOWER: {
+    name: 'Fortschr. Kraftwerk',
+    maxHp: 900,
+    cost: 500,
+    buildTime: 90,
+    // Double the base plant's output — the high-yield upgrade for a power-hungry
+    // base. Reached only by upgrading a Kraftwerk, so it's not in the build menu.
+    power: 300,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: ['CONYARD'],
+    buildable: false,
+    factions: null,
+    sight: 4,
   },
   REFINERY: {
     name: 'Raffinerie',
