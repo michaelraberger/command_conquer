@@ -882,7 +882,14 @@
         border-radius: 8px;
         padding: 26px 30px;
         width: 320px;
+        /* Nie höher als der Viewport — das Panel scrollt selbst. */
+        max-height: 92vh;
+        overflow-y: auto;
         box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+      }
+      /* Startbildschirm: konstante Breite über alle Tabs (Gefecht/Karten/Laden). */
+      #start .panel {
+        width: min(640px, 92vw);
       }
       .panel h1 {
         margin: 0 0 4px;
@@ -1005,8 +1012,6 @@
         display: block;
       }
       .panel .list {
-        max-height: 46vh;
-        overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -1027,8 +1032,9 @@
         font-size: 12px;
       }
       .list-row canvas {
-        width: 56px;
-        height: 56px;
+        width: 76px;
+        height: 76px;
+        object-fit: contain;
         border-radius: 4px;
         image-rendering: pixelated;
         background: #0e1319;
@@ -1050,14 +1056,24 @@
       }
       .list-row .actions {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
         gap: 4px;
+        flex: none;
+      }
+      /* Eigene Karten haben 4 Aktionen: als 2×2-Raster, damit der Titel Platz behält. */
+      .list-row .actions:has(button:nth-child(3)) {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
       }
       .list-row .actions button {
         width: auto;
         margin: 0;
-        padding: 4px 8px;
+        padding: 5px 10px;
         font-size: 11px;
+        white-space: nowrap;
       }
       .list-row .actions button.subtle {
         background: #16222f;
@@ -1662,6 +1678,7 @@
             <button class="swatch" data-ed-terrain="tree" style="background: #2e4a1e" title="Wald"></button>
             <button class="swatch" data-ed-terrain="ice" style="background: #bcdbe9" title="Eis (begehbar mit 60 % Tempo, nicht bebaubar, blockiert Schiffe)"></button>
             <button class="swatch" data-ed-terrain="sand" style="background: #d6bd82" title="Wüste"></button>
+            <button class="swatch" data-ed-terrain="bridge" style="background: #a67c47" title="Brücke (begehbar, Schiffe fahren darunter durch, nicht bebaubar)"></button>
           </div>
           <h3>Rohstoffe</h3>
           <div class="row">
