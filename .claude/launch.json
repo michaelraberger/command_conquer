@@ -18,6 +18,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "packages/client", "--port", "5174", "--strictPort"],
       "port": 5174
+    },
+    {
+      "name": "client-dev-5175",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "packages/client", "--port", "5175", "--strictPort"],
+      "port": 5175
     }
   ]
 }
