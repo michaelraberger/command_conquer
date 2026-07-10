@@ -771,6 +771,426 @@
       #end .panel {
         text-align: center;
       }
+
+      .panel button.subtle {
+        background: #16222f;
+        border-color: #2c3a4a;
+        color: #8fa1b3;
+      }
+      .panel button.subtle:hover {
+        background: #1c2b3a;
+      }
+      .panel .list-heading {
+        margin: 0 0 8px;
+        font-size: 11px;
+        color: #8fa1b3;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      /* Start-screen tabs (Gefecht / Karten / Laden) */
+      .tab-nav {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .tab-nav button {
+        flex: 1;
+        margin: 0;
+        padding: 6px;
+        font-size: 12px;
+        background: #16222f;
+        border: 1px solid #2c3a4a;
+        color: #8fa1b3;
+      }
+      .tab-nav button.active {
+        background: #24405c;
+        border-color: #4da6ff;
+        color: #fff;
+      }
+      .tab-panel {
+        display: none;
+      }
+      .tab-panel.active {
+        display: block;
+      }
+      .panel .list {
+        max-height: 46vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .panel .list-empty {
+        color: #8fa1b3;
+        font-size: 12px;
+        padding: 8px 2px;
+      }
+      .list-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid #2c3a4a;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 12px;
+      }
+      .list-row canvas {
+        width: 56px;
+        height: 56px;
+        border-radius: 4px;
+        image-rendering: pixelated;
+        background: #0e1319;
+        flex: none;
+      }
+      .list-row .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .list-row .title {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .list-row .meta {
+        color: #8fa1b3;
+        font-size: 11px;
+      }
+      .list-row .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .list-row .actions button {
+        width: auto;
+        margin: 0;
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .list-row .actions button.subtle {
+        background: #16222f;
+        border-color: #2c3a4a;
+        color: #8fa1b3;
+      }
+
+      /* Auth box in the start panel + login dialog */
+      #auth-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 12px;
+        color: #8fa1b3;
+      }
+      #auth-box button {
+        width: auto;
+        margin: 0;
+        padding: 5px 10px;
+        font-size: 11px;
+      }
+      #auth-box .username {
+        color: #d7e0ea;
+        font-weight: 600;
+      }
+      .dialog {
+        z-index: 30;
+      }
+      .dialog .panel label {
+        display: block;
+        margin: 0 0 4px;
+        color: #8fa1b3;
+        font-size: 11px;
+      }
+      .dialog .panel input {
+        width: 100%;
+        box-sizing: border-box;
+        background: #0e1319;
+        border: 1px solid #2c3a4a;
+        border-radius: 5px;
+        color: #d7e0ea;
+        font: inherit;
+        padding: 7px 8px;
+        margin-bottom: 10px;
+      }
+      .dialog .panel input:focus {
+        outline: none;
+        border-color: #4da6ff;
+      }
+      .form-error {
+        color: #ff8a7a;
+        font-size: 11px;
+        min-height: 14px;
+        margin-bottom: 8px;
+      }
+      .form-ok {
+        color: #6fd86a;
+        font-size: 11px;
+        min-height: 14px;
+        margin-bottom: 8px;
+      }
+
+      /* Map editor */
+      #editor {
+        position: fixed;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        background: #0b0f14;
+        color: #d7e0ea;
+        z-index: 20;
+        font-size: 12px;
+      }
+      #ed-topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: #10151b;
+        border-bottom: 1px solid #2c3a4a;
+        flex-wrap: wrap;
+      }
+      #ed-topbar input,
+      #ed-topbar select {
+        background: #0e1319;
+        border: 1px solid #2c3a4a;
+        border-radius: 5px;
+        color: #d7e0ea;
+        font: inherit;
+        padding: 6px 8px;
+      }
+      #ed-name {
+        width: 200px;
+      }
+      #ed-topbar button {
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        padding: 6px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #ed-topbar button:hover {
+        background: #2d5175;
+      }
+      #ed-topbar button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      #ed-topbar button.subtle {
+        background: #16222f;
+        border-color: #2c3a4a;
+        color: #8fa1b3;
+      }
+      #ed-main {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      #ed-tools {
+        width: 168px;
+        flex: none;
+        background: #10151b;
+        border-right: 1px solid #2c3a4a;
+        padding: 10px;
+        overflow-y: auto;
+      }
+      #ed-tools h3 {
+        margin: 10px 0 6px;
+        font-size: 11px;
+        color: #8fa1b3;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      #ed-tools h3:first-child {
+        margin-top: 0;
+      }
+      #ed-tools .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      #ed-tools button {
+        background: #16222f;
+        border: 1px solid #2c3a4a;
+        border-radius: 5px;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 11px;
+        padding: 6px 8px;
+        cursor: pointer;
+      }
+      #ed-tools button.active {
+        border-color: #4da6ff;
+        background: #24405c;
+      }
+      #ed-tools .swatch {
+        width: 32px;
+        height: 26px;
+        padding: 0;
+      }
+      #ed-canvas-wrap {
+        flex: 1;
+        position: relative;
+        min-width: 0;
+      }
+      #ed-canvas {
+        position: absolute;
+        inset: 0;
+        cursor: crosshair;
+        touch-action: none;
+      }
+      #ed-statusbar {
+        padding: 7px 12px;
+        background: #10151b;
+        border-top: 1px solid #2c3a4a;
+        min-height: 18px;
+      }
+      .ed-status-error {
+        color: #ff8a7a;
+      }
+      .ed-status-ok {
+        color: #6fd86a;
+      }
+      .ed-status-info {
+        color: #8fa1b3;
+      }
+      /* "Was ist neu" — bottom-left corner link + changelog panel (Swiper
+         carousel) that opens right above it. Link z 11: above the fullscreen
+         start screen (z 10) so it is reachable both on the menu and in-game.
+         Panel z 11, below the tour (z 12). */
+      #changelog-link {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        z-index: 11;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16, 20, 26, 0.9);
+        border: 1px solid #2c3a4a;
+        border-radius: 12px;
+        color: #8fa1b3;
+        font-size: 11px;
+        padding: 4px 10px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      #changelog-link:hover {
+        border-color: #4da6ff;
+        color: #d7e0ea;
+      }
+      #changelog-dot {
+        display: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #e04a3a;
+      }
+      #changelog-link.unseen #changelog-dot {
+        display: block;
+      }
+      /* Invisible fullscreen catcher (click outside closes); the card itself
+         floats above the corner link, popover-style — no dimmed backdrop. */
+      #changelog {
+        position: fixed;
+        inset: 0;
+        display: none;
+        background: transparent;
+        z-index: 11;
+      }
+      #changelog.open {
+        display: block;
+      }
+      #changelog .changelog-card {
+        position: absolute;
+        left: 10px;
+        bottom: 44px; /* right above the "Was ist neu" link */
+        background: rgba(16, 20, 26, 0.97);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 20px 24px;
+        width: 480px;
+        max-width: calc(100vw - 240px);
+        max-height: calc(100vh - 70px);
+        overflow-y: auto;
+        color: #d7e0ea;
+        font-size: 13px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+      }
+      #changelog h2 {
+        margin: 0 0 12px;
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+      #changelog .changelog-x {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        background: none;
+        border: none;
+        color: #8fa1b3;
+        font: inherit;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      #changelog .changelog-x:hover {
+        color: #d7e0ea;
+      }
+      #changelog .swiper {
+        --swiper-navigation-color: #4da6ff;
+        --swiper-navigation-size: 26px;
+        --swiper-pagination-color: #4da6ff;
+        --swiper-pagination-bullet-inactive-color: #8fa1b3;
+        padding: 0 30px 26px; /* room for nav arrows + pagination bullets */
+      }
+      #changelog .swiper-slide img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 8 / 5; /* stable card height even before/without the image */
+        object-fit: cover;
+        border: 1px solid #2c3a4a;
+        border-radius: 4px;
+        background: #0e1319;
+      }
+      #changelog .cl-date {
+        margin: 10px 0 2px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #8fa1b3;
+      }
+      #changelog .swiper-slide h3 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+      #changelog .swiper-slide p {
+        margin: 0;
+        line-height: 1.5;
+        color: #c3ced9;
+      }
+      #changelog .cl-empty {
+        color: #8fa1b3;
+        text-align: center;
+        padding: 24px 0;
+      }
+      #changelog #changelog-close {
+        margin-top: 14px;
+        width: 100%;
+        background: #24405c;
+        border: 1px solid #4da6ff;
+        color: #fff;
+        font: inherit;
+        padding: 8px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #changelog #changelog-close:hover {
+        background: #2d5175;
+      }
     </style>
   </head>
   <body>
@@ -867,11 +1287,39 @@
       </div>
     </div>
 
+    <a id="changelog-link" href="#">Was ist neu<span id="changelog-dot"></span></a>
+    <div id="changelog">
+      <div class="changelog-card">
+        <h2>Was ist neu</h2>
+        <button class="changelog-x" title="Schließen">×</button>
+        <div class="swiper">
+          <div class="swiper-wrapper"><!-- slides injected by changelog.ts --></div>
+          <div class="swiper-button-prev"></div>
+          <div class="swiper-button-next"></div>
+          <div class="swiper-pagination"></div>
+        </div>
+        <button id="changelog-close">Alles klar</button>
+      </div>
+    </div>
+
     <div id="start" class="fullscreen" style="display: flex">
       <canvas id="start-bg"></canvas>
       <div class="panel">
         <h1>CAC</h1>
         <div class="sub">Echtzeitstrategie im Browser</div>
+        <div id="auth-box" style="display: none">
+          <span id="auth-state">Nicht angemeldet</span>
+          <span>
+            <button id="auth-open">Anmelden</button>
+            <button id="auth-logout" style="display: none">Abmelden</button>
+          </span>
+        </div>
+        <div class="tab-nav" id="start-tabs" style="display: none">
+          <button data-tab="gefecht" class="active">Gefecht</button>
+          <button data-tab="karten">Karten</button>
+          <button data-tab="laden">Laden</button>
+        </div>
+        <div id="tab-gefecht" class="tab-panel active">
         <fieldset>
           <legend>Fraktion</legend>
           <label><input type="radio" name="faction" value="ALLIES" checked /> Alliierte</label>
@@ -918,6 +1366,23 @@
           </div>
         </fieldset>
         <button id="start-ai">Gefecht gegen KI starten</button>
+        <button id="start-editor" class="subtle">Karteneditor</button>
+        </div>
+
+        <div id="tab-karten" class="tab-panel">
+          <h3 class="list-heading" id="my-maps-heading" style="display: none">Meine Karten</h3>
+          <div class="list" id="my-maps" style="display: none"></div>
+          <h3 class="list-heading">Öffentliche Karten</h3>
+          <div class="list" id="public-maps">
+            <div class="list-empty">Lade Karten …</div>
+          </div>
+        </div>
+
+        <div id="tab-laden" class="tab-panel">
+          <div class="list" id="save-list">
+            <div class="list-empty">Lade Spielstände …</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -926,7 +1391,102 @@
         <h1>SIEG!</h1>
         <div class="sub">Die Partie ist beendet.</div>
         <button id="end-restart">Neue Partie</button>
+        <button id="end-editor" style="display: none">Zurück zum Editor</button>
       </div>
+    </div>
+
+    <div id="auth-dialog" class="fullscreen dialog">
+      <div class="panel">
+        <h1 style="font-size: 16px">Konto</h1>
+        <div class="sub">Anmelden oder neues Konto erstellen</div>
+        <div class="tab-nav">
+          <button data-authtab="login" class="active">Anmelden</button>
+          <button data-authtab="register">Registrieren</button>
+        </div>
+        <label for="auth-email">E-Mail</label>
+        <input id="auth-email" type="email" autocomplete="email" />
+        <label for="auth-password">Passwort</label>
+        <input id="auth-password" type="password" autocomplete="current-password" />
+        <div id="auth-username-row" style="display: none">
+          <label for="auth-username">Benutzername (3–24 Zeichen)</label>
+          <input id="auth-username" type="text" autocomplete="username" maxlength="24" />
+        </div>
+        <div class="form-error" id="auth-error"></div>
+        <button id="auth-submit">Anmelden</button>
+        <button id="auth-cancel" class="subtle">Abbrechen</button>
+      </div>
+    </div>
+
+    <div id="save-dialog" class="fullscreen dialog">
+      <div class="panel">
+        <h1 style="font-size: 16px">Spiel speichern</h1>
+        <div class="sub">Die Partie wird währenddessen pausiert.</div>
+        <label for="save-name">Name des Spielstands</label>
+        <input id="save-name" type="text" maxlength="60" />
+        <div class="form-error" id="save-error"></div>
+        <button id="save-confirm">Speichern</button>
+        <button id="save-cancel" class="subtle">Abbrechen</button>
+      </div>
+    </div>
+
+    <div id="editor">
+      <div id="ed-topbar">
+        <strong>Karteneditor</strong>
+        <input id="ed-name" type="text" maxlength="60" placeholder="Kartenname" />
+        <select id="ed-size">
+          <option value="48">48 × 48 (klein)</option>
+          <option value="64" selected>64 × 64 (normal)</option>
+          <option value="96">96 × 96 (groß)</option>
+        </select>
+        <span style="flex: 1"></span>
+        <button id="ed-check" class="subtle">Prüfen</button>
+        <button id="ed-undo" class="subtle">Rückgängig</button>
+        <button id="ed-new" class="subtle">Neu</button>
+        <button id="ed-test">Testspiel</button>
+        <button id="ed-save">In Cloud speichern</button>
+        <button id="ed-back" class="subtle">Zurück</button>
+      </div>
+      <div id="ed-main">
+        <div id="ed-tools">
+          <h3>Gelände</h3>
+          <div class="row">
+            <button class="swatch" data-ed-terrain="dirt" style="background: #8a6f4d" title="Erde"></button>
+            <button class="swatch" data-ed-terrain="grass" style="background: #4d7a35" title="Gras"></button>
+            <button class="swatch" data-ed-terrain="water" style="background: #2b5d8a" title="Wasser"></button>
+            <button class="swatch" data-ed-terrain="rock" style="background: #7d7a72" title="Felsen"></button>
+            <button class="swatch" data-ed-terrain="tree" style="background: #2e4a1e" title="Wald"></button>
+          </div>
+          <h3>Rohstoffe</h3>
+          <div class="row">
+            <button class="swatch" data-ed-res="ore" style="background: #d9a62e" title="Erz"></button>
+            <button class="swatch" data-ed-res="gems" style="background: #9d7bff" title="Edelsteine"></button>
+          </div>
+          <h3>Werkzeug</h3>
+          <div class="row">
+            <button data-ed-tool="terrain" class="active">Pinsel</button>
+            <button data-ed-tool="fill">Füllen</button>
+            <button data-ed-tool="resource">Rohstoff</button>
+            <button data-ed-tool="eraser">Radierer</button>
+            <button data-ed-tool="spawn">Startpunkt</button>
+          </div>
+          <h3>Pinselgröße</h3>
+          <div class="row">
+            <button data-ed-brush="1">1</button>
+            <button data-ed-brush="3" class="active">3</button>
+            <button data-ed-brush="5">5</button>
+          </div>
+          <h3>Hinweise</h3>
+          <div style="color: #8fa1b3; font-size: 11px; line-height: 1.5">
+            Startpunkt-Werkzeug: Klick setzt (max. 6), Klick auf Punkt entfernt,
+            Ziehen verschiebt. Jede Basis braucht freie Erde/Gras im Umkreis von
+            4 Feldern und Erz in der Nähe.
+          </div>
+        </div>
+        <div id="ed-canvas-wrap">
+          <canvas id="ed-canvas"></canvas>
+        </div>
+      </div>
+      <div id="ed-statusbar"><span id="ed-status" class="ed-status-info"></span></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

@@ -1,4 +1,4 @@
-import { createGame, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
+import { applyBalance, createGame, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
 import { Application, Container } from 'pixi.js';
 import { sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
@@ -16,10 +16,11 @@ import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
 import { Alerts } from './ui/alerts.js';
+import { Changelog } from './ui/changelog.js';
 import { DebugOverlay } from './ui/debug.js';
 import { Minimap } from './ui/minimap.js';
 import { PlacementMode } from './ui/placement.js';
-import { showEndScreen, showStartScreen, type StartChoice } from './ui/screens.js';
+import { showEndScreen, showStartScreen, type StartAction, type StartChoice } from './ui/screens.js';
 import { GroupBar } from './ui/groupBar.js';
 import { HelpMenu } from './ui/help.js';
 import { OnboardingTour } from './ui/tour.js';
@@ -64,7 +65,7 @@ function loadConfig(): Promise<RawConfig | null> {
  * and the ore economy without touching code. The `cheats` section is stripped
  * out here; it is a client-only naming convenience, not a balance value.
  */
-async function loadBalance(): Promise<BalanceConfig | undefined> {
+export async function loadBalance(): Promise<BalanceConfig | undefined> {
   const cfg = await loadConfig();
   if (!cfg) return undefined;
   const { cheats: _cheats, ...balance } = cfg;
@@ -98,8 +99,19 @@ async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
     mapWidth: choice.mapSize,
     mapHeight: choice.mapSize,
     balance: await loadBalance(),
+    customMap: choice.customMap,
   };
   return { state: createGame(seed, options), driver: new LocalDriver() };
+}
+
+/** Extra context a running game carries for the save dialog. */
+export interface GameMeta {
+  /** Balance snapshot the game was created with (goes into save rows). */
+  balance?: BalanceConfig | undefined;
+  /** Display name of the map ("Ödland 64" or the custom map's name). */
+  mapLabel?: string | undefined;
+  /** Editor test match — the end screen offers "Zurück zum Editor". */
+  testPlay?: boolean | undefined;
 }
 
 async function boot(): Promise<void> {
@@ -107,9 +119,65 @@ async function boot(): Promise<void> {
   await app.init({ resizeTo: window, background: 0x101418, antialias: true });
   document.getElementById('app')!.appendChild(app.canvas);
 
-  const choice = await showStartScreen();
-  const { state, driver } = await setupFromChoice(choice);
+  // "Was ist neu": corner link is always live; the popup auto-opens over the
+  // start screen when unseen changelog entries exist. No game dependencies.
+  const changelog = new Changelog();
+  void changelog.init().then(() => changelog.maybeAutoOpen());
 
+  // "Zurück zum Editor" after a test match reloads the page with this flag set
+  // (the app is one-shot per page load; the editor draft lives in localStorage).
+  if (localStorage.getItem('cac-reopen') === 'editor') {
+    localStorage.removeItem('cac-reopen');
+    await runAction(app, { kind: 'editor' });
+    return;
+  }
+
+  // Cloud UI (login box, map gallery, save list) — no-ops without Supabase env.
+  const [{ initAuthUi }, { initStartTabs }] = await Promise.all([
+    import('./ui/authUi.js'),
+    import('./ui/gallery.js'),
+  ]);
+  initAuthUi();
+  initStartTabs();
+
+  const action = await showStartScreen();
+  await runAction(app, action);
+}
+
+/** Dispatches a start-screen action; each branch ends in a running game. */
+async function runAction(app: Application, action: StartAction): Promise<void> {
+  if (action.kind === 'editor') {
+    const { openEditor } = await import('./editor/editor.js');
+    await openEditor(app, action.map ? { map: action.map, cloudId: action.cloudId ?? null } : undefined);
+    return;
+  }
+  if (action.kind === 'resume') {
+    // Balance is module-global and NOT part of the serialized state — it must
+    // be re-applied before the first tick or unit stats silently differ.
+    applyBalance(action.balance);
+    session.localPlayer = 0;
+    await startGame(app, action.state, new LocalDriver(), {
+      balance: action.balance,
+      mapLabel: action.mapLabel,
+    });
+    return;
+  }
+  const { state, driver } = await setupFromChoice(action.choice);
+  await startGame(app, state, driver, {
+    balance: await loadBalance(),
+    mapLabel: action.choice.mapLabel,
+  });
+}
+
+/** Builds the full render/input/UI stack around an existing state and starts
+ *  the loop. Works for fresh games and deserialized saves alike — everything
+ *  here derives from the state. */
+export async function startGame(
+  app: Application,
+  state: GameState,
+  driver: TickDriver,
+  meta: GameMeta = {},
+): Promise<void> {
   const textures = createTextures(app.renderer);
 
   const world = new Container();
@@ -159,6 +227,8 @@ async function boot(): Promise<void> {
   new HelpMenu();
   const tour = new OnboardingTour();
   tour.maybeShowOnFirstRun();
+  const { initSaveDialog } = await import('./ui/saveDialog.js');
+  initSaveDialog(state, hotkeys, meta);
 
   ore.sync(state);
   fog.sync(state, session.localPlayer);
@@ -184,7 +254,8 @@ async function boot(): Promise<void> {
       alerts,
       groups,
       groupBar,
-      onGameOver: (winner) => showEndScreen(winner === session.localPlayer),
+      onGameOver: (winner) =>
+        showEndScreen(winner === session.localPlayer, { backToEditor: meta.testPlay === true }),
     },
     driver,
   );
@@ -206,6 +277,7 @@ async function boot(): Promise<void> {
       hotkeys,
       alerts,
       groups,
+      meta,
     };
   }
 }

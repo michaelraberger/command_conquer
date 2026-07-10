@@ -1,0 +1,51 @@
+[
+  {
+    "id": "2026-07-09-luftlandung",
+    "date": "2026-07-09",
+    "title": "Luftlandung (beide Fraktionen)",
+    "text": "Neue Unterstützungs-Power: Sobald ein Flugplatz steht, lädt unten in der Seitenleiste die kostenlose Luftlandung (4:00). Ein Transportflugzeug wirft 6 Schützen (Alliierte) bzw. 9 Schützen (Sowjets) an jeder Bodenposition ab — aber Vorsicht: Flak kann das Flugzeug samt Truppen abschießen.",
+    "image": "changelog/luftlandung.png"
+  },
+  {
+    "id": "2026-07-09-eiserner-vorhang",
+    "date": "2026-07-09",
+    "title": "Eiserner Vorhang (Sowjets)",
+    "text": "Neue Superwaffe: Der Eiserne Vorhang ($3500, nur 1× pro Spieler) macht Fahrzeuge, Schiffe und Gebäude im Zielgebiet 10 Sekunden lang unverwundbar — sie überstehen sogar Atomraketen. Infanterie und Flugzeuge bleiben ungeschützt. Geschützte Einheiten glühen metallisch rot.",
+    "image": "changelog/eiserner-vorhang.png"
+  },
+  {
+    "id": "2026-07-09-mauer-deckung",
+    "date": "2026-07-09",
+    "title": "Mauern geben jetzt Deckung",
+    "text": "Direktbeschuss kommt nicht mehr über Mauern und Tore hinweg — in beide Richtungen. Ausnahmen: Artillerie und V3 (Bogenschuss), Flugzeuge und Verteidigungstürme. Angreifer ohne Belagerungswaffen müssen sich durch die Mauer schießen. Mauerring plus Türme dahinter ist damit eine echte Verteidigung.",
+    "image": "changelog/mauer-deckung.png"
+  },
+  {
+    "id": "2026-07-09-zielpriorisierung",
+    "date": "2026-07-09",
+    "title": "Klügere Zielwahl",
+    "text": "Einheiten und Türme priorisieren bei automatischer Zielwahl jetzt Bedrohungen: Erst Kampfeinheiten, dann Verteidigungsgebäude, dann erst Sammler und passive Gebäude. Ein Sammler neben einem Panzer fängt keine Schüsse mehr ab. Der gezielte Angriffsbefehl bleibt unverändert.",
+    "image": "changelog/zielpriorisierung.png"
+  },
+  {
+    "id": "2026-07-09-radar-v3",
+    "date": "2026-07-09",
+    "title": "Radarturm & V3-Werfer (Sowjets)",
+    "text": "Der Radarturm ($1000) deckt mit der größten Sichtweite im Spiel einen riesigen Kartenfleck auf — und schaltet den V3-Werfer frei: zerbrechliche Belagerungsartillerie ($800) mit der längsten Bodenreichweite im Spiel, deren Raketen Gebäude verwüsten.",
+    "image": "changelog/radar-v3.png"
+  },
+  {
+    "id": "2026-07-09-prisma-turm",
+    "date": "2026-07-09",
+    "title": "Prisma-Turm (Alliierte)",
+    "text": "Neue Basisverteidigung: Der Prisma-Turm ($1500, braucht Flugplatz) feuert einen gebündelten Lichtstrahl auf Bodenziele. Stehen mehrere Türme nah beieinander, verketten sie sich sichtbar und verstärken den Strahl — bis zu +80 % Schaden. Bei Strommangel schaltet er ab.",
+    "image": "changelog/prisma-turm.png"
+  },
+  {
+    "id": "2026-07-09-neue-einheiten",
+    "date": "2026-07-09",
+    "title": "Scharfschütze, Sturmjet & Tor",
+    "text": "Drei Neuzugänge für die Alliierten: Der Scharfschütze schaltet Infanterie auf große Distanz aus, der Sturmjet fliegt Erdkampf-Angriffe gegen Bodenziele — und das Tor ist eine Mauer, die sich nur für eigene Einheiten öffnet.",
+    "image": "changelog/neue-einheiten.png"
+  }
+]

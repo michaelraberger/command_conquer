@@ -1,14 +1,13 @@
 import {
-  RESOURCE_GEMS,
-  TERRAIN_GRASS,
-  TERRAIN_ROCK,
-  TERRAIN_TREE,
-  TERRAIN_WATER,
   createGame,
   type AiDifficulty,
+  type BalanceConfig,
+  type CustomMapData,
   type Faction,
+  type GameState,
   type MapType,
 } from '@cac/sim';
+import { colorCss, paintMapData } from '../render/palette.js';
 
 /** Fixed seed for the start-screen thumbnails — a representative sample; the
  * actual match rolls its own seed, so details (blobs, islets) will vary. */
@@ -18,32 +17,9 @@ type MapState = ReturnType<typeof createGame>;
 
 /** Draws a top-down 1:1 map (terrain, resources, bases) into `ctx`. */
 function paintMap(ctx: CanvasRenderingContext2D, state: MapState): void {
-  const img = ctx.createImageData(state.mapWidth, state.mapHeight);
-  for (let i = 0; i < state.terrain.length; i++) {
-    const t = state.terrain[i]!;
-    const [r, g, b] =
-      t === TERRAIN_WATER
-        ? [43, 93, 138]
-        : t === TERRAIN_ROCK
-          ? [125, 122, 114]
-          : t === TERRAIN_TREE
-            ? [46, 74, 30]
-            : t === TERRAIN_GRASS
-              ? [77, 122, 53]
-              : [138, 111, 77];
-    img.data[i * 4] = r;
-    img.data[i * 4 + 1] = g;
-    img.data[i * 4 + 2] = b;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  for (let i = 0; i < state.ore.length; i++) {
-    if (state.ore[i]! === 0) continue;
-    ctx.fillStyle = state.resourceKind[i] === RESOURCE_GEMS ? '#9d7bff' : '#d9a62e';
-    ctx.fillRect(i % state.mapWidth, Math.floor(i / state.mapWidth), 1, 1);
-  }
+  paintMapData(ctx, state);
   for (const b of state.buildings) {
-    ctx.fillStyle = `#${state.players[b.owner]!.color.toString(16).padStart(6, '0')}`;
+    ctx.fillStyle = colorCss(state.players[b.owner]!.color);
     ctx.fillRect(b.cx - 1, b.cy - 1, 4, 4);
   }
 }
@@ -99,10 +75,25 @@ export interface StartChoice {
   opponents: number;
   /** Map side length in cells (48 klein / 64 normal / 96 groß). */
   mapSize: number;
+  /** Hand-authored map from the gallery — overrides mapType/mapSize. */
+  customMap?: CustomMapData | undefined;
+  /** Display name of the map (for save-game metadata). */
+  mapLabel?: string | undefined;
 }
 
-/** Blocking start screen; resolves once the player starts a skirmish. */
-export function showStartScreen(): Promise<StartChoice> {
+/** What the player chose on the start screen. */
+export type StartAction =
+  | { kind: 'skirmish'; choice: StartChoice }
+  | {
+      kind: 'resume';
+      state: GameState;
+      balance?: BalanceConfig | undefined;
+      mapLabel?: string | undefined;
+    }
+  | { kind: 'editor'; map?: CustomMapData | undefined; cloudId?: string | undefined };
+
+/** Blocking start screen; resolves once the player picks an action. */
+export function showStartScreen(): Promise<StartAction> {
   const root = document.getElementById('start')!;
   root.style.display = 'flex';
   renderMapPreviews();
@@ -130,24 +121,51 @@ export function showStartScreen(): Promise<StartChoice> {
   window.addEventListener('resize', paintBackdrop);
 
   return new Promise((resolve) => {
-    document.getElementById('start-ai')!.addEventListener('click', () => {
+    const finish = (action: StartAction): void => {
       root.style.display = 'none';
-      resolve({
-        faction: faction(),
-        difficulty: difficulty(),
-        mapType: mapType(),
-        opponents: opponents(),
-        mapSize: mapSize(),
+      resolve(action);
+    };
+    document.getElementById('start-ai')!.addEventListener('click', () => {
+      finish({
+        kind: 'skirmish',
+        choice: {
+          faction: faction(),
+          difficulty: difficulty(),
+          mapType: mapType(),
+          opponents: opponents(),
+          mapSize: mapSize(),
+        },
       });
     });
+    document.getElementById('start-editor')?.addEventListener('click', () => {
+      finish({ kind: 'editor' });
+    });
+    startScreenHooks.onAction = finish;
   });
 }
 
+/** Lets later-added start-screen panels (gallery, save list) resolve the
+ *  start promise without threading callbacks through showStartScreen. */
+export const startScreenHooks: { onAction: ((action: StartAction) => void) | null } = {
+  onAction: null,
+};
+
 /** Victory/defeat overlay. */
-export function showEndScreen(won: boolean): void {
+export function showEndScreen(won: boolean, opts: { backToEditor?: boolean } = {}): void {
   const root = document.getElementById('end')!;
   root.style.display = 'flex';
   root.querySelector('h1')!.textContent = won ? 'SIEG!' : 'NIEDERLAGE';
   root.querySelector('h1')!.style.color = won ? '#53c94f' : '#e04a3a';
   document.getElementById('end-restart')!.addEventListener('click', () => location.reload());
+
+  // After an editor test match: reload with the reopen flag, boot() then jumps
+  // straight back into the editor (the draft lives in localStorage).
+  const editorBtn = document.getElementById('end-editor') as HTMLButtonElement | null;
+  if (editorBtn) {
+    editorBtn.style.display = opts.backToEditor ? '' : 'none';
+    editorBtn.addEventListener('click', () => {
+      localStorage.setItem('cac-reopen', 'editor');
+      location.reload();
+    });
+  }
 }

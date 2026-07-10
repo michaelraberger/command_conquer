@@ -1,14 +1,6 @@
-import {
-  FOG_EXPLORED,
-  FOG_HIDDEN,
-  RESOURCE_GEMS,
-  TERRAIN_GRASS,
-  TERRAIN_ROCK,
-  TERRAIN_TREE,
-  TERRAIN_WATER,
-  type GameState,
-} from '@cac/sim';
+import { FOG_EXPLORED, FOG_HIDDEN, type GameState } from '@cac/sim';
 import { cellToScreen } from '../render/iso.js';
+import { colorCss, resourceCss, terrainRgb } from '../render/palette.js';
 import { session } from '../session.js';
 import type { Camera } from '../input/camera.js';
 
@@ -48,17 +40,7 @@ export class Minimap {
     const ctx = this.base.getContext('2d')!;
     const img = ctx.createImageData(this.state.mapWidth, this.state.mapHeight);
     for (let i = 0; i < this.state.terrain.length; i++) {
-      const t = this.state.terrain[i]!;
-      const [r, g, b] =
-        t === TERRAIN_WATER
-          ? [43, 93, 138]
-          : t === TERRAIN_ROCK
-            ? [125, 122, 114]
-            : t === TERRAIN_TREE
-              ? [46, 74, 30]
-              : t === TERRAIN_GRASS
-                ? [77, 122, 53]
-                : [138, 111, 77];
+      const [r, g, b] = terrainRgb(this.state.terrain[i]!);
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = g;
       img.data[i * 4 + 2] = b;
@@ -74,7 +56,7 @@ export class Minimap {
 
     for (let i = 0; i < state.ore.length; i++) {
       if (state.ore[i]! === 0) continue;
-      ctx.fillStyle = state.resourceKind[i] === RESOURCE_GEMS ? '#9d7bff' : '#d9a62e';
+      ctx.fillStyle = resourceCss(state.resourceKind[i]!);
       ctx.fillRect(i % w, Math.floor(i / w), 1, 1);
     }
     // Team colors follow the faction (Allies blue, Soviets red).
@@ -113,10 +95,6 @@ export class Minimap {
       }
     }
   }
-}
-
-function colorCss(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`;
 }
 
 /** Lightens a color toward white so unit dots read brighter than buildings. */
