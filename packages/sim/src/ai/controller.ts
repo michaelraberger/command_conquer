@@ -350,7 +350,18 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
         countUnits(state, player.id, 'DESTROYER') +
         countUnits(state, player.id, 'GUNBOAT') +
         countUnits(state, player.id, 'SUB');
-      if (ships < params.navalCap) {
+      // Siege support once the surface fleet stands: a single missile sub —
+      // its rockets outrange every shore defense. The easy AI (navalCap 1)
+      // skips it; the Techzentrum requirement gates it to the late game.
+      const wantMissileSub =
+        params.navalCap >= 2 &&
+        ships >= params.navalCap &&
+        countUnits(state, player.id, 'MISSILESUB') < 1 &&
+        countBuildings(state, player.id, 'TECHCENTER') > 0 &&
+        player.credits > unitRule('MISSILESUB').cost + 400;
+      if (wantMissileSub) {
+        startProduction(state, player.id, 'MISSILESUB');
+      } else if (ships < params.navalCap) {
         const flagship: UnitType = availableToFaction(unitRule('DESTROYER').factions, player.faction)
           ? 'DESTROYER'
           : availableToFaction(unitRule('SUB').factions, player.faction)

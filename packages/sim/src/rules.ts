@@ -463,6 +463,25 @@ export const UNIT_RULES = {
     navalOnly: true,
     submerged: true,
   },
+  MISSILESUB: {
+    name: 'Raketen-U-Boot',
+    maxHp: 200,
+    speed: 22,
+    radius: 130,
+    armor: 'light',
+    // Submerged siege platform for both factions: the longest reach in the
+    // game, arcing rockets that flatten shore structures — paid for with a
+    // glacial reload, a thin hull and a steep price. Cannot touch aircraft;
+    // only antiSub weapons (destroyer, gunboat) can hunt it.
+    weapon: { ...weapon(160, 13, 110, 70, { none: 70, light: 90, heavy: 110 }, 'ROCKET'), arcing: true },
+    cost: 2000,
+    buildTime: 160,
+    category: 'naval',
+    requires: ['SHIPYARD', 'TECHCENTER'],
+    factions: null,
+    sight: 7,
+    submerged: true,
+  },
   TRANSPORT: {
     name: 'Transportschiff',
     maxHp: 400,

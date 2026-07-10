@@ -252,6 +252,7 @@ export class EntityRenderer {
       GUNBOAT: this.tex.gunboat,
       DESTROYER: this.tex.destroyer,
       SUB: this.tex.sub,
+      MISSILESUB: this.tex.missilesub,
       TRANSPORT: this.tex.transport,
     };
     return sets[unit.type][unit.facing]!;
