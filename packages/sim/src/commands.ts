@@ -300,7 +300,11 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         if (cmd.cheat === 'MONEY') player.credits += CHEAT_MONEY;
         else if (cmd.cheat === 'POWER') player.powerBonus += CHEAT_POWER;
         else if (cmd.cheat === 'REVEAL') player.mapRevealed = true;
-        else if (cmd.cheat === 'MOTHERLOAD') player.motherload = true;
+        else if (cmd.cheat === 'MOTHERLOAD') {
+          // The mother of all cheats includes full map vision.
+          player.motherload = true;
+          player.mapRevealed = true;
+        }
         break;
       }
       case 'SET_RALLY': {

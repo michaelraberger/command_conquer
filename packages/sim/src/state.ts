@@ -149,8 +149,9 @@ export interface Player {
   mapRevealed: boolean;
   /** Cheat: flat extra power added to the balance. */
   powerBonus: number;
-  /** Cheat (motherload): unlock every unit/building of the faction and top up
-   *  credits + power to effectively unlimited each tick. */
+  /** Cheat (motherload): unlock every unit/building of the faction, top up
+   *  credits + power to effectively unlimited each tick and (via mapRevealed,
+   *  set alongside) keep the whole map visible. */
   motherload: boolean;
   /** Completed technologies (see TECH_RULES). Plain sorted array for replay. */
   researched: TechId[];
