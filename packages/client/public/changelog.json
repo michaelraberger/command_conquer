@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-10-dauerauftraege",
+    "date": "2026-07-10",
+    "title": "Daueraufträge: Patrouille, Eskorte, Position halten",
+    "text": "Deine Truppen können jetzt eigenständig Dienst schieben. Position halten (Taste G): Die Auswahl bleibt exakt stehen und feuert auf alles in Reichweite — sie weicht nie, auch nicht beim Basis-Alarm. Patrouille (Taste Q, dann Rechtsklick): Die Einheiten pendeln zwischen ihrer aktuellen Position und dem Zielpunkt und bekämpfen alles auf der Route. Eskorte (Rechtsklick auf eine eigene Einheit): Kampfeinheiten begleiten den Schützling — perfekt für Sammler in umkämpftem Gebiet. Hubschrauber dürfen patrouillieren und halten, Kampfjets bleiben ihrem Einsatzmodell treu. Alle Tasten stehen im F1-Hilfemenü.",
+    "image": "changelog/dauerauftraege.png"
+  },
+  {
     "id": "2026-07-10-ingenieur-bohrturm",
     "date": "2026-07-10",
     "title": "Ingenieur & Erz-Bohrturm",
