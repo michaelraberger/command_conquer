@@ -1,4 +1,4 @@
-import { applyBalance, createGame, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
+import { applyBalance, createGame, tick, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
 import { Application, Container } from 'pixi.js';
 import { sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
@@ -202,8 +202,15 @@ export async function startGame(
   );
   app.stage.addChild(world);
 
-  // Dev aid: expose the live sim state for console inspection (dev only).
-  if (import.meta.env.DEV) (window as unknown as { __cacState?: unknown }).__cacState = state;
+  // Dev aid: expose the live sim state (and a manual stepper for headless
+  // tabs, where rAF never fires) for console inspection (dev only).
+  if (import.meta.env.DEV) {
+    const w = window as unknown as { __cacState?: unknown; __cacTick?: unknown };
+    w.__cacState = state;
+    w.__cacTick = (n = 1): void => {
+      for (let i = 0; i < n; i++) tick(state);
+    };
+  }
 
   const camera = new Camera(state);
   camera.attach(app.canvas);

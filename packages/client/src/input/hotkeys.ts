@@ -73,6 +73,12 @@ export class Hotkeys {
       case 'd':
         this.tryDeploy();
         break;
+      case 'g':
+        this.holdSelection();
+        break;
+      case 'q':
+        this.controls.armPatrol();
+        break;
       case 'c':
         // preventDefault so this very keystroke isn't typed into the field.
         e.preventDefault();
@@ -89,6 +95,13 @@ export class Hotkeys {
         }
       }
     }
+  }
+
+  /** G: the current selection stands fast (fires in place, never moves). */
+  private holdSelection(): void {
+    const ids = [...this.controls.selected].sort((a, b) => a - b);
+    if (ids.length === 0) return;
+    this.send({ type: 'HOLD', playerId: session.localPlayer, unitIds: ids });
   }
 
   /**

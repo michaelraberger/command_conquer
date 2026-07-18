@@ -24,6 +24,8 @@ export class Controls {
   onManualSelect: (() => void) | null = null;
   /** True while the camera is in grab-pan mode (space held) — suppresses input. */
   isPanning: (() => boolean) | null = null;
+  /** Armed via Q: the next right-click sets a patrol point instead of moving. */
+  private patrolArmed = false;
   private dragStart: { x: number; y: number } | null = null;
   private readonly dragRect: Graphics;
   private readonly canvas: HTMLCanvasElement;
@@ -65,6 +67,7 @@ export class Controls {
       return;
     }
     if (e.button === 0) {
+      this.patrolArmed = false; // a fresh selection cancels the armed patrol click
       this.dragStart = { x: e.global.x, y: e.global.y };
     } else if (e.button === 2) {
       this.issueOrder(e);
@@ -161,6 +164,11 @@ export class Controls {
     }
   }
 
+  /** Q pressed: the next right-click orders a patrol to the clicked cell. */
+  armPatrol(): void {
+    if (this.selected.size > 0) this.patrolArmed = true;
+  }
+
   /** Own carrier (transport ship or air transport) under the cursor, or null. */
   private ownTransportAt(global: { x: number; y: number }): number | null {
     let bestId: number | null = null;
@@ -187,6 +195,26 @@ export class Controls {
       if (unit.owner !== session.localPlayer) continue;
       if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
       if (unit.hp >= unitRule(unit.type).maxHp) continue; // only damaged units
+      const p = this.unitStagePos(unit.x, unit.y);
+      const dx = p.x - global.x;
+      const dy = p.y - global.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = unit.id;
+      }
+    }
+    return bestId;
+  }
+
+  /** Nearest own unit under the cursor that isn't in the selection, or null
+   *  (escort target pick — the ward can't escort itself). */
+  private ownUnitAt(global: { x: number; y: number }): number | null {
+    let bestId: number | null = null;
+    let bestDist = PICK_RADIUS * PICK_RADIUS;
+    for (const unit of this.state.units) {
+      if (unit.owner !== session.localPlayer || this.selected.has(unit.id)) continue;
+      if (unitRule(unit.type).hidden === true) continue;
       const p = this.unitStagePos(unit.x, unit.y);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
@@ -235,6 +263,7 @@ export class Controls {
   private issueOrder(e: FederatedPointerEvent): void {
     const { cx, cy } = this.cellAt(e.global);
     if (this.selected.size === 0) {
+      this.patrolArmed = false;
       if (this.selectedBuilding !== null && inBounds(this.state, cx, cy)) {
         const building = this.state.buildings.find((b) => b.id === this.selectedBuilding);
         if (building && buildingRule(building.type).produces !== null) {
@@ -250,6 +279,16 @@ export class Controls {
       return;
     }
     const unitIds = [...this.selected].sort((x, y) => x - y);
+
+    // Patrol mode (armed via Q): this right-click sets point B — the units
+    // shuttle between where they stand now and the clicked cell.
+    if (this.patrolArmed) {
+      this.patrolArmed = false;
+      if (inBounds(this.state, cx, cy)) {
+        this.send({ type: 'PATROL', playerId: session.localPlayer, unitIds, cx, cy });
+        return;
+      }
+    }
 
     // Specialists right-clicking a foreign building — engineers capture any
     // enemy/neutral building, spies infiltrate enemy storage. Must come before
@@ -341,6 +380,27 @@ export class Controls {
             targetId: targetUnitId,
           });
           const rest = unitIds.filter((id) => byId.get(id)?.type !== 'REPAIR');
+          if (rest.length > 0) {
+            this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
+          }
+          return;
+        }
+      }
+    }
+
+    // Right-clicking another own unit → armed ground/sea units escort it.
+    if (!e.ctrlKey) {
+      const wardId = this.ownUnitAt(e.global);
+      if (wardId !== null) {
+        const escorts = unitIds.filter((id) => {
+          const u = byId.get(id);
+          if (!u || u.id === wardId) return false;
+          const rule = unitRule(u.type);
+          return rule.weapon !== null && rule.air !== true;
+        });
+        if (escorts.length > 0) {
+          this.send({ type: 'ESCORT', playerId: session.localPlayer, unitIds: escorts, targetId: wardId });
+          const rest = unitIds.filter((id) => !escorts.includes(id));
           if (rest.length > 0) {
             this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
           }

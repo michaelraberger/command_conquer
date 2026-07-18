@@ -1,4 +1,4 @@
-import { SUBCELL, facingFromDelta } from '../fixed.js';
+import { SUBCELL, distSq, facingFromDelta } from '../fixed.js';
 import { findPath } from '../path/astar.js';
 import { buildingRule, unitRule, type UnitRule, type WeaponRule } from '../rules.js';
 import {
@@ -24,6 +24,9 @@ const CHASE_REPATH_INTERVAL = 10;
 /** Idle units auto-defend: they step toward an enemy within this radius (cells). */
 const GUARD_RADIUS = 8;
 const GUARD_RANGE_SQ = (GUARD_RADIUS * SUBCELL) ** 2;
+/** An escort closes up once its ward is more than this far ahead. */
+const FOLLOW_GAP = Math.round(2.5 * SUBCELL);
+const FOLLOW_GAP_SQ = FOLLOW_GAP * FOLLOW_GAP;
 
 /**
  * Targeting, chasing and firing for units. Runs BEFORE movement each tick so
@@ -38,13 +41,17 @@ export function combatSystem(state: GameState): void {
 
     // Combat aircraft with empty racks break off: drop the order and head
     // home to rearm (airbaseSystem flies idle planes back to the Flugplatz).
+    // Exception: a helicopter ordered to HOLD or PATROL keeps station even
+    // when dry — the player decides when it goes home to rearm.
     if (rule.ammo !== undefined && unit.ammo <= 0) {
-      if (unit.order !== null) {
+      const keeps = unit.order?.kind === 'HOLD' || unit.order?.kind === 'PATROL';
+      if (unit.order !== null && !keeps) {
         unit.order = null;
         unit.path = null;
         unit.pathIndex = 0;
       }
-      continue;
+      if (!keeps) continue;
+      if (unit.order?.kind === 'HOLD') continue; // hold, but nothing to shoot with
     }
 
     const order = unit.order;
@@ -86,6 +93,84 @@ export function combatSystem(state: GameState): void {
         } else {
           unit.path = path;
           unit.pathIndex = 0;
+        }
+      }
+    } else if (order && order.kind === 'HOLD') {
+      // Stand fast: fire at whatever comes into range, never move — not even
+      // when the base alarm rallies everyone else (order shields the unit).
+      const accept = unitAccept(weapon, rule);
+      const inRange = nearestThreatUnit(state, unit, weapon, weapon.rangeSq, accept);
+      if (inRange) tryFire(state, unit, { kind: 'unit', unit: inRange }, weapon);
+    } else if (order && order.kind === 'PATROL') {
+      // Fight like an attack-move, but on reaching a leg point turn around
+      // instead of going idle — the round trip repeats until reordered.
+      const target = acquireTarget(state, unit, weapon, rule);
+      if (target) {
+        unit.path = null;
+        tryFire(state, unit, target, weapon);
+      } else if (!unit.path) {
+        const cx = unit.cell % state.mapWidth;
+        const cy = (unit.cell - cx) / state.mapWidth;
+        const [gx, gy] = order.leg === 1 ? [order.bx, order.by] : [order.ax, order.ay];
+        const dx = cx - gx;
+        const dy = cy - gy;
+        if ((dx < 0 ? -dx : dx) <= 1 && (dy < 0 ? -dy : dy) <= 1) {
+          order.leg = order.leg === 1 ? 0 : 1; // arrived — walk back
+          continue;
+        }
+        if (isAir(unit)) {
+          unit.path = [{ cx: gx, cy: gy }];
+          unit.pathIndex = 0;
+          continue;
+        }
+        const path = findPath(state, cx, cy, gx, gy, {
+          avoidUnits: false,
+          selfId: unit.id,
+          owner: unit.owner,
+          water: isNaval(unit),
+        });
+        if (!path) {
+          unit.order = null; // leg unreachable — fall back to guard stance
+        } else {
+          unit.path = path;
+          unit.pathIndex = 0;
+        }
+      }
+    } else if (order && order.kind === 'ESCORT') {
+      // Stick with the ward: halt to fight anything in range, otherwise close
+      // up whenever the ward pulls more than a couple of cells ahead.
+      const ward = state.units.find((u) => u.id === order.targetId);
+      if (!ward) {
+        unit.order = null;
+        unit.path = null;
+        unit.pathIndex = 0;
+        continue;
+      }
+      const target = acquireTarget(state, unit, weapon, rule);
+      if (target) {
+        unit.path = null;
+        tryFire(state, unit, target, weapon);
+      } else {
+        const gap = distSq(ward.x - unit.x, ward.y - unit.y);
+        if (gap <= FOLLOW_GAP_SQ) {
+          unit.path = null; // close enough — hold formation
+        } else if (!unit.path || (state.tick + unit.id) % CHASE_REPATH_INTERVAL === 0) {
+          const wcx = ward.cell % state.mapWidth;
+          const wcy = (ward.cell - wcx) / state.mapWidth;
+          const cx = unit.cell % state.mapWidth;
+          const cy = (unit.cell - cx) / state.mapWidth;
+          const path = findPath(state, cx, cy, wcx, wcy, {
+            avoidUnits: false,
+            selfId: unit.id,
+            owner: unit.owner,
+            water: isNaval(unit),
+          });
+          if (path) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.blockedTicks = 0;
+            unit.repathCount = 0;
+          }
         }
       }
     } else if (!unit.path) {
@@ -294,6 +379,8 @@ function engageOrChase(state: GameState, unit: Unit, target: Target, weapon: Wea
 }
 
 function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRule): void {
+  // Empty racks never fire (a dry patrol helicopter keeps pacing instead).
+  if (unitRule(unit.type).ammo !== undefined && unit.ammo <= 0) return;
   const aim = aimPoint(target, unit.x, unit.y);
   const dx = aim.x - unit.x;
   const dy = aim.y - unit.y;

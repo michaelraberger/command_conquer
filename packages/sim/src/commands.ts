@@ -57,6 +57,9 @@ export type Command =
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'CAPTURE'; playerId: number; unitIds: number[]; targetId: number }
+  | { type: 'HOLD'; playerId: number; unitIds: number[] }
+  | { type: 'PATROL'; playerId: number; unitIds: number[]; cx: number; cy: number }
+  | { type: 'ESCORT'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'DEPLOY'; playerId: number; unitIds: number[] }
   | { type: 'RESEARCH_START'; playerId: number; tech: string }
   | { type: 'RESEARCH_CANCEL'; playerId: number }
@@ -327,6 +330,55 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           if (unitRule(unit.type).captures !== true) continue;
           unit.order = { kind: 'CAPTURE', targetId: cmd.targetId };
           unit.path = null; // the capture system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'HOLD': {
+        // Stand fast where the unit is right now. Jets can't hold (they always
+        // fly sorties); hovering helicopters can. Unarmed units may hold too —
+        // the order shields them from the base-alarm pull.
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          const rule = unitRule(unit.type);
+          if (rule.hidden === true || (rule.air === true && rule.hover !== true)) continue;
+          unit.order = { kind: 'HOLD' };
+          unit.path = null;
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'PATROL': {
+        // Shuttle between the unit's current cell and the clicked cell. A
+        // combat order: armed ground/sea units and hovering helicopters only.
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          const rule = unitRule(unit.type);
+          if (rule.weapon === null || rule.hidden === true) continue;
+          if (rule.air === true && rule.hover !== true) continue;
+          const ax = unit.cell % state.mapWidth;
+          const ay = (unit.cell - ax) / state.mapWidth;
+          unit.order = { kind: 'PATROL', ax, ay, bx: cmd.cx, by: cmd.cy, leg: 1 };
+          unit.path = null; // combat paces the legs
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'ESCORT': {
+        // Guard an own living unit; the escort may not escort itself.
+        const ward = state.units.find((u) => u.id === cmd.targetId);
+        if (
+          !ward ||
+          ward.owner !== cmd.playerId ||
+          unitRule(ward.type).hidden === true ||
+          cmd.unitIds.includes(ward.id)
+        ) {
+          break;
+        }
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          const rule = unitRule(unit.type);
+          if (rule.weapon === null || rule.hidden === true || rule.air === true) continue;
+          if (unit.id === ward.id) continue;
+          unit.order = { kind: 'ESCORT', targetId: ward.id };
+          unit.path = null; // combat handles following
           unit.pathIndex = 0;
         }
         break;

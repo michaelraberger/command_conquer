@@ -96,6 +96,9 @@ export interface UnitRule {
   /** Combat aircraft: shots per sortie. Move orders become attack runs — fly
    *  out, engage, and once empty (or done) return to a Flugplatz to rearm. */
   ammo?: number;
+  /** Hovering aircraft (helicopter): may PATROL and HOLD in the air — jets
+   *  cannot, they always fly sorties and return to the pad. */
+  hover?: boolean;
   /** Weapon only engages ships (torpedoes) — never land targets or buildings. */
   navalOnly?: boolean;
   /** Submerged (submarine): only weapons with antiSub can hit it. */
@@ -392,6 +395,7 @@ export const UNIT_RULES = {
     sight: 8,
     air: true,
     ammo: 8,
+    hover: true,
   },
   JET: {
     name: 'Kampfjet',

@@ -43,7 +43,14 @@ export type UnitOrder =
   | { kind: 'BOARD'; targetId: number }
   | { kind: 'INFILTRATE'; targetId: number }
   | { kind: 'CAPTURE'; targetId: number }
-  | { kind: 'PARADROP'; cx: number; cy: number };
+  | { kind: 'PARADROP'; cx: number; cy: number }
+  /** Stand fast: fire at enemies in range but never move — not even when the
+   *  base is under attack (defenseReaction only touches order-less units). */
+  | { kind: 'HOLD' }
+  /** Shuttle between (ax,ay) and (bx,by), fighting whatever crosses the route. */
+  | { kind: 'PATROL'; ax: number; ay: number; bx: number; by: number; leg: 0 | 1 }
+  /** Stick with an own unit and fight off whatever threatens the escort. */
+  | { kind: 'ESCORT'; targetId: number };
 
 export interface Unit {
   id: number;
