@@ -120,17 +120,19 @@ function isArmedUnit(u: Unit): boolean {
 }
 
 /**
- * Walls give cover: direct fire may not cross a WALL/GATE cell. Arcing weapons
- * (Artillerie, V3) lob over the top, aircraft shoot from above, and shots at
- * aircraft fly over the wall too. Base-defense towers are exempt in
- * defenseSystem (they are tall) — this check is for units only.
+ * Walls give cover: direct fire may not cross an ENEMY WALL/GATE cell — own
+ * and allied walls never block (defenders fire out over their ring, attackers
+ * cannot shoot in). Arcing weapons (Artillerie, V3) lob over the top, aircraft
+ * shoot from above, and shots at aircraft fly over the wall too. Base-defense
+ * towers are exempt in defenseSystem (they are tall) — this check is for
+ * units only.
  */
 function losClear(state: GameState, unit: Unit, weapon: WeaponRule, target: Target): boolean {
   if (weapon.arcing === true || isAir(unit)) return true;
   if (target.kind === 'unit' && isAir(target.unit)) return true;
   const aim = aimPoint(target, unit.x, unit.y);
   const ignoreId = target.kind === 'building' ? target.building.id : 0;
-  return !losBlockedByWall(state, unit.x, unit.y, aim.x, aim.y, ignoreId);
+  return !losBlockedByWall(state, unit.x, unit.y, aim.x, aim.y, ignoreId, unit.owner);
 }
 
 /**

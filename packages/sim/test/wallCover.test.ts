@@ -94,4 +94,28 @@ describe('walls block direct fire (cover)', () => {
     const walls = state.buildings.filter((b) => b.type === 'WALL');
     expect(walls.some((w) => w.hp < 250)).toBe(true); // the ring is under fire
   });
+
+  it('cover is one-way: defenders fire out over their OWN wall, attackers cannot shoot in', () => {
+    const state = arena();
+    // Player 0's wall line between the two shooters — 0 owns the wall.
+    for (let cy = 18; cy <= 22; cy++) constructBuilding(state, 'WALL', 0, 22, cy);
+    const defender = spawnUnit(state, 'TANK', 0, 20, 20); // hinter der eigenen Mauer
+    const attacker = spawnUnit(state, 'RIFLEMAN', 1, 24, 20); // davor, in Reichweite
+
+    tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [defender.id], targetId: attacker.id }]);
+    runTicks(state, 60);
+    // The defender's shot crosses his own wall; the attacker never reaches the
+    // tank behind it (he chews on the wall instead — breach behavior).
+    expect(attacker.hp).toBeLessThan(unitRule('RIFLEMAN').maxHp);
+    expect(defender.hp).toBe(unitRule('TANK').maxHp);
+  });
+
+  it('idle defenders auto-acquire enemies beyond their own wall', () => {
+    const state = arena();
+    for (let cy = 18; cy <= 22; cy++) constructBuilding(state, 'WALL', 0, 22, cy);
+    spawnUnit(state, 'TANK', 0, 20, 20); // idle, guard stance
+    const enemy = spawnUnit(state, 'RIFLEMAN', 1, 24, 20);
+    runTicks(state, 40);
+    expect(enemy.hp).toBeLessThan(unitRule('RIFLEMAN').maxHp);
+  });
 });

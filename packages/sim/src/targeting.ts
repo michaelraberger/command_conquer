@@ -37,7 +37,10 @@ export function weaponHitsBuildings(weapon: WeaponRule): boolean {
  * Walls give cover: true when a WALL/GATE cell lies strictly between the two
  * points, so direct fire cannot cross it. The shooter's own cell and the
  * target's footprint (`ignoreId`, e.g. when the wall itself is the target) do
- * not block. Integer sampling at half-cell steps — deterministic by design.
+ * not block. Cover is one-way: with `shooterOwner` set, walls of the shooter's
+ * own team never block — defenders fire out over their own ring while
+ * attackers cannot shoot in. Integer sampling at half-cell steps —
+ * deterministic by design.
  */
 export function losBlockedByWall(
   state: GameState,
@@ -46,6 +49,7 @@ export function losBlockedByWall(
   x1: number,
   y1: number,
   ignoreId = 0,
+  shooterOwner?: number,
 ): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -63,7 +67,11 @@ export function losBlockedByWall(
     const id = state.structures[cell]!;
     if (id === 0 || id === ignoreId) continue;
     const b = state.buildings.find((s) => s.id === id);
-    if (b && (b.type === 'WALL' || b.type === 'GATE')) return true;
+    if (b && (b.type === 'WALL' || b.type === 'GATE')) {
+      // Own/allied walls don't block the shooter's line of fire.
+      if (shooterOwner !== undefined && !areEnemies(state, shooterOwner, b.owner)) continue;
+      return true;
+    }
   }
   return false;
 }
