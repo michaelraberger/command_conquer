@@ -381,7 +381,9 @@ export const UNIT_RULES = {
     speed: 48,
     radius: 100,
     armor: 'light',
-    weapon: weapon(35, 5, 28, 220, { none: 60, light: 100, heavy: 85 }, 'ROCKET'),
+    // Rockets engage ground AND air: the Kampfhubschrauber doubles as the
+    // mobile counter to enemy helicopters and jets.
+    weapon: weapon(35, 5, 28, 220, { none: 60, light: 100, heavy: 85 }, 'ROCKET', 'both'),
     cost: 1200,
     buildTime: 110,
     category: 'air',

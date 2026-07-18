@@ -96,6 +96,28 @@ describe('air vs ground targeting', () => {
     expect(heli.hp).toBeLessThan(unitRule('HELI').maxHp);
   });
 
+  it('the combat helicopter engages enemy aircraft (targets: both)', () => {
+    expect(unitRule('HELI').weapon!.targets).toBe('both');
+
+    // Ordered air-to-air attack: the order is accepted and the rockets connect.
+    const state = arena();
+    const heli = spawnUnit(state, 'HELI', 0, 18, 18);
+    const enemyLift = spawnUnit(state, 'AIRLIFT', 1, 20, 18);
+    enemyLift.path = null;
+    tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [heli.id], targetId: enemyLift.id }]);
+    expect(heli.order).not.toBeNull();
+    runTicks(state, 60);
+    expect(enemyLift.hp).toBeLessThan(unitRule('AIRLIFT').maxHp);
+
+    // Still anti-ground: it engages a tank as before.
+    const ground = arena();
+    const h = spawnUnit(ground, 'HELI', 0, 18, 18);
+    const tank = spawnUnit(ground, 'TANK', 1, 20, 18);
+    tick(ground, [{ type: 'ATTACK', playerId: 0, unitIds: [h.id], targetId: tank.id }]);
+    runTicks(ground, 60);
+    expect(tank.hp).toBeLessThan(unitRule('TANK').maxHp);
+  });
+
   it('rocket infantry hit both aircraft and the ground (targets: both)', () => {
     expect(unitRule('ROCKETEER').weapon!.targets).toBe('both');
 

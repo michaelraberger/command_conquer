@@ -589,6 +589,14 @@ export class Sidebar {
       hp.className = 'bhp';
       hp.textContent = `HP ${units[0]!.hp} / ${unitRule(units[0]!.type).maxHp}`;
       this.binfoEl.append(hp);
+      // Combat aircraft: show the sortie ammo (empty planes fly home to rearm).
+      const maxAmmo = unitRule(units[0]!.type).ammo;
+      if (maxAmmo !== undefined) {
+        const ammo = document.createElement('div');
+        ammo.className = 'bhp';
+        ammo.textContent = `Munition ${units[0]!.ammo} / ${maxAmmo}`;
+        this.binfoEl.append(ammo);
+      }
     } else {
       const list = document.createElement('div');
       list.className = 'bhint';
