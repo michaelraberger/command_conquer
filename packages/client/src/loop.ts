@@ -10,6 +10,7 @@ import type { Effects } from './render/effects.js';
 import type { EntityRenderer } from './render/entities.js';
 import type { FogRenderer } from './render/fog.js';
 import type { OreRenderer } from './render/ore.js';
+import type { PatrolRouteOverlay } from './render/patrolRoutes.js';
 import type { PrismLinkOverlay } from './render/prismLinks.js';
 import { session } from './session.js';
 import type { Alerts } from './ui/alerts.js';
@@ -46,6 +47,7 @@ export interface LoopDeps {
   entities: EntityRenderer;
   effects: Effects;
   prismLinks: PrismLinkOverlay;
+  patrolRoutes: PatrolRouteOverlay;
   ore: OreRenderer;
   fog: FogRenderer;
   buildRadius: BuildRadiusOverlay;
@@ -118,6 +120,7 @@ export function startLoop(
     deps.camera.apply(deps.world, width, height);
     deps.entities.render(state, accumulator / TICK_MS, deps.controls.selected, deps.groups.tags());
     deps.prismLinks.update(state, app.ticker.deltaMS);
+    deps.patrolRoutes.update(state, deps.controls.selected, deps.hotkeys.showAllRadius);
     deps.effects.update(app.ticker.deltaMS);
     deps.buildRadius.update(state, deps.controls.selectedBuilding, deps.hotkeys.showAllRadius);
     deps.groupBar.sync();

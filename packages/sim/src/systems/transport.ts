@@ -1,4 +1,5 @@
 import { SUBCELL, distSq } from '../fixed.js';
+import { releaseCell } from '../map.js';
 import { findPath } from '../path/astar.js';
 import { TRANSPORT_CAPACITY, TRANSPORT_REACH } from '../rules.js';
 import type { GameState } from '../state.js';
@@ -35,7 +36,7 @@ export function transportSystem(state: GameState): void {
     }
 
     if (distSq(transport.x - unit.x, transport.y - unit.y) <= REACH_SQ) {
-      if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+      releaseCell(state, unit);
       unit.order = null;
       unit.path = null;
       unit.pathIndex = 0;

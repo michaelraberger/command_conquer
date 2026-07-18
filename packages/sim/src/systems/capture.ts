@@ -1,3 +1,4 @@
+import { releaseCell } from '../map.js';
 import { buildingRule } from '../rules.js';
 import { areEnemies, type Building, type GameState, type Unit } from '../state.js';
 import { targetDistSq } from '../targeting.js';
@@ -59,7 +60,7 @@ export function captureSystem(state: GameState): void {
 
       state.events.push({ type: 'HIT', x: building.x, y: building.y });
       state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
-      if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+      releaseCell(state, unit);
       consumed.add(unit.id);
       continue;
     }

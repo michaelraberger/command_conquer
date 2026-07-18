@@ -145,7 +145,7 @@ describe('Eskorte (ESCORT)', () => {
     expect(guard.order).toBeNull();
   });
 
-  it('is refused for aircraft and for foreign/dead targets', () => {
+  it('helicopters may escort, jets and foreign/dead targets are refused', () => {
     const state = arena(7);
     const heli = spawnUnit(state, 'HELI', 0, 12, 12);
     const jet = spawnUnit(state, 'STRIKEJET', 0, 13, 12);
@@ -155,9 +155,9 @@ describe('Eskorte (ESCORT)', () => {
       { type: 'ESCORT', playerId: 0, unitIds: [heli.id, jet.id], targetId: ward.id },
       { type: 'ESCORT', playerId: 0, unitIds: [ward.id], targetId: foe.id },
     ]);
-    expect(heli.order).toBeNull();
+    expect(heli.order).toEqual({ kind: 'ESCORT', targetId: ward.id }); // hover may escort
     expect(jet.order).toBeNull();
-    expect(ward.order).toBeNull();
+    expect(ward.order).toBeNull(); // foe is not an own unit
   });
 });
 

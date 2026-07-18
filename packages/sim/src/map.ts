@@ -1,4 +1,5 @@
 import { nextInt, type RngCarrier } from './rng.js';
+import { unitRule, type UnitType } from './rules.js';
 
 /** Terrain kinds. Dirt, grass, ice, sand and bridges are passable, the rest
  *  blocks movement. Ice is a frozen surface: ground units cross it slowly,
@@ -90,6 +91,65 @@ export function isNavigableWater(grid: GridView, cx: number, cy: number): boolea
   const idx = cellIndex(grid, cx, cy);
   const t = grid.terrain[idx];
   return (t === TERRAIN_WATER || t === TERRAIN_BRIDGE) && grid.structures[idx] === 0;
+}
+
+/* ---------------------- unit occupancy bookkeeping ----------------------- *
+ * occupancy[cell] holds one of three states:
+ *   0    free
+ *   +id  a single vehicle/ship (classic reservation)
+ *   -n   a pack of n infantry (1..INFANTRY_STACK share the tile)
+ * Every ground unit is counted in exactly the cell `unit.cell`; all
+ * transitions go through the helpers below so the counters can never drift.
+ * Air units never touch the grid.                                           */
+
+/** How many infantry may share one tile (classic C&C clumping). */
+export const INFANTRY_STACK = 3;
+
+/** Minimal unit view for occupancy bookkeeping (avoids a state.ts cycle). */
+export interface OccupantView {
+  id: number;
+  cell: number;
+  type: UnitType;
+}
+
+export function isInfantryType(type: UnitType): boolean {
+  return unitRule(type).category === 'infantry';
+}
+
+/** Whether `cellIdx` is occupancy-blocked for THIS unit (its own cell never is). */
+export function cellBlockedFor(grid: GridView, unit: OccupantView, cellIdx: number): boolean {
+  if (cellIdx === unit.cell) return false;
+  const occ = grid.occupancy[cellIdx]!;
+  if (occ === 0) return false;
+  if (isInfantryType(unit.type)) return occ > 0 || occ <= -INFANTRY_STACK;
+  return true;
+}
+
+/** Raw reservation of `cellIdx` (no release) — precondition: not blocked. */
+export function reserveCell(grid: GridView, unit: OccupantView, cellIdx: number): void {
+  if (isInfantryType(unit.type)) {
+    const occ = grid.occupancy[cellIdx]!;
+    grid.occupancy[cellIdx] = occ < 0 ? occ - 1 : -1;
+  } else {
+    grid.occupancy[cellIdx] = unit.id;
+  }
+  unit.cell = cellIdx;
+}
+
+/** Removes the unit from its booked cell (death, boarding, consuming, deploy). */
+export function releaseCell(grid: GridView, unit: OccupantView): void {
+  const occ = grid.occupancy[unit.cell]!;
+  if (isInfantryType(unit.type)) {
+    if (occ < 0) grid.occupancy[unit.cell] = occ + 1;
+  } else if (occ === unit.id) {
+    grid.occupancy[unit.cell] = 0;
+  }
+}
+
+/** Moves the unit's booking from its current cell to `cellIdx`. */
+export function claimCell(grid: GridView, unit: OccupantView, cellIdx: number): void {
+  releaseCell(grid, unit);
+  reserveCell(grid, unit, cellIdx);
 }
 
 /** Open water for placing water buildings (shipyard): bridges don't count. */

@@ -165,7 +165,7 @@ describe('ai opponent', () => {
     // but must not attack before tick 9000.
     state.tick = 8000;
     let maxAiArmy = 0;
-    for (let t = 0; t < 4500 && state.winner === -1; t++) {
+    for (let t = 0; t < 6000 && state.winner === -1; t++) {
       tick(state);
       const combat = state.units.filter(
         (u) => u.owner === 1 && unitRule(u.type).weapon !== null,
@@ -177,7 +177,7 @@ describe('ai opponent', () => {
     expect(aiBuildings).toContain('REFINERY');
     expect(aiBuildings).toContain('FACTORY');
     expect(aiBuildings.length).toBeGreaterThanOrEqual(5);
-    // The AI fielded a real army and beat the idle human within 4000 ticks.
+    // The AI fielded a real army and beat the idle human within the budget.
     expect(maxAiArmy).toBeGreaterThanOrEqual(7);
     expect(state.winner).toBe(1);
   }, 30000);

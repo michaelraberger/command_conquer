@@ -9,6 +9,7 @@ import {
   availableToFaction,
   buildingMaxHp,
   buildingRule,
+  findFreeAirfield,
   isBuildingType,
   powerBalance,
   satisfiesRequirement,
@@ -242,10 +243,20 @@ export class Sidebar {
         this.state.buildings.some(
           (b) => b.owner === session.localPlayer && b.type === el.item,
         );
+      // Airfield-bound jets: one per Flugfeld — with every field taken (or
+      // none standing) the sim refuses the order, so grey the button out.
+      // Not bypassed by motherload (the physical cap always holds).
+      const noAirfield =
+        !isBuildingType(el.item) &&
+        unitRule(el.item as UnitType).airfieldBound === true &&
+        findFreeAirfield(this.state, session.localPlayer) === null;
       const isThis = q.item === el.item;
       const busy = q.item !== null && !isThis;
 
-      el.root.classList.toggle('disabled', !prereqsMet || techLocked || busy || uniqueBuilt);
+      el.root.classList.toggle(
+        'disabled',
+        !prereqsMet || techLocked || busy || uniqueBuilt || noAirfield,
+      );
       el.root.classList.toggle('ready', isThis && q.ready);
       el.progress.style.width =
         isThis && !q.ready ? `${Math.round((q.progress / rule.buildTime) * 100)}%` : '0%';
@@ -265,6 +276,8 @@ export class Sidebar {
           .join(', ')}`;
       } else if (techLocked) {
         text = `erforschen: ${techRule(tech).name}`;
+      } else if (noAirfield) {
+        text = 'Kein Flugfeld frei – weiteres Flugfeld bauen';
       } else if (isThis && q.ready) {
         text = 'Bereit – klicken zum Platzieren';
       } else if (isThis) {

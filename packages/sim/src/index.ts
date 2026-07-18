@@ -23,8 +23,12 @@ export {
   RESOURCE_GEMS,
   MAP_TYPES,
   MAP_NAMES,
+  INFANTRY_STACK,
+  cellBlockedFor,
   cellIndex,
+  claimCell,
   inBounds,
+  isInfantryType,
   isPassableTerrain,
   isPassableKind,
   isBuildableTerrain,
@@ -32,10 +36,13 @@ export {
   isNavigableWater,
   isOpenWater,
   cellsAroundRect,
+  releaseCell,
+  reserveCell,
   stampResourcePatch,
   generateTerrain,
   type GridView,
   type MapType,
+  type OccupantView,
 } from './map.js';
 export {
   UNIT_RULES,
@@ -165,6 +172,7 @@ export { fnv1a, hashState } from './hash.js';
 export { findPath, type PathOptions } from './path/astar.js';
 export { applyCommands, unloadTransport, type Command } from './commands.js';
 export { canPlaceBuilding } from './systems/placement.js';
+export { findFreeAirfield } from './systems/airbase.js';
 export { powerBalance, startProduction } from './systems/production.js';
 export { aiSystem } from './ai/controller.js';
 export { tick, TICKS_PER_SECOND, TICK_MS } from './tick.js';

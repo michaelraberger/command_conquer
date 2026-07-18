@@ -32,23 +32,28 @@ function arena(seed = 7): { state: GameState; pad: Building } {
 }
 
 describe('Kampfflugzeuge fliegen Einsätze vom Flugplatz', () => {
-  it('a move order becomes an attack run: engage at the target, then fly home', () => {
+  it('a helicopter hovers where it was sent and guards the spot', () => {
     const { state, pad } = arena();
     const heli = spawnUnit(state, 'HELI', 0, 11, 11);
     const victim = spawnUnit(state, 'RIFLEMAN', 1, 28, 28);
 
     tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [heli.id], cx: 28, cy: 28 }]);
-    expect(heli.order).toEqual({ kind: 'ATTACK_MOVE', cx: 28, cy: 28 }); // kein Parken
+    expect(heli.order).toBeNull(); // plain move: helicopters may park anywhere
 
     let died = false;
     for (let i = 0; i < 400 && !died; i++) {
       tick(state);
       died = !state.units.some((u) => u.id === victim.id);
     }
-    expect(died).toBe(true); // attacked without an explicit attack order
+    expect(died).toBe(true); // guard stance engages the enemy at the spot
 
     runTicks(state, 400);
-    expect(cellDist(state, heli, pad)).toBeLessThan(3.5); // came home to the pad
+    // Hovers at the destination instead of flying back to the pad.
+    const cx = Math.trunc(heli.x / 256);
+    const cy = Math.trunc(heli.y / 256);
+    expect(Math.abs(cx - 28)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cy - 28)).toBeLessThanOrEqual(1);
+    expect(cellDist(state, heli, pad)).toBeGreaterThan(3.5);
   });
 
   it('an empty plane breaks off mid-attack and rearms at the pad', () => {
@@ -76,11 +81,11 @@ describe('Kampfflugzeuge fliegen Einsätze vom Flugplatz', () => {
     expect(heli.order).toBeNull(); // der Angriffsbefehl wurde abgebrochen
   });
 
-  it('without a Flugplatz the plane holds at the base and cannot rearm', () => {
+  it('a dry helicopter without a Landefläche holds at the base, no rearm', () => {
     const { state, pad } = arena(9);
     const heli = spawnUnit(state, 'HELI', 0, 11, 11);
     const victim = spawnUnit(state, 'RIFLEMAN', 1, 28, 28);
-    // Flugplatz fällt weg: kein Nachladen mehr möglich.
+    // Landefläche fällt weg: kein Nachladen mehr möglich.
     state.buildings = state.buildings.filter((b) => b.id !== pad.id);
     for (let y = pad.cy; y < pad.cy + 2; y++) {
       for (let x = pad.cx; x < pad.cx + 2; x++) {
@@ -90,16 +95,40 @@ describe('Kampfflugzeuge fliegen Einsätze vom Flugplatz', () => {
 
     tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [heli.id], cx: 28, cy: 28 }]);
     for (let i = 0; i < 400; i++) tick(state);
-    const spent = heli.ammo;
-    expect(spent).toBeLessThan(unitRule('HELI').ammo!); // hat geschossen
+    expect(heli.ammo).toBeLessThan(unitRule('HELI').ammo!); // hat geschossen
     expect(state.units.some((u) => u.id === victim.id)).toBe(false);
 
+    // Racks leer → fliegt heim; ohne Landefläche kreist er über der Basis.
+    heli.ammo = 0;
     runTicks(state, 400);
     const nearest = Math.min(
       ...state.buildings.filter((b) => b.owner === 0).map((b) => cellDist(state, heli, b)),
     );
     expect(nearest).toBeLessThan(3.5); // kreist über der Basis (nächstes Gebäude)
-    expect(heli.ammo).toBe(spent); // ohne Flugplatz kein Nachladen
+    expect(heli.ammo).toBe(0); // ohne Landefläche kein Nachladen
+  });
+
+  it('a helicopter can escort: follows the ward, never returns to the pad', () => {
+    const { state, pad } = arena(21);
+    const heli = spawnUnit(state, 'HELI', 0, 14, 13);
+    const ward = spawnUnit(state, 'HARVESTER', 0, 14, 14);
+
+    tick(state, [{ type: 'ESCORT', playerId: 0, unitIds: [heli.id], targetId: ward.id }]);
+    expect(heli.order).toEqual({ kind: 'ESCORT', targetId: ward.id });
+
+    // Send the ward on a long trip; the heli must stay close the whole way.
+    tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [ward.id], cx: 45, cy: 40 }]);
+    for (let i = 0; i < 900; i++) {
+      tick(state);
+      if (i % 90 === 0) {
+        const gap = Math.hypot(heli.x - ward.x, heli.y - ward.y) / 256;
+        expect(gap).toBeLessThan(8);
+      }
+    }
+    const gap = Math.hypot(heli.x - ward.x, heli.y - ward.y) / 256;
+    expect(gap).toBeLessThan(4); // parked next to the ward at the destination
+    expect(cellDist(state, heli, pad)).toBeGreaterThan(3.5); // no homing
+    expect(heli.order).toEqual({ kind: 'ESCORT', targetId: ward.id }); // order sticks
   });
 
   it('the Transporthubschrauber still flies and parks freely', () => {

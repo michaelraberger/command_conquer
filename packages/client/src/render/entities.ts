@@ -4,6 +4,7 @@ import {
   SUBCELL,
   buildingMaxHp,
   buildingRule,
+  isInfantryType,
   powerBalance,
   toCell,
   unitRule,
@@ -77,6 +78,12 @@ const CURTAIN_TINT = 0xff6a55;
 const AIR_ALTITUDE = 24;
 /** zIndex floor for aircraft so they always render above ground entities. */
 const AIR_Z = 1_000_000;
+/** Sub-cell draw offsets for infantry sharing a tile (slot = id % 3). */
+const PACK_OFFSETS = [
+  { dx: -SUBCELL * 0.23, dy: -SUBCELL * 0.12 },
+  { dx: SUBCELL * 0.23, dy: -SUBCELL * 0.12 },
+  { dx: 0, dy: SUBCELL * 0.2 },
+];
 
 /**
  * Presentation layer: keeps one sprite tree per sim entity and interpolates
@@ -129,8 +136,20 @@ export class EntityRenderer {
     for (const unit of state.units) {
       seen.add(unit.id);
       const view = this.views.get(unit.id) ?? this.createView(unit);
-      const fx = view.prevX + (unit.x - view.prevX) * alpha;
-      const fy = view.prevY + (unit.y - view.prevY) * alpha;
+      let fx = view.prevX + (unit.x - view.prevX) * alpha;
+      let fy = view.prevY + (unit.y - view.prevY) * alpha;
+
+      // Infantry sharing a tile fans out cosmetically: a fixed per-unit
+      // sub-cell offset (id % 3) so pack members don't draw on one spot.
+      // Pure rendering — the sim keeps all of them on the cell center.
+      if (
+        state.occupancy[unit.cell]! <= -2 &&
+        isInfantryType(unit.type)
+      ) {
+        const slot = PACK_OFFSETS[unit.id % 3]!;
+        fx += slot.dx;
+        fy += slot.dy;
+      }
 
       // Enemy units are only drawn inside currently visible cells.
       const visible =

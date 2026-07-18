@@ -1,4 +1,5 @@
 import { SUBCELL, facingFromDelta } from '../fixed.js';
+import { releaseCell } from '../map.js';
 import { findPath } from '../path/astar.js';
 import {
   areEnemies,
@@ -66,7 +67,7 @@ export function spySystem(state: GameState): void {
       }
       state.events.push({ type: 'HIT', x: building.x, y: building.y });
       state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
-      if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+      releaseCell(state, unit);
       consumed.add(unit.id);
       continue;
     }

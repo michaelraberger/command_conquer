@@ -111,14 +111,15 @@ describe('paradrop support power', () => {
     readyParadrop(state);
     fireAndDrop(state, 30, 30);
     expect(riflemen(state, 0)).toBe(6);
-    // All landed within the drop radius, on their own occupied cells.
+    // All landed within the drop radius, each alone on a booked cell
+    // (infantry cells count packs: -1 = one soldier).
     for (const u of state.units.filter((x) => x.type === 'RIFLEMAN')) {
       const cx = u.cell % state.mapWidth;
       const cy = Math.floor(u.cell / state.mapWidth);
       expect(Math.max(Math.abs(cx - 30), Math.abs(cy - 30))).toBeLessThanOrEqual(
         PARADROP_DROP_RADIUS,
       );
-      expect(state.occupancy[u.cell]).toBe(u.id);
+      expect(state.occupancy[u.cell]).toBe(-1);
     }
   });
 

@@ -10,8 +10,8 @@ import type { ControlGroups } from './groups.js';
  * outside multiplayer (stalling one lockstep peer would just freeze both).
  * Camera keys (WASD/arrows) and the debug toggle live in their own handlers.
  *
- * P pause · U upgrade selected building · R toggle full build radius ·
- * H center camera on own base · E unload selected transport ships.
+ * P pause · U upgrade selected building · R toggle full build radius and
+ * patrol routes · H center camera on own base · E unload selected transports.
  * Ctrl+1–9 assign a control group, 1–9 recall it (double-tap centers camera).
  * C opens the (solo-only) cheat console; the codes are secret and named in
  * balance.json, so nothing on screen reveals them.
@@ -23,7 +23,8 @@ export type CheatCodes = Record<string, CheatKind>;
 
 export class Hotkeys {
   paused = false;
-  /** R toggles showing the whole buildable area (read by the loop). */
+  /** R toggles the info overlays: full buildable area + all patrol routes
+   *  (read by the loop). */
   showAllRadius = false;
   private readonly overlay = document.getElementById('pause')!;
   private readonly cheatOverlay = document.getElementById('cheat')!;

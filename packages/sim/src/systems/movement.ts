@@ -1,16 +1,41 @@
 import { cellCenter, distSq, facingFromDelta, isqrt } from '../fixed.js';
-import { TERRAIN_ICE, isNavigableWater, passableFor } from '../map.js';
+import {
+  TERRAIN_ICE,
+  cellBlockedFor,
+  claimCell,
+  isInfantryType,
+  isNavigableWater,
+  passableFor,
+  releaseCell,
+  reserveCell,
+} from '../map.js';
 import { findPath } from '../path/astar.js';
 import { unitRule } from '../rules.js';
-import type { GameState, Unit } from '../state.js';
+import { areEnemies, type GameState, type Unit } from '../state.js';
 import { isNaval } from '../targeting.js';
 
 /** Ticks to wait in front of a reserved cell before trying a new path. */
 const BLOCKED_TICKS_BEFORE_REPATH = 8;
-/** Failed repaths before a unit gives up (classic C&C traffic-jam behavior). */
+/** Failed repaths before a unit backs off — it never gives up its path. */
 const MAX_REPATHS = 3;
+/** Backoff after a full repath round: wait this long before the next cycle. */
+const REPATH_BACKOFF_TICKS = 30;
+/** Blocked ticks before asking blockers to step aside / trying a cell swap. */
+const YIELD_AFTER_TICKS = 4;
 /** Ground speed multiplier on ice, in 1/256 (154/256 ≈ 60 %). Integer-only. */
 const ICE_SPEED_NUM = 154;
+
+/** Fixed probe order for sidesteps — deterministic across runs. */
+const SIDESTEP_DIRS = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: 1 },
+  { dx: 0, dy: -1 },
+  { dx: 1, dy: 1 },
+  { dx: -1, dy: -1 },
+  { dx: 1, dy: -1 },
+  { dx: -1, dy: 1 },
+];
 
 /**
  * Cell-reservation movement: a unit occupies exactly one cell (the one it has
@@ -34,8 +59,7 @@ export function movementSystem(state: GameState): void {
 
     if (unit.cell !== wpIdx) {
       // Not yet reserved: claim the waypoint cell or wait/repath.
-      const occ = state.occupancy[wpIdx]!;
-      if (occ !== 0 && occ !== unit.id) {
+      if (cellBlockedFor(state, unit, wpIdx)) {
         handleBlocked(state, unit);
         continue;
       }
@@ -46,9 +70,7 @@ export function movementSystem(state: GameState): void {
         stopUnit(unit);
         continue;
       }
-      state.occupancy[unit.cell] = 0;
-      state.occupancy[wpIdx] = unit.id;
-      unit.cell = wpIdx;
+      claimCell(state, unit, wpIdx);
       unit.blockedTicks = 0;
     }
 
@@ -115,13 +137,26 @@ function flyAir(state: GameState, unit: Unit): void {
   if (unit.x === wx && unit.y === wy) stopUnit(unit);
 }
 
+/**
+ * Anti-jam escalation for a unit whose next cell is reserved by someone else:
+ * ask friendly idlers to step aside (or swap cells head-on), then repath, and
+ * after a fruitless repath round back off and start over — a unit NEVER
+ * abandons its path because of traffic.
+ */
 function handleBlocked(state: GameState, unit: Unit): void {
   unit.blockedTicks++;
+  if (unit.blockedTicks === YIELD_AFTER_TICKS) {
+    if (trySwap(state, unit)) return;
+    yieldBlockers(state, unit);
+    return;
+  }
   if (unit.blockedTicks < BLOCKED_TICKS_BEFORE_REPATH) return;
   unit.blockedTicks = 0;
   unit.repathCount++;
   if (unit.repathCount > MAX_REPATHS) {
-    stopUnit(unit);
+    // Never give up: keep path and intent, wait out the jam, try again.
+    unit.repathCount = 0;
+    unit.blockedTicks = -REPATH_BACKOFF_TICKS;
     return;
   }
   const goal = unit.path![unit.path!.length - 1]!;
@@ -132,11 +167,91 @@ function handleBlocked(state: GameState, unit: Unit): void {
     selfId: unit.id,
     owner: unit.owner,
     water: isNaval(unit),
+    infantry: isInfantryType(unit.type),
   });
   if (!newPath) {
-    stopUnit(unit);
+    // Fully enclosed right now — back off instead of giving up.
+    unit.blockedTicks = -REPATH_BACKOFF_TICKS;
     return;
   }
   unit.path = newPath;
   unit.pathIndex = 0;
+}
+
+/** Ground units booked on `idx`: the vehicle by id, or every pack member. */
+function blockersAt(state: GameState, idx: number): Unit[] {
+  const occ = state.occupancy[idx]!;
+  if (occ > 0) {
+    const u = state.units.find((x) => x.id === occ);
+    return u ? [u] : [];
+  }
+  if (occ < 0) {
+    return state.units.filter((x) => x.cell === idx && unitRule(x.type).air !== true);
+  }
+  return [];
+}
+
+/**
+ * Head-on deadlock (1-wide corridor): the blocker's next waypoint is OUR
+ * cell. Swap the two bookings atomically; both units then glide through each
+ * other to their waypoints — the classic RTS resolution.
+ */
+function trySwap(state: GameState, unit: Unit): boolean {
+  const wp = unit.path![unit.pathIndex]!;
+  const wpIdx = wp.cy * state.mapWidth + wp.cx;
+  for (const b of blockersAt(state, wpIdx)) {
+    if (areEnemies(state, unit.owner, b.owner)) continue;
+    if (!b.path) continue;
+    const bwp = b.path[b.pathIndex];
+    if (!bwp) continue;
+    if (bwp.cy * state.mapWidth + bwp.cx !== unit.cell) continue;
+    const myCell = unit.cell;
+    // Release both bookings, then check the crossed cells actually fit
+    // (a vehicle cannot take over a cell that still holds infantry).
+    releaseCell(state, unit);
+    releaseCell(state, b);
+    if (cellBlockedFor(state, unit, wpIdx) || cellBlockedFor(state, b, myCell)) {
+      reserveCell(state, unit, myCell);
+      reserveCell(state, b, wpIdx);
+      continue;
+    }
+    reserveCell(state, unit, wpIdx);
+    reserveCell(state, b, myCell);
+    unit.blockedTicks = 0;
+    unit.repathCount = 0;
+    b.blockedTicks = 0;
+    b.repathCount = 0;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Asks idle friendly blockers to sidestep one cell so the jammed unit can
+ * pass. Units with any order — HOLD above all — never budge; neither does
+ * anything already moving.
+ */
+function yieldBlockers(state: GameState, unit: Unit): void {
+  const wp = unit.path![unit.pathIndex]!;
+  const wpIdx = wp.cy * state.mapWidth + wp.cx;
+  for (const b of blockersAt(state, wpIdx)) {
+    if (b.order !== null || b.path !== null) continue;
+    if (areEnemies(state, unit.owner, b.owner)) continue;
+    const bcx = b.cell % state.mapWidth;
+    const bcy = (b.cell - bcx) / state.mapWidth;
+    for (const d of SIDESTEP_DIRS) {
+      const nx = bcx + d.dx;
+      const ny = bcy + d.dy;
+      const nIdx = ny * state.mapWidth + nx;
+      if (nIdx === unit.cell) continue; // never step into the asker
+      const traversable = isNaval(b)
+        ? isNavigableWater(state, nx, ny)
+        : passableFor(state, nx, ny, b.owner);
+      if (!traversable) continue;
+      if (cellBlockedFor(state, b, nIdx)) continue;
+      b.path = [{ cx: nx, cy: ny }];
+      b.pathIndex = 0;
+      break;
+    }
+  }
 }

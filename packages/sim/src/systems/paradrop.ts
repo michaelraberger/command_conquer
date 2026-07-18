@@ -1,5 +1,5 @@
 import { cellCenter } from '../fixed.js';
-import { cellIndex, cellsAroundRect, inBounds, isPassableTerrain } from '../map.js';
+import { cellIndex, cellsAroundRect, inBounds, isPassableTerrain, reserveCell } from '../map.js';
 import {
   PARADROP_COOLDOWN_TICKS,
   PARADROP_COUNTS,
@@ -81,13 +81,12 @@ function dropPassengers(state: GameState, plane: Unit, cx: number, cy: number): 
       const unit = remaining.shift()!;
       unit.x = cellCenter(cell.cx);
       unit.y = cellCenter(cell.cy);
-      unit.cell = idx;
       unit.path = null;
       unit.pathIndex = 0;
       unit.order = null;
       unit.blockedTicks = 0;
       unit.repathCount = 0;
-      state.occupancy[idx] = unit.id;
+      reserveCell(state, unit, idx);
       state.units.push(unit);
       state.events.push({ type: 'PARADROP', x: unit.x, y: unit.y });
     }

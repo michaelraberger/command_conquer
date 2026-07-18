@@ -93,9 +93,12 @@ export function airbaseSystem(state: GameState): void {
       unit.ammo++;
     }
 
-    // Idle and away from home → fly back. Small per-id offset spreads a wing
+    // Idle and away from home → fly back. Helicopters hover wherever their
+    // last order left them and only head home once their racks are empty;
+    // jets always return after a sortie. Small per-id offset spreads a wing
     // around the pad instead of stacking every plane on the same spot.
-    if (unit.order === null && unit.path === null && !atHome) {
+    const wantsHome = rule.hover === true ? unit.ammo === 0 : true;
+    if (wantsHome && unit.order === null && unit.path === null && !atHome) {
       const w = state.mapWidth;
       const hcx = Math.min(w - 1, Math.max(0, Math.trunc(home.x / SUBCELL) + (unit.id % 3) - 1));
       const hcy = Math.min(state.mapHeight - 1, Math.max(0, Math.trunc(home.y / SUBCELL) + (Math.trunc(unit.id / 3) % 3) - 1));

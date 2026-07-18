@@ -1,3 +1,4 @@
+import { releaseCell } from '../map.js';
 import { buildingRule } from '../rules.js';
 import { storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
 import { crashBoundJets } from './airbase.js';
@@ -21,7 +22,7 @@ export function deathSystem(state: GameState): void {
         survivors.push(unit);
         continue;
       }
-      if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+      releaseCell(state, unit);
       state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
     }
     state.units = survivors;

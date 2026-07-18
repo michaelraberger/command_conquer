@@ -1,10 +1,14 @@
 import {
+  INFANTRY_STACK,
   cellIndex,
   cellsAroundRect,
   inBounds,
   isBuildableTerrain,
+  isInfantryType,
   isNavigableWater,
   isPassableTerrain,
+  releaseCell,
+  reserveCell,
 } from './map.js';
 import { findPath } from './path/astar.js';
 import { cellCenter } from './fixed.js';
@@ -91,11 +95,11 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         ];
         for (const { units, water } of groups) {
           if (units.length === 0) continue;
-          const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length, water);
+          const targets = spreadGroup(state, cmd.cx, cmd.cy, units, water);
           if (targets.length === 0) continue;
           for (let i = 0; i < units.length; i++) {
             const unit = units[i]!;
-            const t = targets[i] ?? targets[targets.length - 1]!;
+            const t = targets[i]!;
             if (unitRule(unit.type).weapon === null) {
               // Weaponless units treat attack-move as a plain move.
               moveUnitTo(state, unit, t.cx, t.cy);
@@ -166,7 +170,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
             }
           }
           if (!clear) continue;
-          if (state.occupancy[unit.cell] === unit.id) state.occupancy[unit.cell] = 0;
+          releaseCell(state, unit);
           deployed.add(unit.id);
           constructBuilding(state, 'CONYARD', cmd.playerId, bx, by);
         }
@@ -379,7 +383,8 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         }
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
           const rule = unitRule(unit.type);
-          if (rule.weapon === null || rule.hidden === true || rule.air === true) continue;
+          if (rule.weapon === null || rule.hidden === true) continue;
+          if (rule.air === true && rule.hover !== true) continue; // jets can't escort
           if (unit.id === ward.id) continue;
           unit.order = { kind: 'ESCORT', targetId: ward.id };
           unit.path = null; // combat handles following
@@ -442,11 +447,11 @@ function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number;
   ];
   for (const { units, water } of groups) {
     if (units.length === 0) continue;
-    const targets = assignTargetCells(state, cmd.cx, cmd.cy, units.length, water);
+    const targets = spreadGroup(state, cmd.cx, cmd.cy, units, water);
     if (targets.length === 0) continue;
     for (let i = 0; i < units.length; i++) {
       const unit = units[i]!;
-      const target = targets[i] ?? targets[targets.length - 1]!;
+      const target = targets[i]!;
       moveUnitTo(state, unit, target.cx, target.cy);
     }
   }
@@ -456,10 +461,10 @@ function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number;
 function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void {
   unit.order = null;
   const rule = unitRule(unit.type);
-  if (rule.air === true && rule.ammo !== undefined) {
-    // Combat aircraft never park in the field: a move order is an attack run —
-    // fly out, engage whatever waits there, then return to the pad
-    // (airbaseSystem brings idle planes home).
+  if (rule.air === true && rule.ammo !== undefined && rule.hover !== true) {
+    // Jets never park in the field: a move order is an attack run — fly out,
+    // engage whatever waits there, then return to the pad (airbaseSystem
+    // brings idle planes home). Helicopters hover anywhere instead.
     unit.order = { kind: 'ATTACK_MOVE', cx, cy };
     unit.path = null;
     unit.pathIndex = 0;
@@ -504,17 +509,52 @@ export function unloadTransport(state: GameState, transport: Unit): void {
       const unit = remaining.shift()!;
       unit.x = cellCenter(cell.cx);
       unit.y = cellCenter(cell.cy);
-      unit.cell = idx;
       unit.path = null;
       unit.pathIndex = 0;
       unit.order = null;
       unit.blockedTicks = 0;
       unit.repathCount = 0;
-      state.occupancy[idx] = unit.id;
+      reserveCell(state, unit, idx);
       state.units.push(unit);
     }
   }
   transport.passengers = remaining;
+}
+
+/**
+ * Per-unit target cells for a group order: infantry clumps up to
+ * INFANTRY_STACK per cell (closest to the click), vehicles/ships get one
+ * distinct cell each. Returns an array parallel to `units`; empty when the
+ * click area has no usable cell at all.
+ */
+function spreadGroup(
+  state: GameState,
+  cx: number,
+  cy: number,
+  units: Unit[],
+  water: boolean,
+): PathCell[] {
+  const infantry = units.filter((u) => isInfantryType(u.type));
+  const vehicles = units.filter((u) => !isInfantryType(u.type));
+  const cellsNeeded = vehicles.length + Math.ceil(infantry.length / INFANTRY_STACK);
+  const cells = assignTargetCells(state, cx, cy, cellsNeeded, water);
+  if (cells.length === 0) return [];
+  const byId = new Map<number, PathCell>();
+  let ci = 0;
+  let slots = 0;
+  for (const inf of infantry) {
+    byId.set(inf.id, cells[Math.min(ci, cells.length - 1)]!);
+    if (++slots === INFANTRY_STACK) {
+      slots = 0;
+      ci++;
+    }
+  }
+  if (slots > 0) ci++;
+  for (const v of vehicles) {
+    byId.set(v.id, cells[Math.min(ci, cells.length - 1)]!);
+    ci++;
+  }
+  return units.map((u) => byId.get(u.id)!);
 }
 
 /**

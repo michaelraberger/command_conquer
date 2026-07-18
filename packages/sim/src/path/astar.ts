@@ -1,4 +1,4 @@
-import { isNavigableWater, passableFor, type GridView } from '../map.js';
+import { INFANTRY_STACK, isNavigableWater, passableFor, type GridView } from '../map.js';
 import type { PathCell } from '../state.js';
 import { MinHeap } from './heap.js';
 
@@ -11,6 +11,8 @@ export interface PathOptions {
   water?: boolean;
   /** Owner of the pathing unit — its own gates are passable, others block. */
   owner?: number;
+  /** Infantry share tiles: only full packs and vehicles block (avoidUnits). */
+  infantry?: boolean;
 }
 
 const COST_STRAIGHT = 10;
@@ -63,7 +65,12 @@ export function findPath(
     if (!traversable(grid, cx, cy)) return false;
     if (opts.avoidUnits) {
       const occ = grid.occupancy[cy * w + cx]!;
-      if (occ !== 0 && occ !== opts.selfId) return false;
+      if (opts.infantry === true) {
+        if (occ > 0 && occ !== opts.selfId) return false;
+        if (occ <= -INFANTRY_STACK) return false;
+      } else if (occ !== 0 && occ !== opts.selfId) {
+        return false;
+      }
     }
     return true;
   };

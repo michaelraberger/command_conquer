@@ -41,10 +41,13 @@ export function combatSystem(state: GameState): void {
 
     // Combat aircraft with empty racks break off: drop the order and head
     // home to rearm (airbaseSystem flies idle planes back to the pad).
-    // Exception: a helicopter ordered to HOLD or PATROL keeps station even
-    // when dry — the player decides when it goes home to rearm.
+    // Exception: a helicopter ordered to HOLD, PATROL or ESCORT keeps
+    // station even when dry — the player decides when it goes home to rearm.
     if (rule.ammo !== undefined && unit.ammo <= 0) {
-      const keeps = unit.order?.kind === 'HOLD' || unit.order?.kind === 'PATROL';
+      const keeps =
+        unit.order?.kind === 'HOLD' ||
+        unit.order?.kind === 'PATROL' ||
+        unit.order?.kind === 'ESCORT';
       if (unit.order !== null && !keeps) {
         unit.order = null;
         unit.path = null;
@@ -157,6 +160,12 @@ export function combatSystem(state: GameState): void {
         } else if (!unit.path || (state.tick + unit.id) % CHASE_REPATH_INTERVAL === 0) {
           const wcx = ward.cell % state.mapWidth;
           const wcy = (ward.cell - wcx) / state.mapWidth;
+          if (isAir(unit)) {
+            // Escorting helicopters fly straight after the ward.
+            unit.path = [{ cx: wcx, cy: wcy }];
+            unit.pathIndex = 0;
+            continue;
+          }
           const cx = unit.cell % state.mapWidth;
           const cy = (unit.cell - cx) / state.mapWidth;
           const path = findPath(state, cx, cy, wcx, wcy, {

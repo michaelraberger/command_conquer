@@ -2,11 +2,14 @@ import { validateCustomMap, type CustomMapData } from './customMap.js';
 import type { SimEvent } from './events.js';
 import { cellCenter, SUBCELL } from './fixed.js';
 import {
+  INFANTRY_STACK,
   RESOURCE_GEMS,
   RESOURCE_ORE,
   cellIndex,
   clearArea,
   generateTerrain,
+  isInfantryType,
+  reserveCell,
   spawnCenters,
   stampResourcePatch,
   type MapType,
@@ -204,7 +207,8 @@ export interface GameState {
   ore: Uint16Array;
   /** Permanent field kind per cell (RESOURCE_*) — depleted fields regrow. */
   resourceKind: Uint8Array;
-  /** Unit id occupying/reserving each cell, 0 = free. */
+  /** Per cell: 0 = free, +id = vehicle/ship, -n = n infantry sharing the
+   *  tile (see the occupancy helpers in map.ts). */
   occupancy: Int32Array;
   /** Building id covering each cell, 0 = free. */
   structures: Int32Array;
@@ -237,7 +241,12 @@ export function spawnUnit(
   const cell = cellIndex(state, cx, cy);
   const isAir = unitRule(type).air === true;
   // Aircraft fly over everything, so they never claim a ground cell.
-  if (!isAir && (state.occupancy[cell] !== 0 || state.structures[cell] !== 0)) {
+  // Infantry may spawn into a not-yet-full pack on the cell.
+  const occ = state.occupancy[cell]!;
+  const spawnBlocked = isInfantryType(type)
+    ? occ > 0 || occ <= -INFANTRY_STACK
+    : occ !== 0;
+  if (!isAir && (spawnBlocked || state.structures[cell] !== 0)) {
     throw new Error(`spawn cell ${cx},${cy} occupied`);
   }
   const unit: Unit = {
@@ -260,7 +269,7 @@ export function spawnUnit(
     curtainTicks: 0,
     ammo: unitRule(type).ammo ?? 0,
   };
-  if (!isAir) state.occupancy[cell] = unit.id;
+  if (!isAir) reserveCell(state, unit, cell);
   state.units.push(unit);
   return unit;
 }

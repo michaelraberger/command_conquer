@@ -388,7 +388,8 @@ export class Controls {
       }
     }
 
-    // Right-clicking another own unit → armed ground/sea units escort it.
+    // Right-clicking another own unit → armed units escort it (ground, sea
+    // and hovering helicopters — jets keep their sortie model).
     if (!e.ctrlKey) {
       const wardId = this.ownUnitAt(e.global);
       if (wardId !== null) {
@@ -396,7 +397,7 @@ export class Controls {
           const u = byId.get(id);
           if (!u || u.id === wardId) return false;
           const rule = unitRule(u.type);
-          return rule.weapon !== null && rule.air !== true;
+          return rule.weapon !== null && (rule.air !== true || rule.hover === true);
         });
         if (escorts.length > 0) {
           this.send({ type: 'ESCORT', playerId: session.localPlayer, unitIds: escorts, targetId: wardId });
