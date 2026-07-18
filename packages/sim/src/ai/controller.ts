@@ -15,6 +15,7 @@ import {
   type UnitType,
 } from '../rules.js';
 import { areEnemies, type Building, type GameState, type Player } from '../state.js';
+import { findFreeAirfield } from '../systems/airbase.js';
 import { canPlaceBuilding } from '../systems/placement.js';
 import {
   placeQueuedBuilding,
@@ -94,12 +95,13 @@ const DIFFICULTY_PARAMS: Record<AiDifficulty, AiParams> = {
 const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
   SOVIETS: [
     'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'RADAR', 'TECHCENTER',
-    'TESLA', 'POWER', 'TESLA', 'WERKSTATT', 'HELIPAD', 'SILO', 'FLAKTOWER', 'POWER', 'NUKESILO',
+    'TESLA', 'POWER', 'TESLA', 'WERKSTATT', 'HELIPAD', 'FLUGFELD', 'SILO', 'FLAKTOWER', 'POWER',
+    'NUKESILO',
   ],
   ALLIES: [
     'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'TECHCENTER', 'PILLBOX',
-    'POWER', 'PILLBOX', 'WERKSTATT', 'HELIPAD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER', 'PRISM',
-    'WEATHER',
+    'POWER', 'PILLBOX', 'WERKSTATT', 'HELIPAD', 'FLUGFELD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER',
+    'PRISM', 'WEATHER',
   ],
 };
 
@@ -126,8 +128,8 @@ function goalsFor(state: GameState, player: Player, params: AiParams): BuildingT
     const defense: BuildingType = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
     const superweapon: BuildingType = faction === 'SOVIETS' ? 'NUKESILO' : 'WEATHER';
     order = [
-      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'HELIPAD', 'SHIPYARD',
-      'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'SILO', 'POWER', superweapon,
+      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'HELIPAD', 'FLUGFELD',
+      'SHIPYARD', 'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'SILO', 'POWER', superweapon,
     ];
   } else {
     order = BUILD_GOALS[faction];
@@ -135,7 +137,7 @@ function goalsFor(state: GameState, player: Player, params: AiParams): BuildingT
   const goals: BuildingType[] = [];
   for (const type of order) {
     if (!params.useHighTech && HIGH_TECH.has(type)) continue;
-    if (type === 'HELIPAD' && params.airCap <= 0) continue;
+    if ((type === 'HELIPAD' || type === 'FLUGFELD') && params.airCap <= 0) continue;
     if (type === 'SHIPYARD' && params.navalCap <= 0) continue;
     goals.push(type);
   }
@@ -336,19 +338,23 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
     }
   }
 
-  // Air: keep a small standing air force once a helipad stands. Aircraft fly
-  // over water, so this is the AI's main threat on island maps.
-  if (
-    params.airCap > 0 &&
-    player.queues.air.item === null &&
-    state.buildings.some((b) => b.owner === player.id && b.type === 'HELIPAD')
-  ) {
+  // Air: keep a small standing air force once an air building stands. Helis
+  // come from the Landefläche, jets need a FREE Flugfeld (one jet per field).
+  // Aircraft fly over water, so this is the AI's main threat on island maps.
+  if (params.airCap > 0 && player.queues.air.item === null) {
+    const hasPad = state.buildings.some((b) => b.owner === player.id && b.type === 'HELIPAD');
     const jetOk = availableToFaction(unitRule('JET').factions, player.faction);
     const heli = countUnits(state, player.id, 'HELI');
     const jet = jetOk ? countUnits(state, player.id, 'JET') : 0;
     if (heli + jet < params.airCap) {
-      const wantJet = jetOk && heli >= 1 && jet < Math.floor(params.airCap / 2) && player.credits > 1400;
-      startProduction(state, player.id, wantJet ? 'JET' : 'HELI');
+      const wantJet =
+        jetOk &&
+        heli >= 1 &&
+        jet < Math.floor(params.airCap / 2) &&
+        player.credits > 1400 &&
+        findFreeAirfield(state, player.id) !== null;
+      if (wantJet) startProduction(state, player.id, 'JET');
+      else if (hasPad) startProduction(state, player.id, 'HELI');
     }
   }
 
@@ -427,7 +433,8 @@ const LATE_ESCALATION = 15 * 60 * 15;
 const RAID_ESCALATION_STEP = 5 * 60 * 15;
 /** Raid targets, most-wanted first — hit the economy/production, not the HQ. */
 const RAID_PRIORITY: readonly BuildingType[] = [
-  'REFINERY', 'SILO', 'FACTORY', 'BARRACKS', 'TECHCENTER', 'WERKSTATT', 'HELIPAD', 'SHIPYARD',
+  'REFINERY', 'SILO', 'FACTORY', 'BARRACKS', 'TECHCENTER', 'WERKSTATT', 'HELIPAD', 'FLUGFELD',
+  'SHIPYARD',
 ];
 
 /**
@@ -641,11 +648,11 @@ function manageSuperweapon(state: GameState, player: Player, params: AiParams): 
 }
 
 /** Drop paratroopers on the raid target once the (free) power is charged.
- *  No high-tech gate: every difficulty builds a Flugplatz anyway. */
+ *  No high-tech gate: every difficulty builds a Flugfeld anyway. */
 function manageParadrop(state: GameState, player: Player, params: AiParams): void {
   if (state.tick < params.firstAttackTick) return; // same grace period as nukes
   if (player.paradropCooldown > 0) return;
-  if (!state.buildings.some((b) => b.owner === player.id && b.type === 'HELIPAD')) return;
+  if (!state.buildings.some((b) => b.owner === player.id && b.type === 'FLUGFELD')) return;
   const home = state.buildings.find((b) => b.owner === player.id && b.type === 'CONYARD');
   const target = pickAttackTarget(state, player, home, false);
   if (!target) return;

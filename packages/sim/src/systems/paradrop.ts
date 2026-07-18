@@ -9,7 +9,7 @@ import {
 import { createPassenger, spawnUnit, type GameState, type Unit } from '../state.js';
 
 /**
- * Paradrop support power: free, gated on owning a Flugplatz, one per-player
+ * Paradrop support power: free, gated on owning a Flugfeld, one per-player
  * cooldown (multiple Flugplätze do NOT stack). A real, shoot-downable
  * transport plane (PARAPLANE) flies a straight line across the map — nearest
  * edge in, over the target, opposite edge out — and drops its paratroopers at
@@ -49,7 +49,7 @@ function exitCell(state: GameState, entry: { cx: number; cy: number }, cx: numbe
 /**
  * Launches the paradrop for a validated PARADROP command: resets the player's
  * cooldown and spawns the loaded plane at the map edge, headed for the target.
- * Called from applyCommands; validation (cooldown, Flugplatz) happens there.
+ * Called from applyCommands; validation (cooldown, Flugfeld) happens there.
  */
 export function launchParadrop(state: GameState, playerId: number, cx: number, cy: number): void {
   const player = state.players.find((p) => p.id === playerId);
@@ -107,7 +107,7 @@ export function paradropSystem(state: GameState): void {
   for (const player of state.players) {
     if (
       player.paradropCooldown > 0 &&
-      state.buildings.some((b) => b.owner === player.id && b.type === 'HELIPAD')
+      state.buildings.some((b) => b.owner === player.id && b.type === 'FLUGFELD')
     ) {
       player.paradropCooldown--;
     }

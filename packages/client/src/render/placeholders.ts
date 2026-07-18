@@ -476,6 +476,33 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     },
     team: (g) => teamMark(g, 0.4, 0.4, 16),
   },
+  FLUGFELD: {
+    frameTop: 26,
+    fx: 0xcfd6dc,
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      // Ground quad in cell coordinates, iso-projected (runway markings).
+      const quad = (x0: number, y0: number, x1: number, y1: number, color: number): void => {
+        const a = iso(x0, y0);
+        const b = iso(x1, y0);
+        const c = iso(x1, y1);
+        const d = iso(x0, y1);
+        g.poly([a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y]).fill(color);
+      };
+      // Dark tarmac runway along the long axis...
+      quad(0.3, 1.2, 3.7, 2.1, 0x4a463d);
+      // ...with yellow threshold stripes at both ends and a dashed centerline.
+      quad(0.42, 1.3, 0.54, 2.0, 0xd8b13c);
+      quad(3.46, 1.3, 3.58, 2.0, 0xd8b13c);
+      for (let x = 0.85; x <= 3.05; x += 0.45) quad(x, 1.61, x + 0.22, 1.69, fx);
+      prismAt(g, 0.15, 0.15, 1.2, 0.8, 16, 0xb0a794); // hangar
+      // Windsock beside the runway end.
+      const p = iso(3.45, 0.55);
+      g.rect(p.x, p.y - 20, 1.5, 20).fill(0x6f6f6f);
+      g.poly([p.x + 1.5, p.y - 20, p.x + 11, p.y - 16.5, p.x + 1.5, p.y - 13]).fill(0xe8833a);
+    },
+    team: (g) => teamMark(g, 1.5, 1.1, 20),
+  },
   FLAKTOWER: {
     frameTop: 28,
     fx: 0xcfd6dc,

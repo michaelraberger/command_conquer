@@ -32,9 +32,9 @@ function arena(seed = 7, factions?: ['ALLIES' | 'SOVIETS', 'ALLIES' | 'SOVIETS']
   return state;
 }
 
-/** Flugplatz + ready cooldown for player 0. */
+/** Flugfeld + ready cooldown for player 0. */
 function readyParadrop(state: GameState): void {
-  constructBuilding(state, 'HELIPAD', 0, 9, 5);
+  constructBuilding(state, 'FLUGFELD', 0, 9, 5);
   state.players[0]!.paradropCooldown = 0;
 }
 
@@ -68,7 +68,7 @@ describe('paradrop support power', () => {
     expect(PARADROP_COUNTS).toEqual({ ALLIES: 6, SOVIETS: 9 });
   });
 
-  it('is refused without a Flugplatz', () => {
+  it('is refused without a Flugfeld', () => {
     const state = arena();
     state.players[0]!.paradropCooldown = 0;
     tick(state, [{ type: 'PARADROP', playerId: 0, cx: 30, cy: 30 }]);
@@ -78,19 +78,19 @@ describe('paradrop support power', () => {
 
   it('is refused while the cooldown is still charging', () => {
     const state = arena();
-    constructBuilding(state, 'HELIPAD', 0, 9, 5);
+    constructBuilding(state, 'FLUGFELD', 0, 9, 5);
     state.players[0]!.paradropCooldown = 10;
     tick(state, [{ type: 'PARADROP', playerId: 0, cx: 30, cy: 30 }]);
     expect(plane(state)).toBeUndefined();
   });
 
-  it('charges only while a Flugplatz stands, and two do not stack', () => {
+  it('charges only while a Flugfeld stands, and two do not stack', () => {
     const state = arena();
     runTicks(state, 50);
     expect(state.players[0]!.paradropCooldown).toBe(PARADROP_COOLDOWN_TICKS); // no airfield
 
-    constructBuilding(state, 'HELIPAD', 0, 9, 5);
-    constructBuilding(state, 'HELIPAD', 0, 13, 5); // second one must not stack
+    constructBuilding(state, 'FLUGFELD', 0, 9, 5);
+    constructBuilding(state, 'FLUGFELD', 0, 14, 5); // second one must not stack
     runTicks(state, 100);
     expect(state.players[0]!.paradropCooldown).toBe(PARADROP_COOLDOWN_TICKS - 100);
   });
@@ -102,7 +102,7 @@ describe('paradrop support power', () => {
     const p = plane(state)!;
     expect(p).toBeDefined();
     expect(p.passengers.length).toBe(PARADROP_COUNTS.ALLIES);
-    // Reset, then already recharging (HELIPAD stands): one tick elapsed.
+    // Reset, then already recharging (Flugfeld stands): one tick elapsed.
     expect(state.players[0]!.paradropCooldown).toBe(PARADROP_COOLDOWN_TICKS - 1);
   });
 
@@ -199,7 +199,7 @@ describe('paradrop support power', () => {
   it('the AI fires the paradrop once charged', () => {
     const state = createGame(5, { ai: true, aiDifficulty: 'hard' });
     const ai = state.players[1]!;
-    constructBuilding(state, 'HELIPAD', 1, 45, 40);
+    constructBuilding(state, 'FLUGFELD', 1, 45, 40);
     ai.paradropCooldown = 0;
     ai.aiLastAttackTick = 0;
     // Past the grace period the AI drops on its raid target.

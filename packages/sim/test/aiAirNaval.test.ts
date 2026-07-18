@@ -32,9 +32,10 @@ const countAiUnits = (state: GameState, type: string): number =>
   state.units.filter((u) => u.owner === 1 && u.type === type).length;
 
 describe('ai air power', () => {
-  it('builds a helipad and trains aircraft on any map', () => {
+  it('builds a helipad plus airfield and trains aircraft on any map', () => {
     const state = runAiGame('BADLANDS', 9000);
     expect(owns(state, 'HELIPAD') || state.winner === 1).toBe(true);
+    expect(owns(state, 'FLUGFELD') || state.winner === 1).toBe(true);
     // Either aircraft exist, or the AI already won with its ground+air push.
     const air = countAiUnits(state, 'HELI') + countAiUnits(state, 'JET');
     expect(air > 0 || state.winner === 1).toBe(true);

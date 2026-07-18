@@ -14,6 +14,7 @@ import {
   type ProductionCategory,
 } from '../rules.js';
 import { constructBuilding, spawnUnit, type GameState, type Player } from '../state.js';
+import { findFreeAirfield } from './airbase.js';
 import { canPlaceBuilding } from './placement.js';
 
 /** Net power balance for a player (produced minus consumed + cheat bonus). */
@@ -73,6 +74,11 @@ export function startProduction(state: GameState, playerId: number, item: string
     return;
   }
   if (!availableToFaction(rule.factions, player.faction)) return;
+  // One jet per Flugfeld — physical capacity, not tech, so it binds even
+  // under the motherload cheat.
+  if (isUnitType(item) && unitRule(item).airfieldBound === true && findFreeAirfield(state, playerId) === null) {
+    return;
+  }
   // Motherload cheat unlocks everything of the faction — skip prereq/tech gates.
   if (!player.motherload) {
     if (!prereqsMet(state, playerId, rule.requires)) return;
@@ -227,9 +233,17 @@ export function buildingUpgradeSystem(state: GameState): void {
 function trySpawnProduced(state: GameState, player: Player, item: string): boolean {
   if (!isUnitType(item)) return false;
   const category = unitRule(item).category;
-  const producer = state.buildings.find(
-    (b) => b.owner === player.id && buildingRule(b.type).produces === category,
-  );
+  // Jets spawn at (and get bound to) a free Flugfeld; every other unit at the
+  // first matching producer — for helis that skips the Flugfeld on purpose.
+  const bound = unitRule(item).airfieldBound === true;
+  const producer = bound
+    ? findFreeAirfield(state, player.id)
+    : state.buildings.find(
+        (b) =>
+          b.owner === player.id &&
+          b.type !== 'FLUGFELD' &&
+          buildingRule(b.type).produces === category,
+      );
   if (!producer) return false;
   const rule = buildingRule(producer.type);
   const air = unitRule(item).air === true;
@@ -247,6 +261,7 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
         if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
       }
       const unit = spawnUnit(state, item, player.id, cell.cx, cell.cy);
+      if (bound) unit.homeId = producer.id; // this Flugfeld is the jet's home
       if (producer.rallyCx >= 0) {
         unit.path = air
           ? [{ cx: producer.rallyCx, cy: producer.rallyCy }]

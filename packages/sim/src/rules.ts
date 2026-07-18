@@ -94,11 +94,14 @@ export interface UnitRule {
    *  and can only be hit by anti-air weapons. */
   air?: boolean;
   /** Combat aircraft: shots per sortie. Move orders become attack runs — fly
-   *  out, engage, and once empty (or done) return to a Flugplatz to rearm. */
+   *  out, engage, and once empty (or done) return to their pad to rearm. */
   ammo?: number;
   /** Hovering aircraft (helicopter): may PATROL and HOLD in the air — jets
    *  cannot, they always fly sorties and return to the pad. */
   hover?: boolean;
+  /** Jet: bound to the one Flugfeld it spawned at (one jet per field). It
+   *  rearms only there and crashes when that field is destroyed or sold. */
+  airfieldBound?: boolean;
   /** Weapon only engages ships (torpedoes) — never land targets or buildings. */
   navalOnly?: boolean;
   /** Submerged (submarine): only weapons with antiSub can hit it. */
@@ -264,7 +267,7 @@ export const UNIT_RULES = {
     cost: 800,
     buildTime: 70,
     category: 'infantry',
-    // Needs the air command post (Flugplatz), like its inspiration — so it also
+    // Needs the Hubschrauber-Landefläche, like its inspiration — so it also
     // sits behind the air-tech chain.
     requires: ['BARRACKS', 'HELIPAD'],
     factions: ['ALLIES'],
@@ -407,11 +410,12 @@ export const UNIT_RULES = {
     cost: 1400,
     buildTime: 120,
     category: 'air',
-    requires: ['HELIPAD'],
+    requires: ['FLUGFELD'],
     factions: ['SOVIETS'],
     sight: 9,
     air: true,
     ammo: 6,
+    airfieldBound: true,
   },
   STRIKEJET: {
     name: 'Sturmjet',
@@ -425,11 +429,12 @@ export const UNIT_RULES = {
     cost: 1200,
     buildTime: 110,
     category: 'air',
-    requires: ['HELIPAD'],
+    requires: ['FLUGFELD'],
     factions: ['ALLIES'],
     sight: 9,
     air: true,
     ammo: 16,
+    airfieldBound: true,
   },
   GUNBOAT: {
     name: 'Kanonenboot',
@@ -903,7 +908,7 @@ export const BUILDING_RULES = {
     sight: 7,
   },
   HELIPAD: {
-    name: 'Flugplatz',
+    name: 'Hubschrauber-Landefläche',
     maxHp: 900,
     cost: 1000,
     buildTime: 120,
@@ -918,6 +923,26 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 5,
+    tech: 'air',
+  },
+  FLUGFELD: {
+    name: 'Flugfeld',
+    maxHp: 900,
+    cost: 900,
+    buildTime: 100,
+    power: -30,
+    // Runway footprint: wider than the square helicopter pad. Hosts exactly
+    // ONE jet at a time (see airfieldBound units) and launches the paradrop.
+    width: 4,
+    height: 3,
+    armor: 'light',
+    produces: 'air',
+    weapon: null,
+    superweapon: null,
+    requires: ['FACTORY'],
+    buildable: true,
+    factions: null,
+    sight: 6,
     tech: 'air',
   },
   FLAKTOWER: {
@@ -1229,7 +1254,7 @@ export const SUPERWEAPON_TRAVEL_TICKS = 75;
 /** How long the iron curtain keeps vehicles/buildings invulnerable (10 s). */
 export const IRON_CURTAIN_TICKS = 150;
 
-/** Paradrop support power (free, gated on owning a Flugplatz): per-player
+/** Paradrop support power (free, gated on owning a Flugfeld): per-player
  *  cooldown, faction-sized squads, drop scatter radius around the target. */
 export const PARADROP_COOLDOWN_TICKS = 3600; // 4:00 at 15 ticks/s
 export const PARADROP_COUNTS: Record<Faction, number> = { ALLIES: 6, SOVIETS: 9 };

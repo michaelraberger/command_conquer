@@ -22,6 +22,7 @@ import {
   type ProductionCategory,
 } from './rules.js';
 import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
+import { crashBoundJets } from './systems/airbase.js';
 import { launchParadrop } from './systems/paradrop.js';
 import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
@@ -226,6 +227,9 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         );
         if (!player || !building) break;
         player.credits += sellRefund(building.type, building.level);
+        // Selling a Flugfeld loses its bound jet (fixed binding, like being
+        // destroyed) — deathSystem sweeps the crashed jet this same tick.
+        if (building.type === 'FLUGFELD') crashBoundJets(state, building);
         // Deconstruct without an explosion: free the footprint, drop the record.
         const rule = buildingRule(building.type);
         for (let y = building.cy; y < building.cy + rule.height; y++) {
@@ -265,12 +269,12 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       }
       case 'PARADROP': {
-        // Free support power: needs a standing Flugplatz and a ready cooldown.
+        // Free support power: needs a standing Flugfeld and a ready cooldown.
         // Firing into fog is allowed, same as the superweapons.
         if (!inBounds(state, cmd.cx, cmd.cy)) break;
         const player = state.players.find((p) => p.id === cmd.playerId);
         if (!player || player.paradropCooldown > 0) break;
-        if (!state.buildings.some((b) => b.owner === cmd.playerId && b.type === 'HELIPAD')) break;
+        if (!state.buildings.some((b) => b.owner === cmd.playerId && b.type === 'FLUGFELD')) break;
         launchParadrop(state, cmd.playerId, cmd.cx, cmd.cy);
         break;
       }
@@ -454,7 +458,7 @@ function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void 
   const rule = unitRule(unit.type);
   if (rule.air === true && rule.ammo !== undefined) {
     // Combat aircraft never park in the field: a move order is an attack run —
-    // fly out, engage whatever waits there, then return to the Flugplatz
+    // fly out, engage whatever waits there, then return to the pad
     // (airbaseSystem brings idle planes home).
     unit.order = { kind: 'ATTACK_MOVE', cx, cy };
     unit.path = null;

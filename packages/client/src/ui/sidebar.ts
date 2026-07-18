@@ -290,9 +290,9 @@ export class Sidebar {
       silos.push(b);
     }
     silos.sort((a, b) => a.id - b.id); // stable row order
-    // Paradrop row: shown while a Flugplatz stands (per-player cooldown).
+    // Paradrop row: shown while a Flugfeld stands (per-player cooldown).
     const hasAirfield = this.state.buildings.some(
-      (b) => b.owner === session.localPlayer && b.type === 'HELIPAD',
+      (b) => b.owner === session.localPlayer && b.type === 'FLUGFELD',
     );
     const liveKeys = new Set(silos.map((s) => `sw:${s.id}`));
     for (const [key, row] of this.swRows) {

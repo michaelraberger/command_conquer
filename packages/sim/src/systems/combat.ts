@@ -40,7 +40,7 @@ export function combatSystem(state: GameState): void {
     if (!weapon) continue;
 
     // Combat aircraft with empty racks break off: drop the order and head
-    // home to rearm (airbaseSystem flies idle planes back to the Flugplatz).
+    // home to rearm (airbaseSystem flies idle planes back to the pad).
     // Exception: a helicopter ordered to HOLD or PATROL keeps station even
     // when dry — the player decides when it goes home to rearm.
     if (rule.ammo !== undefined && unit.ammo <= 0) {

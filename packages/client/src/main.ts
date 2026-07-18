@@ -1,6 +1,6 @@
 import { applyBalance, createGame, tick, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
 import { Application, Container } from 'pixi.js';
-import { sendCommand } from './commandQueue.js';
+import { drainCommands, sendCommand } from './commandQueue.js';
 import { Camera } from './input/camera.js';
 import { Controls } from './input/controls.js';
 import { ControlGroups } from './input/groups.js';
@@ -202,13 +202,16 @@ export async function startGame(
   );
   app.stage.addChild(world);
 
-  // Dev aid: expose the live sim state (and a manual stepper for headless
-  // tabs, where rAF never fires) for console inspection (dev only).
+  // Dev aid: expose the live sim state, a command injector and a manual
+  // stepper (headless tabs never fire rAF) for console inspection (dev only).
+  // The stepper drains the same queue as the loop, so UI clicks and injected
+  // commands apply exactly like in live play.
   if (import.meta.env.DEV) {
-    const w = window as unknown as { __cacState?: unknown; __cacTick?: unknown };
+    const w = window as unknown as { __cacState?: unknown; __cacTick?: unknown; __cacCmd?: unknown };
     w.__cacState = state;
+    w.__cacCmd = sendCommand;
     w.__cacTick = (n = 1): void => {
-      for (let i = 0; i < n; i++) tick(state);
+      for (let i = 0; i < n; i++) tick(state, drainCommands());
     };
   }
 

@@ -46,18 +46,19 @@ describe('Sturmjet (Allied strike jet)', () => {
     expect(jet2.hp).toBeLessThan(unitRule('STRIKEJET').maxHp);
   });
 
-  it('needs a Flugplatz and is Allied-only', () => {
+  it('needs a Flugfeld and is Allied-only', () => {
     const s = createGame(1, { factions: ['ALLIES', 'SOVIETS'] });
     s.players[0]!.credits = 5000;
-    // No helipad yet → not buildable.
+    // No airfield yet → not buildable (a helipad alone is not enough).
+    constructBuilding(s, 'HELIPAD', 0, 24, 18);
     tick(s, [{ type: 'BUILD_START', playerId: 0, item: 'STRIKEJET' }]);
     expect(s.players[0]!.queues.air.item).toBeNull();
-    constructBuilding(s, 'HELIPAD', 0, 18, 18);
+    constructBuilding(s, 'FLUGFELD', 0, 18, 18);
     tick(s, [{ type: 'BUILD_START', playerId: 0, item: 'STRIKEJET' }]);
     expect(s.players[0]!.queues.air.item).toBe('STRIKEJET');
-    // Soviets can't build it even with a helipad (faction gate).
+    // Soviets can't build it even with an airfield (faction gate).
     s.players[1]!.credits = 5000;
-    constructBuilding(s, 'HELIPAD', 1, 50, 50);
+    constructBuilding(s, 'FLUGFELD', 1, 50, 50);
     tick(s, [{ type: 'BUILD_START', playerId: 1, item: 'STRIKEJET' }]);
     expect(s.players[1]!.queues.air.item).toBeNull();
   });

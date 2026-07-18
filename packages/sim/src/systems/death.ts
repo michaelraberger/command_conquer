@@ -1,5 +1,6 @@
 import { buildingRule } from '../rules.js';
 import { storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
+import { crashBoundJets } from './airbase.js';
 
 /**
  * Removes units and buildings at 0 hp, frees their grid reservations and
@@ -7,6 +8,12 @@ import { storedInBuilding, type Building, type GameState, type Unit } from '../s
  * deterministically.
  */
 export function deathSystem(state: GameState): void {
+  // A dying Flugfeld takes its bound jet down with it (RA2-style): crash the
+  // jet first so the unit sweep below removes it in the same tick.
+  for (const b of state.buildings) {
+    if (b.hp <= 0 && b.type === 'FLUGFELD') crashBoundJets(state, b);
+  }
+
   if (state.units.some((u) => u.hp <= 0)) {
     const survivors: Unit[] = [];
     for (const unit of state.units) {

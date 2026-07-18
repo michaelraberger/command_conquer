@@ -79,8 +79,12 @@ export interface Unit {
   /** Iron curtain: remaining ticks of invulnerability (0 = none). */
   curtainTicks: number;
   /** Combat aircraft: shots left this sortie (0 for everyone else). Empty
-   *  planes fly home and rearm at a Flugplatz (see airbaseSystem). */
+   *  planes fly home and rearm at their pad/airfield (see airbaseSystem). */
   ammo: number;
+  /** Airfield-bound jets: id of the Flugfeld this jet belongs to. Absent for
+   *  all other units and for jets from pre-Flugfeld saves (orphans: they fly
+   *  and fight but never rearm and never crash with a field). */
+  homeId?: number;
 }
 
 export interface Building {
@@ -162,7 +166,7 @@ export interface Player {
   queues: Record<ProductionCategory, ProductionQueue>;
   /** AI scratch memory — plain data so it hashes/replays. */
   aiLastAttackTick: number;
-  /** Paradrop: ticks until ready; counts down only while a Flugplatz stands. */
+  /** Paradrop: ticks until ready; counts down only while a Flugfeld stands. */
   paradropCooldown: number;
   /** Cheat: the whole map stays visible for this player. */
   mapRevealed: boolean;
