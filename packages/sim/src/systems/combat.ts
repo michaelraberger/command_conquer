@@ -36,6 +36,17 @@ export function combatSystem(state: GameState): void {
     const weapon = rule.weapon;
     if (!weapon) continue;
 
+    // Combat aircraft with empty racks break off: drop the order and head
+    // home to rearm (airbaseSystem flies idle planes back to the Flugplatz).
+    if (rule.ammo !== undefined && unit.ammo <= 0) {
+      if (unit.order !== null) {
+        unit.order = null;
+        unit.path = null;
+        unit.pathIndex = 0;
+      }
+      continue;
+    }
+
     const order = unit.order;
     if (order && order.kind === 'ATTACK') {
       const target = findTarget(state, order.targetId);
@@ -289,6 +300,8 @@ function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRul
   if (dx !== 0 || dy !== 0) unit.facing = facingFromDelta(dx, dy);
   if (unit.cooldown > 0) return;
   unit.cooldown = weapon.cooldown;
+  // Combat aircraft burn a rack per shot; empty planes break off next tick.
+  if (unitRule(unit.type).ammo !== undefined) unit.ammo--;
   state.events.push({ type: 'SHOT', x: unit.x, y: unit.y, tx: aim.x, ty: aim.y, fx: weapon.fx });
   if (weapon.projectileSpeed === 0) {
     damageTarget(state, target, weapon, { x: unit.x, y: unit.y, kind: aggroKindOfType(unit.type) });

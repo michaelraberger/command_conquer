@@ -399,7 +399,19 @@ function applyMove(state: GameState, cmd: { unitIds: number[]; playerId: number;
 /** Plain move: clears any order (manual moves override attack/harvest). */
 function moveUnitTo(state: GameState, unit: Unit, cx: number, cy: number): void {
   unit.order = null;
-  if (unitRule(unit.type).air === true) {
+  const rule = unitRule(unit.type);
+  if (rule.air === true && rule.ammo !== undefined) {
+    // Combat aircraft never park in the field: a move order is an attack run —
+    // fly out, engage whatever waits there, then return to the Flugplatz
+    // (airbaseSystem brings idle planes home).
+    unit.order = { kind: 'ATTACK_MOVE', cx, cy };
+    unit.path = null;
+    unit.pathIndex = 0;
+    unit.blockedTicks = 0;
+    unit.repathCount = 0;
+    return;
+  }
+  if (rule.air === true) {
     // Aircraft fly straight there — no ground path.
     unit.path = [{ cx, cy }];
   } else {

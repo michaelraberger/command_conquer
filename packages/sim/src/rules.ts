@@ -93,6 +93,9 @@ export interface UnitRule {
   /** Aircraft: flies in a straight line over any terrain, ignores occupancy,
    *  and can only be hit by anti-air weapons. */
   air?: boolean;
+  /** Combat aircraft: shots per sortie. Move orders become attack runs — fly
+   *  out, engage, and once empty (or done) return to a Flugplatz to rearm. */
+  ammo?: number;
   /** Weapon only engages ships (torpedoes) — never land targets or buildings. */
   navalOnly?: boolean;
   /** Submerged (submarine): only weapons with antiSub can hit it. */
@@ -386,6 +389,7 @@ export const UNIT_RULES = {
     factions: null,
     sight: 8,
     air: true,
+    ammo: 8,
   },
   JET: {
     name: 'Kampfjet',
@@ -401,6 +405,7 @@ export const UNIT_RULES = {
     factions: ['SOVIETS'],
     sight: 9,
     air: true,
+    ammo: 6,
   },
   STRIKEJET: {
     name: 'Sturmjet',
@@ -418,6 +423,7 @@ export const UNIT_RULES = {
     factions: ['ALLIES'],
     sight: 9,
     air: true,
+    ammo: 16,
   },
   GUNBOAT: {
     name: 'Kanonenboot',

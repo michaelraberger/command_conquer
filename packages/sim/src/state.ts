@@ -71,6 +71,9 @@ export interface Unit {
   passengers: Unit[];
   /** Iron curtain: remaining ticks of invulnerability (0 = none). */
   curtainTicks: number;
+  /** Combat aircraft: shots left this sortie (0 for everyone else). Empty
+   *  planes fly home and rearm at a Flugplatz (see airbaseSystem). */
+  ammo: number;
 }
 
 export interface Building {
@@ -244,6 +247,7 @@ export function spawnUnit(
     cargo: 0,
     passengers: [],
     curtainTicks: 0,
+    ammo: unitRule(type).ammo ?? 0,
   };
   if (!isAir) state.occupancy[cell] = unit.id;
   state.units.push(unit);
@@ -281,6 +285,7 @@ export function createPassenger(
     cargo: 0,
     passengers: [],
     curtainTicks: 0,
+    ammo: unitRule(type).ammo ?? 0,
   };
 }
 
@@ -577,6 +582,13 @@ export function deserialize(json: string): GameState {
     gateOwner: number[];
     fogs: number[][];
   };
+  // Saves from before the aircraft-ammo field: top the planes up on load.
+  for (const u of raw.units) {
+    if (typeof u.ammo !== 'number') u.ammo = unitRule(u.type).ammo ?? 0;
+    for (const p of u.passengers) {
+      if (typeof p.ammo !== 'number') p.ammo = unitRule(p.type).ammo ?? 0;
+    }
+  }
   return {
     ...raw,
     terrain: Uint8Array.from(raw.terrain),

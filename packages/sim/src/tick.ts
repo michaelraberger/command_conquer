@@ -1,6 +1,7 @@
 import { aiSystem } from './ai/controller.js';
 import { applyCommands, type Command } from './commands.js';
 import type { GameState } from './state.js';
+import { airbaseSystem } from './systems/airbase.js';
 import { combatSystem } from './systems/combat.js';
 import { deathSystem } from './systems/death.js';
 import { defenseReactionSystem } from './systems/defenseReaction.js';
@@ -53,6 +54,8 @@ export function tick(state: GameState, commands: Command[] = []): void {
   // Right after movement: flyAir nulls a paradrop plane's path exactly on
   // arrival, which is paradropSystem's drop/despawn signal.
   paradropSystem(state);
+  // Combat aircraft that just went idle turn for home / rearm at the pad.
+  airbaseSystem(state);
   projectileSystem(state);
   // After every damage source (combat, towers, projectiles): rally idle
   // defenders toward whoever just hit friendly units or buildings.
