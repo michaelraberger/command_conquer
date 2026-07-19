@@ -9,6 +9,7 @@ import {
   type GameState,
 } from '@cac/sim';
 import { Container, Graphics, type Application, type FederatedPointerEvent } from 'pixi.js';
+import { CURSORS } from '../render/cursors.js';
 import { screenToCell, worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { PlacementMode } from '../ui/placement.js';
@@ -83,8 +84,18 @@ export class Controls {
       return;
     }
     if (!this.dragStart) {
-      const hostile = this.selected.size > 0 && this.enemyAt(e.global) !== null;
-      this.canvas.style.cursor = hostile ? 'crosshair' : 'default';
+      // Classic C&C cursors: attack reticle over enemies, move arrows with a
+      // selection in hand, select brackets over own (selectable) units.
+      if (this.selected.size > 0) {
+        this.canvas.style.cursor =
+          this.enemyAt(e.global) !== null
+            ? CURSORS.attack
+            : this.hoverOwnUnit(e.global)
+              ? CURSORS.select
+              : CURSORS.move;
+      } else {
+        this.canvas.style.cursor = this.hoverOwnUnit(e.global) ? CURSORS.select : 'default';
+      }
       return;
     }
     const { x, y } = this.dragStart;
@@ -167,6 +178,20 @@ export class Controls {
   /** Q pressed: the next right-click orders a patrol to the clicked cell. */
   armPatrol(): void {
     if (this.selected.size > 0) this.patrolArmed = true;
+  }
+
+  /** Any own selectable unit under the cursor (for the bracket cursor)? */
+  private hoverOwnUnit(global: { x: number; y: number }): boolean {
+    const r2 = PICK_RADIUS * PICK_RADIUS;
+    for (const unit of this.state.units) {
+      if (unit.owner !== session.localPlayer) continue;
+      if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
+      const p = this.unitStagePos(unit.x, unit.y);
+      const dx = p.x - global.x;
+      const dy = p.y - global.y;
+      if (dx * dx + dy * dy < r2) return true;
+    }
+    return false;
   }
 
   /** Own carrier (transport ship or air transport) under the cursor, or null. */
