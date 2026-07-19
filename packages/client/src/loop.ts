@@ -28,6 +28,13 @@ export interface TickDriver {
   canTick(nextTick: number): boolean;
   commandsFor(nextTick: number): Command[];
   onTicked(state: GameState): void;
+  /**
+   * Extra ticks to fast-forward this frame (lockstep catch-up): the
+   * accumulator is clamped per frame and zeroed after bursts, so a tab that
+   * was hidden — rAF stops, remote frames keep arriving — could otherwise
+   * never catch up to its peers. Absent/0 for local play.
+   */
+  catchUpTicks?(): number;
 }
 
 export class LocalDriver implements TickDriver {
@@ -78,6 +85,10 @@ export function startLoop(
 
   app.ticker.add(() => {
     accumulator += Math.min(app.ticker.deltaMS, 250);
+    // Lockstep catch-up: when the driver is behind the network frontier
+    // (hidden tab, long stall), grant extra tick budget beyond wall time.
+    const extra = driver.catchUpTicks?.() ?? 0;
+    if (extra > 0) accumulator += TICK_MS * extra;
     let steps = 0;
     while (accumulator >= TICK_MS && steps < MAX_TICKS_PER_FRAME) {
       if (deps.hotkeys.paused) {

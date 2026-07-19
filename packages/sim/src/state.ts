@@ -165,6 +165,11 @@ export interface Player {
   team: number;
   /** Render tint; lives in state so replays carry identical player setups. */
   color: number;
+  /** Gave up (SURRENDER command, e.g. dropped from an internet match): no
+   *  longer counts as alive for victory; units/buildings remain standing but
+   *  uncontrolled. Optional so pre-existing saves deserialize (undefined =
+   *  not surrendered); always initialized to false for stable hashing. */
+  surrendered?: boolean;
   credits: number;
   queues: Record<ProductionCategory, ProductionQueue>;
   /** AI scratch memory — plain data so it hashes/replays. */
@@ -357,6 +362,18 @@ export const PLAYER_SPAWNS: ReadonlyArray<readonly [number, number]> = spawnCent
 /** Distinct AI tints (never blue/red, so they don't clash with a faction). */
 const AI_COLORS: readonly number[] = [0x5fd873, 0xff8a3a, 0xb98cff, 0x35c4c4, 0xf2d33c];
 
+/** Fixed seat tints for multiplayer (FFA): distinct even when two players pick
+ *  the same faction; seat order = lobby order, identical on every client. */
+const MP_COLORS: readonly number[] = [0x3aa0ff, 0xe04a3a, 0x5fd873, 0xf2d33c];
+
+/** One human seat in an internet match (lobby order = player id). */
+export interface MultiplayerSeat {
+  faction: Faction;
+  /** Display name from the lobby — part of the serialized state, so it MUST
+   *  be identical on every client (comes from the host's start payload). */
+  name: string;
+}
+
 export interface GameOptions {
   /** Per-player factions; index 0 is the human. Missing entries alternate. */
   factions?: Faction[];
@@ -377,6 +394,13 @@ export interface GameOptions {
    * and the opponent count is capped at `customMap.spawns.length - 1`.
    */
   customMap?: CustomMapData | undefined;
+  /**
+   * Internet match (lockstep): one entry per human seat, player id = array
+   * index, every seat on its OWN team (FFA). Overrides factions/opponents/ai.
+   * Every client must pass the identical seats array (host's start payload)
+   * or the sims diverge immediately.
+   */
+  multiplayer?: { seats: readonly MultiplayerSeat[] } | undefined;
 }
 
 /** Owner id of neutral map structures (Erz-Bohrturm): no Player record exists
@@ -432,8 +456,12 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
   const size = mapWidth * mapHeight;
   const mapType = customMap?.mapType ?? options.mapType ?? 'BADLANDS';
 
+  const seats = options.multiplayer?.seats;
   const maxPlayers = customMap ? customMap.spawns.length : 6;
-  const playerCount = Math.max(2, Math.min(maxPlayers, 1 + (options.opponents ?? 1)));
+  const playerCount = Math.max(
+    2,
+    Math.min(maxPlayers, seats ? seats.length : 1 + (options.opponents ?? 1)),
+  );
   const spawns = customMap
     ? customMap.spawns.slice(0, playerCount).map(([x, y]) => [x, y] as const)
     : spawnCenters(playerCount, mapWidth, mapHeight);
@@ -444,12 +472,25 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
 
   const makePlayer = (id: number): Player => ({
     id,
-    name: id === 0 ? 'Spieler' : playerCount > 2 ? `Gegner ${id}` : 'Gegner',
-    faction: factionFor(id),
-    isAi: id !== 0 && options.ai === true,
+    // Multiplayer seats: every player is human, on their own team (FFA), with
+    // a fixed per-seat tint — identical on every client by construction.
+    name: seats
+      ? seats[id]!.name
+      : id === 0
+        ? 'Spieler'
+        : playerCount > 2
+          ? `Gegner ${id}`
+          : 'Gegner',
+    faction: seats ? seats[id]!.faction : factionFor(id),
+    isAi: !seats && id !== 0 && options.ai === true,
     difficulty: options.aiDifficulty ?? 'normal',
-    team: id === 0 ? 0 : 1,
-    color: id === 0 ? FACTION_COLORS[humanFaction] : AI_COLORS[(id - 1) % AI_COLORS.length]!,
+    team: seats ? id : id === 0 ? 0 : 1,
+    color: seats
+      ? MP_COLORS[id % MP_COLORS.length]!
+      : id === 0
+        ? FACTION_COLORS[humanFaction]
+        : AI_COLORS[(id - 1) % AI_COLORS.length]!,
+    surrendered: false,
     credits: STARTING_CREDITS,
     queues: {
       building: emptyQueue(),

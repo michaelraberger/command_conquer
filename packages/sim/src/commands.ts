@@ -68,7 +68,10 @@ export type Command =
   | { type: 'DEPLOY'; playerId: number; unitIds: number[] }
   | { type: 'RESEARCH_START'; playerId: number; tech: string }
   | { type: 'RESEARCH_CANCEL'; playerId: number }
-  | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' | 'MOTHERLOAD' };
+  | { type: 'CHEAT'; playerId: number; cheat: 'MONEY' | 'REVEAL' | 'POWER' | 'MOTHERLOAD' }
+  /** Give up (internet match: injected for dropped players): the player stops
+   *  counting for victory; their units/buildings stay standing, uncontrolled. */
+  | { type: 'SURRENDER'; playerId: number };
 
 export function applyCommands(state: GameState, commands: Command[]): void {
   for (const cmd of commands) {
@@ -405,6 +408,20 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           player.motherload = true;
           player.mapRevealed = true;
         }
+        break;
+      }
+      case 'SURRENDER': {
+        const player = state.players.find((p) => p.id === cmd.playerId);
+        if (!player || player.surrendered === true) break;
+        player.surrendered = true;
+        // Abort everything in production (no refunds — the seat is gone) so
+        // half-built items don't finish for a player nobody controls.
+        for (const queue of Object.values(player.queues)) {
+          queue.item = null;
+          queue.progress = 0;
+          queue.ready = false;
+        }
+        player.research = null;
         break;
       }
       case 'SET_RALLY': {

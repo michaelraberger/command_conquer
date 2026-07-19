@@ -1,6 +1,7 @@
-import { applyBalance, createGame, tick, type BalanceConfig, type Faction, type GameState } from '@cac/sim';
+import { applyBalance, createGame, tick, type BalanceConfig, type CustomMapData, type Faction, type GameState } from '@cac/sim';
 import { Application, Container } from 'pixi.js';
 import { drainCommands, sendCommand } from './commandQueue.js';
+import { cloudEnabled } from './net/supabase.js';
 import { Camera } from './input/camera.js';
 import { Controls } from './input/controls.js';
 import { ControlGroups } from './input/groups.js';
@@ -114,6 +115,8 @@ export interface GameMeta {
   mapLabel?: string | undefined;
   /** Editor test match — the end screen offers "Zurück zum Editor". */
   testPlay?: boolean | undefined;
+  /** Internet match: no pause, no cheats, no saving, no tour. */
+  multiplayer?: boolean | undefined;
 }
 
 async function boot(): Promise<void> {
@@ -134,13 +137,16 @@ async function boot(): Promise<void> {
     return;
   }
 
-  // Cloud UI (login box, map gallery, save list) — no-ops without Supabase env.
-  const [{ initAuthUi }, { initStartTabs }] = await Promise.all([
+  // Cloud UI (login box, map gallery, save list, multiplayer lobby) — no-ops
+  // without Supabase env.
+  const [{ initAuthUi }, { initStartTabs }, { initLobbyUi }] = await Promise.all([
     import('./ui/authUi.js'),
     import('./ui/gallery.js'),
+    import('./ui/lobbyUi.js'),
   ]);
   initAuthUi();
   initStartTabs();
+  if (cloudEnabled()) initLobbyUi();
 
   const action = await showStartScreen();
   await runAction(app, action);
@@ -161,6 +167,52 @@ async function runAction(app: Application, action: StartAction): Promise<void> {
     await startGame(app, action.state, new LocalDriver(), {
       balance: action.balance,
       mapLabel: action.mapLabel,
+    });
+    return;
+  }
+  if (action.kind === 'multiplayer') {
+    // Internet match: every client builds the identical state from the host's
+    // start payload (seed + seats + balance) and hands ticking to the
+    // lockstep RemoteDriver. session.localPlayer = our seat, so every command
+    // we send is stamped correctly.
+    const match = action.match;
+    session.localPlayer = match.localSeat;
+    // Gallery map: every client fetches the identical row itself — only the
+    // id travels the wire (broadcast payloads are limited, the row is not).
+    let customMap: CustomMapData | undefined;
+    if (match.cloudMapId !== undefined) {
+      try {
+        const { getMap } = await import('./net/mapsRepo.js');
+        customMap = await getMap(match.cloudMapId);
+      } catch (err) {
+        alert(
+          `Karte konnte nicht geladen werden — die Partie kann nicht starten.\n${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        location.reload();
+        return;
+      }
+    }
+    const state = createGame(match.seed, {
+      multiplayer: { seats: match.seats },
+      mapType: match.mapType,
+      mapWidth: match.mapWidth,
+      mapHeight: match.mapHeight,
+      customMap,
+      balance: match.balance,
+    });
+    const [{ RemoteDriver }, { createMpOverlay }] = await Promise.all([
+      import('./net/lockstep.js'),
+      import('./ui/mpOverlay.js'),
+    ]);
+    const driver = new RemoteDriver(match, createMpOverlay());
+    if (import.meta.env.DEV) (window as unknown as { __mpDriver?: unknown }).__mpDriver = driver;
+    await driver.connect();
+    await startGame(app, state, driver, {
+      balance: match.balance,
+      mapLabel: match.mapLabel,
+      multiplayer: true,
     });
     return;
   }
@@ -231,22 +283,26 @@ export async function startGame(
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
   const minimap = new Minimap(state, camera);
   const debug = new DebugOverlay();
+  const solo = meta.multiplayer !== true;
   const hotkeys = new Hotkeys(
     state,
     controls,
     sendCommand,
     camera,
-    true, // solo only now → pause always available
-    await loadCheatCodes(),
+    solo, // lockstep multiplayer: pausing one client would stall everyone
+    // No cheat console in internet matches — an empty code map disables it.
+    solo ? await loadCheatCodes() : {},
     groups,
   );
   const alerts = new Alerts();
   new HelpMenu();
   new TechTreeOverlay(state);
-  const tour = new OnboardingTour();
-  tour.maybeShowOnFirstRun();
-  const { initSaveDialog } = await import('./ui/saveDialog.js');
-  initSaveDialog(state, hotkeys, meta);
+  if (solo) {
+    const tour = new OnboardingTour();
+    tour.maybeShowOnFirstRun();
+    const { initSaveDialog } = await import('./ui/saveDialog.js');
+    initSaveDialog(state, hotkeys, meta);
+  }
 
   ore.sync(state);
   fog.sync(state, session.localPlayer);

@@ -10,14 +10,17 @@ import type { GameState } from '../state.js';
 export function victorySystem(state: GameState): void {
   if (state.winner !== -1) return;
   const alive = (id: number): boolean =>
-    state.buildings.some((b) => b.owner === id && b.type !== 'WALL') ||
+    // Surrendered players (SURRENDER command, e.g. dropped from an internet
+    // match) are out — their abandoned base does not keep the game running.
+    state.players[id]?.surrendered !== true &&
+    (state.buildings.some((b) => b.owner === id && b.type !== 'WALL') ||
     // An MCV keeps you alive — including one riding inside a transport (the
     // classic island move: ferry your MCV to a new island as the base falls).
     state.units.some(
       (u) =>
         (u.owner === id && u.type === 'MCV') ||
         u.passengers.some((p) => p.owner === id && p.type === 'MCV'),
-    );
+    ));
   // Team -> representative (lowest) player id still alive.
   const aliveTeams = new Map<number, number>();
   for (const p of state.players) {

@@ -144,6 +144,7 @@ export {
   FOG_VISIBLE,
   type GameState,
   type GameOptions,
+  type MultiplayerSeat,
   type Unit,
   type UnitOrder,
   type Building,

@@ -89,6 +89,10 @@ export class Changelog {
 
   /** Auto-popup when there is something the player has not seen yet. */
   maybeAutoOpen(): void {
+    // Only over the start screen — the fetch resolves async, and a game
+    // (esp. a multiplayer match) may already be running by then.
+    const start = document.getElementById('start');
+    if (start && start.style.display === 'none') return;
     if (this.entries.length > 0 && this.unseenCount() > 0) this.open();
   }
 

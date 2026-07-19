@@ -7,7 +7,9 @@ import {
   type GameState,
   type MapType,
 } from '@cac/sim';
+import { cloudEnabled } from '../net/supabase.js';
 import { colorCss, paintMapData } from '../render/palette.js';
+import { createMapPicker, type MapSelection } from './mapPicker.js';
 
 /** Fixed seed for the start-screen thumbnails — a representative sample; the
  * actual match rolls its own seed, so details (blobs, islets) will vary. */
@@ -24,47 +26,63 @@ function paintMap(ctx: CanvasRenderingContext2D, state: MapState): void {
   }
 }
 
-/** Paints a top-down thumbnail (terrain, resources, HQ spots) per map card. */
-function renderMapPreviews(): void {
-  const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas.map-preview');
-  for (const canvas of canvases) {
-    const state = createGame(PREVIEW_SEED, { mapType: canvas.dataset['maptype'] as MapType });
-    canvas.width = state.mapWidth;
-    canvas.height = state.mapHeight;
-    paintMap(canvas.getContext('2d')!, state);
-  }
-}
-
-/**
- * Full-map backdrop: renders the selected map (with the chosen opponent count,
- * so the bases hint at what's coming) upscaled to fill the screen. It's blurred
- * and darkened in CSS, so a chunky source is fine.
- */
-function renderStartBackground(mapType: MapType, opponents: number, mapSize: number): void {
+/** Upscales the small painted source canvas into the blurred fullscreen bg. */
+function blitStartBackground(small: HTMLCanvasElement): void {
   const bg = document.getElementById('start-bg') as HTMLCanvasElement | null;
   if (!bg) return;
-  const state = createGame(PREVIEW_SEED, {
-    mapType,
-    opponents,
-    ai: true,
-    mapWidth: mapSize,
-    mapHeight: mapSize,
-  });
-  const small = document.createElement('canvas');
-  small.width = state.mapWidth;
-  small.height = state.mapHeight;
-  paintMap(small.getContext('2d')!, state);
-
   const w = window.innerWidth;
   const h = window.innerHeight;
   bg.width = w;
   bg.height = h;
   const ctx = bg.getContext('2d')!;
-  ctx.imageSmoothingEnabled = true; // smooth the 64² source into soft blobs
+  ctx.imageSmoothingEnabled = true; // smooth the chunky source into soft blobs
   const scale = Math.max(w / small.width, h / small.height);
   const dw = small.width * scale;
   const dh = small.height * scale;
   ctx.drawImage(small, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+/**
+ * Full-map backdrop following the map choice: procedural maps render a fixed-
+ * seed sample (with the chosen opponent count, so the bases hint at what's
+ * coming); gallery maps paint their authored layers.
+ */
+function renderStartBackground(
+  sel: MapSelection,
+  opponents: number,
+  mapSize: number,
+  loadMap: () => Promise<CustomMapData | undefined>,
+): void {
+  const small = document.createElement('canvas');
+  if (sel.kind === 'proc') {
+    const state = createGame(PREVIEW_SEED, {
+      mapType: sel.mapType,
+      opponents,
+      ai: true,
+      mapWidth: mapSize,
+      mapHeight: mapSize,
+    });
+    small.width = state.mapWidth;
+    small.height = state.mapHeight;
+    paintMap(small.getContext('2d')!, state);
+    blitStartBackground(small);
+    return;
+  }
+  void loadMap()
+    .then((map) => {
+      if (!map) return;
+      small.width = map.width;
+      small.height = map.height;
+      paintMapData(small.getContext('2d')!, {
+        mapWidth: map.width,
+        mapHeight: map.height,
+        terrain: map.terrain,
+        ore: map.ore,
+        resourceKind: map.resourceKind,
+      });
+      blitStartBackground(small);
+    })
+    .catch(() => undefined);
 }
 
 export interface StartChoice {
@@ -90,33 +108,57 @@ export type StartAction =
       balance?: BalanceConfig | undefined;
       mapLabel?: string | undefined;
     }
-  | { kind: 'editor'; map?: CustomMapData | undefined; cloudId?: string | undefined };
+  | { kind: 'editor'; map?: CustomMapData | undefined; cloudId?: string | undefined }
+  /** Internet match: the lobby agreed on a MatchStart (see net/lobby.ts). */
+  | { kind: 'multiplayer'; match: import('../net/lobby.js').MatchStart };
 
 /** Blocking start screen; resolves once the player picks an action. */
 export function showStartScreen(): Promise<StartAction> {
   const root = document.getElementById('start')!;
   root.style.display = 'flex';
-  renderMapPreviews();
 
   const faction = (): Faction =>
     (document.querySelector('input[name="faction"]:checked') as HTMLInputElement).value as Faction;
   const difficulty = (): AiDifficulty =>
     (document.querySelector('input[name="difficulty"]:checked') as HTMLInputElement)
       .value as AiDifficulty;
-  const mapType = (): MapType =>
-    (document.querySelector('input[name="maptype"]:checked') as HTMLInputElement).value as MapType;
   const opponents = (): number =>
     Number((document.querySelector('input[name="opponents"]:checked') as HTMLInputElement).value);
   const mapSize = (): number =>
     Number((document.querySelector('input[name="mapsize"]:checked') as HTMLInputElement).value);
 
-  // Blurred full-map backdrop that follows the map/opponent/size choice.
-  const paintBackdrop = (): void => renderStartBackground(mapType(), opponents(), mapSize());
-  paintBackdrop();
-  for (const input of document.querySelectorAll(
-    'input[name="maptype"], input[name="opponents"], input[name="mapsize"]',
-  )) {
+  const sizeRow = document.getElementById('sp-size-row')!;
+  const mapHint = document.getElementById('sp-map-hint')!;
+
+  // The map chooser (procedural + public gallery maps, list + big preview).
+  const picker = createMapPicker(document.getElementById('sp-map-picker')!, {
+    name: 'maptype',
+    cloud: cloudEnabled(),
+    getSize: mapSize,
+    onChange: () => onMapChange(),
+  });
+  void picker.refreshCloud();
+
+  // Blurred full-map backdrop that follows the map/opponent/size choice;
+  // gallery maps bring their own size, so the size row greys out for them.
+  const paintBackdrop = (): void =>
+    renderStartBackground(picker.selection(), opponents(), mapSize(), picker.loadSelectedMap);
+  const onMapChange = (): void => {
+    const sel = picker.selection();
+    sizeRow.classList.toggle('mp-disabled', sel.kind === 'cloud');
+    mapHint.textContent =
+      sel.kind === 'cloud' ? `Eigene Karte · max. ${sel.maxPlayers} Spieler` : '';
+    paintBackdrop();
+  };
+  onMapChange();
+  for (const input of document.querySelectorAll('input[name="opponents"]')) {
     input.addEventListener('change', paintBackdrop);
+  }
+  for (const input of document.querySelectorAll('input[name="mapsize"]')) {
+    input.addEventListener('change', () => {
+      picker.refreshPreview(); // procedural preview follows the size choice
+      paintBackdrop();
+    });
   }
   window.addEventListener('resize', paintBackdrop);
 
@@ -126,16 +168,38 @@ export function showStartScreen(): Promise<StartAction> {
       resolve(action);
     };
     document.getElementById('start-ai')!.addEventListener('click', () => {
-      finish({
-        kind: 'skirmish',
-        choice: {
-          faction: faction(),
-          difficulty: difficulty(),
-          mapType: mapType(),
-          opponents: opponents(),
-          mapSize: mapSize(),
-        },
-      });
+      const sel = picker.selection();
+      const base = {
+        faction: faction(),
+        difficulty: difficulty(),
+        opponents: opponents(),
+        mapSize: mapSize(),
+      };
+      if (sel.kind === 'proc') {
+        finish({ kind: 'skirmish', choice: { ...base, mapType: sel.mapType } });
+        return;
+      }
+      // Gallery map: fetch the authored layers, cap the AI count at the
+      // map's spawn capacity (the sim would clamp anyway — the UI is honest).
+      void picker
+        .loadSelectedMap()
+        .then((map) => {
+          if (!map) return;
+          finish({
+            kind: 'skirmish',
+            choice: {
+              ...base,
+              opponents: Math.min(base.opponents, map.spawns.length - 1),
+              mapType: map.mapType,
+              mapSize: map.width,
+              customMap: map,
+              mapLabel: map.name,
+            },
+          });
+        })
+        .catch((err: unknown) => {
+          mapHint.textContent = err instanceof Error ? err.message : String(err);
+        });
     });
     document.getElementById('start-editor')?.addEventListener('click', () => {
       finish({ kind: 'editor' });

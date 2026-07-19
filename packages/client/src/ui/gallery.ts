@@ -19,6 +19,7 @@ export function initStartTabs(): void {
   nav.style.display = 'flex';
   const panels: Record<string, HTMLElement> = {
     gefecht: document.getElementById('tab-gefecht')!,
+    mehrspieler: document.getElementById('tab-mehrspieler')!,
     karten: document.getElementById('tab-karten')!,
     laden: document.getElementById('tab-laden')!,
   };
