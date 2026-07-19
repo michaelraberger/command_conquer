@@ -325,6 +325,7 @@ export class EntityRenderer {
     // "offline" look never disagrees with the actual mechanic.
     const balance = powerBalance(state, session.localPlayer);
     const localDeficit = balance.used > balance.produced;
+    const bridgeBars = this.computeBridgeBarIds(state);
 
     const seen = new Set<number>();
     for (const building of state.buildings) {
@@ -398,7 +399,7 @@ export class EntityRenderer {
         view.lastStarved = starved;
         view.lastShielded = shielded;
       }
-      this.updateBuildingBar(building, view);
+      this.updateBuildingBar(building, view, bridgeBars);
     }
     for (const [id, view] of this.buildingViews) {
       if (!seen.has(id)) {
@@ -480,15 +481,68 @@ export class EntityRenderer {
     };
   }
 
-  private updateBuildingBar(building: Building, view: BuildingView): void {
+  private updateBuildingBar(
+    building: Building,
+    view: BuildingView,
+    bridgeBars: Set<number> | null,
+  ): void {
     const maxHp = buildingMaxHp(building);
-    const show = building.hp < maxHp;
+    // Bridges are one span PER CELL — a damaged crossing would sprout a bar
+    // over every hurt cell. Show one bar per contiguous bridge instead: only
+    // its weakest span (see computeBridgeBarIds).
+    const show =
+      building.hp < maxHp &&
+      (building.type !== 'BRIDGE' || (bridgeBars !== null && bridgeBars.has(building.id)));
     view.bar.visible = show;
     if (!show || building.hp === view.lastHp) return;
     view.lastHp = building.hp;
     const rule = buildingRule(building.type);
     const width = 14 + rule.width * 8;
     drawBar(view.bar, width, Math.max(0, building.hp / maxHp));
+  }
+
+  /** For every contiguous run of bridge spans: the id of its weakest damaged
+   *  span — the single span whose health bar represents the whole bridge. */
+  private computeBridgeBarIds(state: GameState): Set<number> | null {
+    let spans: Map<number, Building> | null = null;
+    for (const b of state.buildings) {
+      if (b.type !== 'BRIDGE') continue;
+      (spans ??= new Map()).set(b.cy * state.mapWidth + b.cx, b);
+    }
+    if (!spans) return null;
+    const ids = new Set<number>();
+    const visited = new Set<number>();
+    for (const idx of spans.keys()) {
+      if (visited.has(idx)) continue;
+      visited.add(idx);
+      let weakest: Building | null = null;
+      const stack = [idx];
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        const s = spans.get(cur)!;
+        if (
+          s.hp < buildingMaxHp(s) &&
+          (weakest === null || s.hp < weakest.hp || (s.hp === weakest.hp && s.id < weakest.id))
+        ) {
+          weakest = s;
+        }
+        const cx = cur % state.mapWidth;
+        const neighbours = [
+          cx > 0 ? cur - 1 : -1,
+          cx < state.mapWidth - 1 ? cur + 1 : -1,
+          cur - state.mapWidth,
+          cur + state.mapWidth,
+        ];
+        for (const n of neighbours) {
+          if (spans.has(n) && !visited.has(n)) {
+            visited.add(n);
+            stack.push(n);
+          }
+        }
+      }
+      if (weakest) ids.add(weakest.id);
+    }
+    return ids;
   }
 
   private updateUnitBar(unit: Unit, view: UnitView, isSelected: boolean): void {
