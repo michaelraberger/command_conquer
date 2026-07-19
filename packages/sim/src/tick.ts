@@ -6,6 +6,7 @@ import { combatSystem } from './systems/combat.js';
 import { deathSystem } from './systems/death.js';
 import { defenseReactionSystem } from './systems/defenseReaction.js';
 import { defenseSystem } from './systems/defense.js';
+import { bridgeRepairSystem } from './systems/bridgeRepair.js';
 import { captureSystem } from './systems/capture.js';
 import { fogSystem } from './systems/fog.js';
 import { harvestSystem } from './systems/harvest.js';
@@ -48,6 +49,7 @@ export function tick(state: GameState, commands: Command[] = []): void {
   transportSystem(state);
   spySystem(state);
   captureSystem(state);
+  bridgeRepairSystem(state);
   combatSystem(state);
   defenseSystem(state);
   movementSystem(state);

@@ -96,11 +96,14 @@ function groundMesh(texture: Texture, cx: number, cy: number): MeshSimple {
   return new MeshSimple({ texture, vertices, uvs, indices });
 }
 
-/** The terrain layer plus the hook the loop uses when a bridge span falls. */
+/** The terrain layer plus the hooks the loop uses when a bridge span falls
+ *  or an engineer rebuilds one. */
 export interface TerrainView {
   layer: Container;
   /** Swap the deck sprite at (cx,cy) for collapsed-bridge debris. */
   collapseBridge(cx: number, cy: number): void;
+  /** Swap the debris at (cx,cy) back for a deck sprite (engineer repair). */
+  restoreBridge(cx: number, cy: number): void;
 }
 
 /** Water in every form — used for shore shading around bridge cells too. */
@@ -200,6 +203,7 @@ export function buildTerrainLayer(state: GameState, tex: GameTextures): TerrainV
   // Bridge decks and (loaded-save) wrecks over the water they span. Axis
   // follows the neighbouring span cells so a run of cells reads as one bridge.
   const decks = new Map<number, Sprite>();
+  const wrecks = new Map<number, Sprite>();
   const spanAt = (nx: number, ny: number): boolean => {
     const t = terrainAt(state, nx, ny, TERRAIN_WATER);
     return t === TERRAIN_BRIDGE || t === TERRAIN_BRIDGE_WRECK;
@@ -210,32 +214,34 @@ export function buildTerrainLayer(state: GameState, tex: GameTextures): TerrainV
   };
   const deckTexture = (cx: number, cy: number): Texture =>
     spanAt(cx - 1, cy) || spanAt(cx + 1, cy) ? tex.bridgeCx : tex.bridgeCy;
+  const addBridgeSprite = (cx: number, cy: number, isDeck: boolean): void => {
+    const sprite = new Sprite(isDeck ? deckTexture(cx, cy) : tex.bridgeWreck);
+    const p = bridgeSpritePos(cx, cy);
+    sprite.position.set(p.x, p.y);
+    layer.addChild(sprite);
+    (isDeck ? decks : wrecks).set(cellIndex(state, cx, cy), sprite);
+  };
   for (let cy = 0; cy < state.mapHeight; cy++) {
     for (let cx = 0; cx < state.mapWidth; cx++) {
       const t = state.terrain[cellIndex(state, cx, cy)];
       if (t !== TERRAIN_BRIDGE && t !== TERRAIN_BRIDGE_WRECK) continue;
-      const sprite = new Sprite(t === TERRAIN_BRIDGE ? deckTexture(cx, cy) : tex.bridgeWreck);
-      const p = bridgeSpritePos(cx, cy);
-      sprite.position.set(p.x, p.y);
-      layer.addChild(sprite);
-      if (t === TERRAIN_BRIDGE) decks.set(cellIndex(state, cx, cy), sprite);
+      addBridgeSprite(cx, cy, t === TERRAIN_BRIDGE);
     }
   }
+  const swapBridgeSprite = (cx: number, cy: number, toDeck: boolean): void => {
+    const idx = cellIndex(state, cx, cy);
+    const old = (toDeck ? wrecks : decks).get(idx);
+    if (old) {
+      old.destroy();
+      (toDeck ? wrecks : decks).delete(idx);
+    }
+    addBridgeSprite(cx, cy, toDeck);
+  };
 
   return {
     layer,
-    collapseBridge(cx: number, cy: number): void {
-      const idx = cellIndex(state, cx, cy);
-      const deck = decks.get(idx);
-      if (deck) {
-        deck.destroy();
-        decks.delete(idx);
-      }
-      const wreck = new Sprite(tex.bridgeWreck);
-      const p = bridgeSpritePos(cx, cy);
-      wreck.position.set(p.x, p.y);
-      layer.addChild(wreck);
-    },
+    collapseBridge: (cx, cy) => swapBridgeSprite(cx, cy, false),
+    restoreBridge: (cx, cy) => swapBridgeSprite(cx, cy, true),
   };
 }
 

@@ -1,5 +1,6 @@
 import {
   INFANTRY_STACK,
+  TERRAIN_BRIDGE_WRECK,
   cellIndex,
   cellsAroundRect,
   inBounds,
@@ -62,6 +63,8 @@ export type Command =
   | { type: 'UNLOAD'; playerId: number; unitIds: number[] }
   | { type: 'INFILTRATE'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'CAPTURE'; playerId: number; unitIds: number[]; targetId: number }
+  /** Engineers rebuild the collapsed bridge cell at (cx,cy). */
+  | { type: 'REPAIR_BRIDGE'; playerId: number; unitIds: number[]; cx: number; cy: number }
   | { type: 'HOLD'; playerId: number; unitIds: number[] }
   | { type: 'PATROL'; playerId: number; unitIds: number[]; cx: number; cy: number }
   | { type: 'ESCORT'; playerId: number; unitIds: number[]; targetId: number }
@@ -135,10 +138,11 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       case 'REPAIR': {
         // The repair vehicle mends own buildings AND own units (vehicles,
-        // infantry, …). Pick whichever the target id refers to.
+        // infantry, …) — plus neutral bridge spans, which belong to no one.
         const building = state.buildings.find((b) => b.id === cmd.targetId);
         const targetUnit = state.units.find((u) => u.id === cmd.targetId);
-        const ownBuilding = building && building.owner === cmd.playerId;
+        const ownBuilding =
+          building && (building.owner === cmd.playerId || building.type === 'BRIDGE');
         const ownUnit = targetUnit && targetUnit.owner === cmd.playerId;
         if (!ownBuilding && !ownUnit) break;
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
@@ -343,6 +347,18 @@ export function applyCommands(state: GameState, commands: Command[]): void {
           if (unitRule(unit.type).captures !== true) continue;
           unit.order = { kind: 'CAPTURE', targetId: cmd.targetId };
           unit.path = null; // the capture system takes over pathing (chase)
+          unit.pathIndex = 0;
+        }
+        break;
+      }
+      case 'REPAIR_BRIDGE': {
+        // Engineers rebuild a collapsed span: only valid on wreck cells.
+        if (!inBounds(state, cmd.cx, cmd.cy)) break;
+        if (state.terrain[cmd.cy * state.mapWidth + cmd.cx] !== TERRAIN_BRIDGE_WRECK) break;
+        for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
+          if (unitRule(unit.type).captures !== true) continue; // engineers only
+          unit.order = { kind: 'REPAIR_BRIDGE', cx: cmd.cx, cy: cmd.cy };
+          unit.path = null; // the bridge-repair system takes over pathing
           unit.pathIndex = 0;
         }
         break;

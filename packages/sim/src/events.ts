@@ -20,6 +20,8 @@ export type SimEvent =
   /** A bridge span collapsed: cell (cx,cy) turned into TERRAIN_BRIDGE_WRECK —
    *  the client patches its terrain view and minimap. */
   | { type: 'BRIDGE_DOWN'; cx: number; cy: number }
+  /** An engineer rebuilt the span at (cx,cy): wreck → deck again. */
+  | { type: 'BRIDGE_UP'; cx: number; cy: number }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
   | { type: 'REPAIR'; x: number; y: number }
   | { type: 'PARADROP'; x: number; y: number };

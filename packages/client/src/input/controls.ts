@@ -1,6 +1,7 @@
 import {
   FOG_VISIBLE,
   TERRAIN_BRIDGE,
+  TERRAIN_BRIDGE_WRECK,
   buildingRule,
   cellIndex,
   inBounds,
@@ -56,6 +57,18 @@ export class Controls {
   private cellAt(global: { x: number; y: number }): { cx: number; cy: number } {
     const local = this.world.toLocal(global);
     return screenToCell(local.x, local.y);
+  }
+
+  /** The collapsed-bridge cell at/behind the given cell (same down-screen
+   *  neighbour probing as bridgeSpanAt). */
+  private bridgeWreckCellAt(cx: number, cy: number): { cx: number; cy: number } | undefined {
+    for (const [bx, by] of [[cx, cy], [cx + 1, cy], [cx, cy + 1]] as const) {
+      if (!inBounds(this.state, bx, by)) continue;
+      if (this.state.terrain[cellIndex(this.state, bx, by)] === TERRAIN_BRIDGE_WRECK) {
+        return { cx: bx, cy: by };
+      }
+    }
+    return undefined;
   }
 
   /** The destructible span at the given cell — the deck renders a few pixels
@@ -485,6 +498,49 @@ export class Controls {
           this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
         }
         return;
+      }
+    }
+
+    // Engineers right-clicking collapsed bridge debris rebuild the span; the
+    // repair vehicle right-clicking a damaged deck mends it in place.
+    if (!e.ctrlKey) {
+      const wreck = this.bridgeWreckCellAt(cx, cy);
+      if (wreck) {
+        const engineers = unitIds.filter((id) => {
+          const u = byId.get(id);
+          return u !== undefined && unitRule(u.type).captures === true;
+        });
+        if (engineers.length > 0) {
+          this.send({
+            type: 'REPAIR_BRIDGE',
+            playerId: session.localPlayer,
+            unitIds: engineers,
+            cx: wreck.cx,
+            cy: wreck.cy,
+          });
+          const rest = unitIds.filter((id) => !engineers.includes(id));
+          if (rest.length > 0) {
+            this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
+          }
+          return;
+        }
+      }
+      const span = this.bridgeSpanAt(cx, cy);
+      if (span && span.hp < buildingRule(span.type).maxHp) {
+        const repairers = unitIds.filter((id) => byId.get(id)?.type === 'REPAIR');
+        if (repairers.length > 0) {
+          this.send({
+            type: 'REPAIR',
+            playerId: session.localPlayer,
+            unitIds: repairers,
+            targetId: span.id,
+          });
+          const rest = unitIds.filter((id) => byId.get(id)?.type !== 'REPAIR');
+          if (rest.length > 0) {
+            this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
+          }
+          return;
+        }
       }
     }
 

@@ -127,6 +127,39 @@ describe('Zerstörbare Brücken', () => {
     expect(state.units.some((u) => u.id === victim.id)).toBe(false);
   });
 
+  it('an engineer rebuilds a collapsed span (and is consumed doing it)', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    shellSpan(state, 21, 24);
+    expect(state.terrain[cellIndex(state, 21, 24)]).toBe(TERRAIN_BRIDGE_WRECK);
+    const engineer = spawnUnit(state, 'ENGINEER', 0, 15, 24);
+    tick(state, [
+      { type: 'REPAIR_BRIDGE', playerId: 0, unitIds: [engineer.id], cx: 21, cy: 24 },
+    ]);
+    for (let i = 0; i < 400 && state.terrain[cellIndex(state, 21, 24)] !== TERRAIN_BRIDGE; i++) {
+      tick(state, []);
+    }
+    expect(state.terrain[cellIndex(state, 21, 24)]).toBe(TERRAIN_BRIDGE);
+    expect(
+      state.buildings.some((b) => b.type === 'BRIDGE' && b.cx === 21 && b.cy === 24),
+    ).toBe(true);
+    expect(state.units.some((u) => u.id === engineer.id)).toBe(false);
+    // The crossing carries traffic again.
+    const ground = findPath(state, 10, 24, 30, 24, { avoidUnits: false, selfId: 0, owner: 0 });
+    expect(ground![ground!.length - 1]!.cx).toBe(30);
+  });
+
+  it('the repair vehicle mends a damaged span', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    const span = state.buildings.find((b) => b.type === 'BRIDGE' && b.cx === 21)!;
+    span.hp = 200;
+    const truck = spawnUnit(state, 'REPAIR', 0, 16, 24);
+    tick(state, [
+      { type: 'REPAIR', playerId: 0, unitIds: [truck.id], targetId: span.id },
+    ]);
+    for (let i = 0; i < 400 && span.hp < 1000; i++) tick(state, []);
+    expect(span.hp).toBe(1000);
+  });
+
   it('the river map crossing is a real bridge with spans (2-player fast path)', () => {
     const state = createGame(7, { mapType: 'RIVER' });
     const cells: number[] = [];

@@ -47,6 +47,8 @@ export type UnitOrder =
   | { kind: 'BOARD'; targetId: number }
   | { kind: 'INFILTRATE'; targetId: number }
   | { kind: 'CAPTURE'; targetId: number }
+  /** Engineer rebuilds a collapsed bridge cell (TERRAIN_BRIDGE_WRECK). */
+  | { kind: 'REPAIR_BRIDGE'; cx: number; cy: number }
   | { kind: 'PARADROP'; cx: number; cy: number }
   /** Stand fast: fire at enemies in range but never move — not even when the
    *  base is under attack (defenseReaction only touches order-less units). */

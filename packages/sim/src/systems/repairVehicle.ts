@@ -23,7 +23,8 @@ function repairTarget(
   if (!order) return null;
   if (order.kind === 'REPAIR_BUILDING') {
     const building = state.buildings.find((b) => b.id === order.targetId);
-    if (!building || building.owner !== unit.owner) return null;
+    // Own buildings — or neutral bridge spans, which belong to no one.
+    if (!building || (building.owner !== unit.owner && building.type !== 'BRIDGE')) return null;
     return { target: { kind: 'building', building }, maxHp: buildingMaxHp(building), hp: building.hp };
   }
   if (order.kind === 'REPAIR_UNIT') {

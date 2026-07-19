@@ -347,6 +347,9 @@ export async function startGame(
           if (e.type === 'BRIDGE_DOWN') {
             terrainView.collapseBridge(e.cx, e.cy);
             minimap.refreshTerrain();
+          } else if (e.type === 'BRIDGE_UP') {
+            terrainView.restoreBridge(e.cx, e.cy);
+            minimap.refreshTerrain();
           }
         }
       },
