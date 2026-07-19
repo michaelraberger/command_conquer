@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-19-mehrspieler",
+    "date": "2026-07-19",
+    "title": "Mehrspieler übers Internet: 2–4 Spieler, jeder gegen jeden",
+    "text": "CAC kann jetzt online gespielt werden — ganz ohne eigenen Server. Im neuen Mehrspieler-Tab erstellst du eine Partie und bekommst einen 6-stelligen Beitritts-Code für bis zu drei Freunde (Konto erforderlich). In der Lobby wählt jeder seine Fraktion, der Host sucht die Karte aus — Zufallskarten in drei Größen oder jede öffentliche Karte aus der Galerie, mit großer Vorschau wie im Klassiker. Gespielt wird jeder gegen jeden, fair im Gleichschritt: Alle Befehle wirken auf allen Rechnern exakt gleich. Wer die Verbindung verliert, wird nach kurzer Wartezeit ausgetragen — seine Basis bleibt als Beute stehen. Der letzte verbliebene Kommandant gewinnt. Dazu trägt der komplette Startbildschirm jetzt Militär-Stahl: Schalterbänke, Goldschrift und roter Akzent wie im großen Vorbild.",
+    "image": "changelog/mehrspieler.png"
+  },
+  {
     "id": "2026-07-10-dauerauftraege",
     "date": "2026-07-10",
     "title": "Daueraufträge: Patrouille, Eskorte, Position halten",
