@@ -86,7 +86,8 @@ function shellSpan(state: GameState, cx: number, cy: number): void {
   tick(state, [
     { type: 'ATTACK', playerId: 0, unitIds: [tank.id], targetId: span.id },
   ]);
-  for (let i = 0; i < 600 && state.buildings.some((b) => b.id === span.id); i++) {
+  // Tough spans (heavy armor, 1000 hp): one tank needs ~22 shells.
+  for (let i = 0; i < 1200 && state.buildings.some((b) => b.id === span.id); i++) {
     tick(state, []);
   }
 }

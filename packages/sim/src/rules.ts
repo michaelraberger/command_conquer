@@ -1079,16 +1079,17 @@ export const BUILDING_RULES = {
   BRIDGE: {
     name: 'Brücke',
     // One destructible span per TERRAIN_BRIDGE cell, spawned NEUTRAL at game
-    // start (never queued, never captured). Light armor so every weapon makes
-    // visible progress — a pair of tanks drops a span in seconds, infantry
-    // can grind one down like in the original.
-    maxHp: 600,
+    // start (never queued, never captured). Deliberately TOUGH, like the
+    // original: heavy armor + lots of hp, so dropping a bridge is a real
+    // operation — small arms barely scratch it (~25%), it takes cannons
+    // (a tank needs ~22 shells) or artillery to sever a crossing.
+    maxHp: 1000,
     cost: 0,
     buildTime: 1,
     power: 0,
     width: 1,
     height: 1,
-    armor: 'light',
+    armor: 'heavy',
     produces: null,
     weapon: null,
     superweapon: null,
