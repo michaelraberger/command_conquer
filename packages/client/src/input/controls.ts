@@ -6,6 +6,7 @@ import {
   inBounds,
   toCell,
   unitRule,
+  type Building,
   type Command,
   type GameState,
 } from '@cac/sim';
@@ -57,6 +58,20 @@ export class Controls {
     return screenToCell(local.x, local.y);
   }
 
+  /** The destructible span at the given cell — the deck renders a few pixels
+   *  above its cell, so the two down-screen neighbours are probed too. */
+  private bridgeSpanAt(cx: number, cy: number): Building | undefined {
+    for (const [bx, by] of [[cx, cy], [cx + 1, cy], [cx, cy + 1]] as const) {
+      if (!inBounds(this.state, bx, by)) continue;
+      if (this.state.terrain[cellIndex(this.state, bx, by)] !== TERRAIN_BRIDGE) continue;
+      const span = this.state.buildings.find(
+        (b) => b.type === 'BRIDGE' && b.cx === bx && b.cy === by,
+      );
+      if (span) return span;
+    }
+    return undefined;
+  }
+
   private onDown(e: FederatedPointerEvent): void {
     if (this.isPanning?.()) return; // space held → camera grab-pan owns the drag
     if (this.placement.busy) {
@@ -85,11 +100,14 @@ export class Controls {
       return;
     }
     if (!this.dragStart) {
-      // Classic C&C cursors: attack reticle over enemies, move arrows with a
-      // selection in hand, select brackets over own (selectable) units.
+      // Classic C&C cursors: attack reticle over enemies (and over bridges
+      // while Ctrl force-fire is held), move arrows with a selection in hand,
+      // select brackets over own (selectable) units.
       if (this.selected.size > 0) {
+        const cell = this.cellAt(e.global);
         this.canvas.style.cursor =
-          this.enemyAt(e.global) !== null
+          this.enemyAt(e.global) !== null ||
+          (e.ctrlKey && this.bridgeSpanAt(cell.cx, cell.cy) !== undefined)
             ? CURSORS.attack
             : this.hoverOwnUnit(e.global)
               ? CURSORS.select
@@ -471,20 +489,12 @@ export class Controls {
     }
 
     // Force-fire on a bridge (classic C&C): Ctrl+right-click a span cell
-    // attacks the bridge itself so it can be dropped. The deck renders a few
-    // pixels above its cell, so clicks near its upper edge resolve to the
-    // neighbouring water cell — probe those neighbours too.
+    // attacks the bridge itself so it can be dropped.
     if (e.ctrlKey) {
-      for (const [bx, by] of [[cx, cy], [cx + 1, cy], [cx, cy + 1]] as const) {
-        if (!inBounds(this.state, bx, by)) continue;
-        if (this.state.terrain[cellIndex(this.state, bx, by)] !== TERRAIN_BRIDGE) continue;
-        const span = this.state.buildings.find(
-          (b) => b.type === 'BRIDGE' && b.cx === bx && b.cy === by,
-        );
-        if (span) {
-          this.send({ type: 'ATTACK', playerId: session.localPlayer, unitIds, targetId: span.id });
-          return;
-        }
+      const span = this.bridgeSpanAt(cx, cy);
+      if (span) {
+        this.send({ type: 'ATTACK', playerId: session.localPlayer, unitIds, targetId: span.id });
+        return;
       }
     }
 

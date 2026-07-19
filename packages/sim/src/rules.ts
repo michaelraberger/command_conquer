@@ -1079,15 +1079,16 @@ export const BUILDING_RULES = {
   BRIDGE: {
     name: 'Brücke',
     // One destructible span per TERRAIN_BRIDGE cell, spawned NEUTRAL at game
-    // start (never queued, never captured). Heavy armor: small arms barely
-    // scratch it — classic C&C, dropping a bridge takes cannon fire.
-    maxHp: 700,
+    // start (never queued, never captured). Light armor so every weapon makes
+    // visible progress — a pair of tanks drops a span in seconds, infantry
+    // can grind one down like in the original.
+    maxHp: 600,
     cost: 0,
     buildTime: 1,
     power: 0,
     width: 1,
     height: 1,
-    armor: 'heavy',
+    armor: 'light',
     produces: null,
     weapon: null,
     superweapon: null,
