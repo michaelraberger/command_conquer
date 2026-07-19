@@ -177,6 +177,9 @@ export class RemoteDriver implements TickDriver {
         this.debug.started = true;
         this.lastProgressAt = now;
         this.lastAnyMessageAt = now;
+        // The silence clock starts NOW — a slow barrier must not count toward
+        // the drop timeout, or a seat could be dropped before its first frame.
+        this.lastSeenAt.fill(now);
       } else if (now - barrierStart > START_BARRIER_MS) {
         this.halted = true;
         this.shutdown();
