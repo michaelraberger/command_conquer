@@ -1046,7 +1046,87 @@
         letter-spacing: 1px;
       }
 
-      /* Start-screen tabs (Gefecht / Mehrspieler / Karten / Laden) */
+      /* --- Classic main menu: riveted plate, stacked bars, green command
+             text (C&C-Hommage, eigene Umsetzung ohne Original-Assets). --- */
+      #start .panel.menu-mode {
+        width: min(400px, 92vw);
+        padding: 26px 30px 22px;
+      }
+      /* Corner rivets on the start plate (menu view only — sub-views scroll). */
+      #start .panel.menu-mode::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 12px 12px, #5a6672 0 2px, #262e37 3px, #0c1014 4px, transparent 5px),
+          radial-gradient(circle at calc(100% - 12px) 12px, #5a6672 0 2px, #262e37 3px, #0c1014 4px, transparent 5px),
+          radial-gradient(circle at 12px calc(100% - 12px), #5a6672 0 2px, #262e37 3px, #0c1014 4px, transparent 5px),
+          radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #5a6672 0 2px, #262e37 3px, #0c1014 4px, transparent 5px);
+        background-repeat: no-repeat;
+      }
+      .menu-plate {
+        text-align: center;
+      }
+      .menu-plate .sub {
+        border-bottom: 2px solid #b03028;
+      }
+      #main-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin-top: 4px;
+      }
+      .menu-item {
+        height: 42px;
+        font-size: 13px !important;
+        letter-spacing: 3px !important;
+        color: #79d63f !important;
+        text-shadow: 0 0 8px rgba(121, 214, 63, 0.4);
+        margin-bottom: 0 !important;
+      }
+      .menu-item:hover {
+        color: #b6ff5e !important;
+        text-shadow: 0 0 12px rgba(150, 255, 80, 0.7);
+      }
+      .menu-item.primary {
+        height: 48px;
+        font-size: 15px !important;
+        color: #8dff3d !important;
+        text-shadow: 0 0 10px rgba(141, 255, 61, 0.55);
+        border-color: #2c4a1c !important;
+        box-shadow:
+          inset 1px 1px 0 #4d5866,
+          inset -1px -1px 0 #12171d,
+          inset 0 0 0 1px rgba(141, 255, 61, 0.22) !important;
+      }
+      .menu-item:disabled {
+        color: #4c5a44 !important;
+        text-shadow: none;
+      }
+      /* Sub-view header: back control + section title. */
+      .sub-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .sub-head button {
+        width: auto;
+        margin: 0;
+        padding: 6px 12px;
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: #79d63f;
+      }
+      .sub-head span {
+        color: #e8b339;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      /* Start-screen tabs (legacy nav, unused but kept for other dialogs) */
       .tab-nav {
         display: flex;
         gap: 4px;
@@ -1939,9 +2019,11 @@
 
     <div id="start" class="fullscreen" style="display: flex">
       <canvas id="start-bg"></canvas>
-      <div class="panel">
-        <h1>CAC</h1>
-        <div class="sub">Echtzeitstrategie im Browser</div>
+      <div class="panel menu-mode" id="start-panel">
+        <div class="menu-plate">
+          <h1>CAC</h1>
+          <div class="sub">Echtzeitstrategie im Browser</div>
+        </div>
         <div id="auth-box" style="display: none">
           <span id="auth-state">Nicht angemeldet</span>
           <span>
@@ -1949,13 +2031,19 @@
             <button id="auth-logout" style="display: none">Abmelden</button>
           </span>
         </div>
-        <div class="tab-nav" id="start-tabs" style="display: none">
-          <button data-tab="gefecht" class="active">Gefecht</button>
-          <button data-tab="mehrspieler">Mehrspieler</button>
-          <button data-tab="karten">Karten</button>
-          <button data-tab="laden">Laden</button>
+        <div id="main-menu">
+          <button class="menu-item primary" data-menu="gefecht">Gefecht starten</button>
+          <button class="menu-item" data-menu="mehrspieler">Mehrspieler &amp; Online</button>
+          <button class="menu-item" data-menu="karten">Karten-Galerie</button>
+          <button class="menu-item" data-menu="laden">Spiel laden</button>
+          <button class="menu-item" id="menu-editor">Karteneditor</button>
+          <button class="menu-item" id="menu-news">Neuigkeiten</button>
         </div>
-        <div id="tab-gefecht" class="tab-panel active">
+        <div class="sub-head" id="sub-head" style="display: none">
+          <button id="menu-back">◄ Hauptmenü</button>
+          <span id="sub-title"></span>
+        </div>
+        <div id="tab-gefecht" class="tab-panel">
           <div class="field">
             <div class="field-label">Karte</div>
             <div id="sp-map-picker"></div>
@@ -1994,7 +2082,6 @@
             </div>
           </div>
           <button id="start-ai">Gefecht starten</button>
-          <button id="start-editor" class="subtle">Karteneditor öffnen</button>
         </div>
 
         <div id="tab-mehrspieler" class="tab-panel">

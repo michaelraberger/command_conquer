@@ -162,6 +162,45 @@ export function showStartScreen(): Promise<StartAction> {
   }
   window.addEventListener('resize', paintBackdrop);
 
+  // Classic main menu: stacked command bars; each entry opens its sub-view
+  // with a back control (the panels used to be tabs).
+  const panelEl = document.getElementById('start-panel')!;
+  const mainMenu = document.getElementById('main-menu')!;
+  const subHead = document.getElementById('sub-head')!;
+  const subTitle = document.getElementById('sub-title')!;
+  const panels: Record<string, { el: HTMLElement; title: string }> = {
+    gefecht: { el: document.getElementById('tab-gefecht')!, title: 'Gefecht' },
+    mehrspieler: { el: document.getElementById('tab-mehrspieler')!, title: 'Mehrspieler & Online' },
+    karten: { el: document.getElementById('tab-karten')!, title: 'Karten-Galerie' },
+    laden: { el: document.getElementById('tab-laden')!, title: 'Spiel laden' },
+  };
+  const backToMenu = (): void => {
+    for (const p of Object.values(panels)) p.el.classList.remove('active');
+    subHead.style.display = 'none';
+    mainMenu.style.display = '';
+    panelEl.classList.add('menu-mode');
+  };
+  const openPanel = (key: string): void => {
+    const panel = panels[key];
+    if (!panel) return;
+    for (const [k, p] of Object.entries(panels)) p.el.classList.toggle('active', k === key);
+    subTitle.textContent = panel.title;
+    subHead.style.display = '';
+    mainMenu.style.display = 'none';
+    panelEl.classList.remove('menu-mode');
+    startMenuHooks.onOpen[key]?.();
+    if (key === 'gefecht') paintBackdrop(); // canvas may have been created hidden
+  };
+  for (const btn of mainMenu.querySelectorAll<HTMLButtonElement>('[data-menu]')) {
+    btn.addEventListener('click', () => openPanel(btn.dataset['menu']!));
+    // Online features need the cloud; without it only Gefecht/Editor remain.
+    if (btn.dataset['menu'] !== 'gefecht' && !cloudEnabled()) btn.style.display = 'none';
+  }
+  document.getElementById('menu-back')!.addEventListener('click', backToMenu);
+  document.getElementById('menu-news')!.addEventListener('click', () => {
+    document.getElementById('changelog-link')?.click();
+  });
+
   return new Promise((resolve) => {
     const finish = (action: StartAction): void => {
       root.style.display = 'none';
@@ -201,7 +240,7 @@ export function showStartScreen(): Promise<StartAction> {
           mapHint.textContent = err instanceof Error ? err.message : String(err);
         });
     });
-    document.getElementById('start-editor')?.addEventListener('click', () => {
+    document.getElementById('menu-editor')?.addEventListener('click', () => {
       finish({ kind: 'editor' });
     });
     startScreenHooks.onAction = finish;
@@ -212,6 +251,11 @@ export function showStartScreen(): Promise<StartAction> {
  *  start promise without threading callbacks through showStartScreen. */
 export const startScreenHooks: { onAction: ((action: StartAction) => void) | null } = {
   onAction: null,
+};
+
+/** Per-panel open callbacks (gallery/save list register their refreshers). */
+export const startMenuHooks: { onOpen: Record<string, () => void> } = {
+  onOpen: {},
 };
 
 /** Victory/defeat overlay. */

@@ -5,39 +5,23 @@ import { deleteSave, listSaves, loadSaveData } from '../net/savesRepo.js';
 import { cloudEnabled } from '../net/supabase.js';
 import { paintMapData } from '../render/palette.js';
 import { authUser, onUserChange } from './authUi.js';
-import { startScreenHooks } from './screens.js';
+import { startMenuHooks, startScreenHooks } from './screens.js';
 
 /**
- * Start-panel tabs: Gefecht (the classic skirmish form), Karten (own + public
- * custom maps) and Laden (cloud saves). Only shown when Supabase is configured;
- * guests still get the Karten tab to play public maps.
+ * Cloud sub-views of the main menu: Karten (own + public custom maps) and
+ * Laden (cloud saves) refresh their lists whenever their menu entry opens.
+ * Without Supabase the menu hides these entries entirely (see screens.ts).
  */
 export function initStartTabs(): void {
   if (!cloudEnabled()) return;
 
-  const nav = document.getElementById('start-tabs')!;
-  nav.style.display = 'flex';
-  const panels: Record<string, HTMLElement> = {
-    gefecht: document.getElementById('tab-gefecht')!,
-    mehrspieler: document.getElementById('tab-mehrspieler')!,
-    karten: document.getElementById('tab-karten')!,
-    laden: document.getElementById('tab-laden')!,
-  };
-  for (const btn of nav.querySelectorAll<HTMLButtonElement>('[data-tab]')) {
-    btn.addEventListener('click', () => {
-      for (const b of nav.querySelectorAll('button')) b.classList.toggle('active', b === btn);
-      for (const [key, panel] of Object.entries(panels)) {
-        panel.classList.toggle('active', key === btn.dataset['tab']);
-      }
-      if (btn.dataset['tab'] === 'karten') void refreshMaps();
-      if (btn.dataset['tab'] === 'laden') void refreshSaves();
-    });
-  }
+  startMenuHooks.onOpen['karten'] = () => void refreshMaps();
+  startMenuHooks.onOpen['laden'] = () => void refreshSaves();
 
   onUserChange(() => {
-    // Re-render on login/logout when a cloud tab is open.
-    if (panels['karten']!.classList.contains('active')) void refreshMaps();
-    if (panels['laden']!.classList.contains('active')) void refreshSaves();
+    // Re-render on login/logout when a cloud view is open.
+    if (document.getElementById('tab-karten')!.classList.contains('active')) void refreshMaps();
+    if (document.getElementById('tab-laden')!.classList.contains('active')) void refreshSaves();
   });
 }
 
