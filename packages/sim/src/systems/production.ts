@@ -12,8 +12,9 @@ import {
   MOTHERLOAD_CREDITS,
   MOTHERLOAD_POWER,
   type ProductionCategory,
+  type UnitCategory,
 } from '../rules.js';
-import { constructBuilding, spawnUnit, type GameState, type Player } from '../state.js';
+import { constructBuilding, spawnUnit, type Building, type GameState, type Player } from '../state.js';
 import { findFreeAirfield } from './airbase.js';
 import { canPlaceBuilding } from './placement.js';
 
@@ -229,6 +230,24 @@ export function buildingUpgradeSystem(state: GameState): void {
   }
 }
 
+/** The producer the player marked primary via SET_RALLY — if it still stands,
+ *  is still theirs and still produces this category; undefined otherwise. */
+function primaryProducer(
+  state: GameState,
+  player: Player,
+  category: UnitCategory,
+): Building | undefined {
+  const id = player.primaryBuildings?.[category];
+  if (id === undefined) return undefined;
+  const b = state.buildings.find((x) => x.id === id);
+  return b &&
+    b.owner === player.id &&
+    b.type !== 'FLUGFELD' &&
+    buildingRule(b.type).produces === category
+    ? b
+    : undefined;
+}
+
 /** Spawns a finished unit next to its producing building; false if blocked. */
 function trySpawnProduced(state: GameState, player: Player, item: string): boolean {
   if (!isUnitType(item)) return false;
@@ -238,12 +257,13 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
   const bound = unitRule(item).airfieldBound === true;
   const producer = bound
     ? findFreeAirfield(state, player.id)
-    : state.buildings.find(
+    : (primaryProducer(state, player, category) ??
+      state.buildings.find(
         (b) =>
           b.owner === player.id &&
           b.type !== 'FLUGFELD' &&
           buildingRule(b.type).produces === category,
-      );
+      ));
   if (!producer) return false;
   const rule = buildingRule(producer.type);
   const air = unitRule(item).air === true;

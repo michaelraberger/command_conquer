@@ -12,6 +12,7 @@ import type { FogRenderer } from './render/fog.js';
 import type { OreRenderer } from './render/ore.js';
 import type { PatrolRouteOverlay } from './render/patrolRoutes.js';
 import type { PrismLinkOverlay } from './render/prismLinks.js';
+import type { RallyOverlay } from './render/rally.js';
 import { session } from './session.js';
 import type { Alerts } from './ui/alerts.js';
 import type { DebugOverlay } from './ui/debug.js';
@@ -58,6 +59,7 @@ export interface LoopDeps {
   ore: OreRenderer;
   fog: FogRenderer;
   buildRadius: BuildRadiusOverlay;
+  rally: RallyOverlay;
   sidebar: Sidebar;
   minimap: Minimap;
   debug: DebugOverlay;
@@ -66,6 +68,8 @@ export interface LoopDeps {
   groups: ControlGroups;
   groupBar: GroupBar;
   onGameOver: (winner: number) => void;
+  /** Extra per-tick event hook (bridge collapses patch terrain + minimap). */
+  onSimEvents?: (events: GameState['events']) => void;
 }
 
 /**
@@ -103,6 +107,7 @@ export function startLoop(
       tick(state, driver.commandsFor(state.tick));
       driver.onTicked(state);
       deps.effects.ingest(state.events); // events are cleared next tick
+      deps.onSimEvents?.(state.events);
       accumulator -= TICK_MS;
       steps++;
     }
@@ -134,6 +139,7 @@ export function startLoop(
     deps.patrolRoutes.update(state, deps.controls.selected, deps.hotkeys.showAllRadius);
     deps.effects.update(app.ticker.deltaMS);
     deps.buildRadius.update(state, deps.controls.selectedBuilding, deps.hotkeys.showAllRadius);
+    deps.rally.update(state, deps.controls.selectedBuilding);
     deps.groupBar.sync();
     deps.sidebar.update();
     deps.debug.update(state, app.ticker.FPS, deps.controls.selected.size);

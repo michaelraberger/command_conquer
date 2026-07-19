@@ -5,6 +5,7 @@ import {
   INFANTRY_STACK,
   RESOURCE_GEMS,
   RESOURCE_ORE,
+  TERRAIN_BRIDGE,
   cellIndex,
   clearArea,
   generateTerrain,
@@ -172,6 +173,12 @@ export interface Player {
   surrendered?: boolean;
   credits: number;
   queues: Record<ProductionCategory, ProductionQueue>;
+  /** Primary producer per unit category: finished units spawn at this
+   *  building. Set by SET_RALLY (classic primary-building behavior); stale or
+   *  missing entries fall back to the first matching producer. Optional so
+   *  pre-existing saves deserialize; always initialized to {} for stable
+   *  hashing. */
+  primaryBuildings?: Partial<Record<ProductionCategory, number>>;
   /** AI scratch memory — plain data so it hashes/replays. */
   aiLastAttackTick: number;
   /** Paradrop: ticks until ready; counts down only while a Flugfeld stands. */
@@ -339,15 +346,38 @@ export function constructBuilding(
     charge: 0,
     curtainTicks: 0,
   };
-  for (let y = cy; y < cy + rule.height; y++) {
-    for (let x = cx; x < cx + rule.width; x++) {
-      const idx = cellIndex(state, x, y);
-      state.structures[idx] = building.id;
-      if (type === 'GATE') state.gateOwner[idx] = owner + 1;
+  // Bridge spans never enter the structures grid: ground units drive over
+  // them and ships sail beneath — the span is only a damage target.
+  if (type !== 'BRIDGE') {
+    for (let y = cy; y < cy + rule.height; y++) {
+      for (let x = cx; x < cx + rule.width; x++) {
+        const idx = cellIndex(state, x, y);
+        state.structures[idx] = building.id;
+        if (type === 'GATE') state.gateOwner[idx] = owner + 1;
+      }
     }
   }
   state.buildings.push(building);
   return building;
+}
+
+/**
+ * Ensures every TERRAIN_BRIDGE cell carries a neutral, destructible BRIDGE
+ * span (classic C&C: force-fire drops the bridge). Idempotent — called at
+ * game creation and after loading saves from before spans existed.
+ */
+export function spawnBridgeSpans(state: GameState): void {
+  const spanned = new Set<number>();
+  for (const b of state.buildings) {
+    if (b.type === 'BRIDGE') spanned.add(cellIndex(state, b.cx, b.cy));
+  }
+  for (let cy = 0; cy < state.mapHeight; cy++) {
+    for (let cx = 0; cx < state.mapWidth; cx++) {
+      const idx = cellIndex(state, cx, cy);
+      if (state.terrain[idx] !== TERRAIN_BRIDGE || spanned.has(idx)) continue;
+      constructBuilding(state, 'BRIDGE', NEUTRAL_OWNER, cx, cy);
+    }
+  }
 }
 
 /** The cell in front of a refinery where harvesters dock to unload. */
@@ -499,6 +529,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       air: emptyQueue(),
       naval: emptyQueue(),
     },
+    primaryBuildings: {},
     aiLastAttackTick: 0,
     paradropCooldown: PARADROP_COOLDOWN_TICKS,
     mapRevealed: false,
@@ -575,6 +606,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     spawnUnit(state, 'RIFLEMAN', 1, 48, 48);
     spawnUnit(state, 'RIFLEMAN', 1, 49, 48);
     spawnUnit(state, 'HARVESTER', 1, 43, 47);
+    spawnBridgeSpans(state); // river-map bridge cells need their spans too
     return state;
   }
 
@@ -616,6 +648,9 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     constructBuilding(state, nb.type as BuildingType, NEUTRAL_OWNER, nb.cx, nb.cy);
   }
 
+  // Destructible neutral span on every authored bridge cell.
+  spawnBridgeSpans(state);
+
   return state;
 }
 
@@ -643,6 +678,10 @@ export function deserialize(json: string): GameState {
     gateOwner: number[];
     fogs: number[][];
   };
+  // Saves from before the primary-building field: default it in.
+  for (const p of raw.players) {
+    if (!p.primaryBuildings) p.primaryBuildings = {};
+  }
   // Saves from before the aircraft-ammo field: top the planes up on load.
   for (const u of raw.units) {
     if (typeof u.ammo !== 'number') u.ammo = unitRule(u.type).ammo ?? 0;
@@ -650,6 +689,9 @@ export function deserialize(json: string): GameState {
       if (typeof p.ammo !== 'number') p.ammo = unitRule(p.type).ammo ?? 0;
     }
   }
+  // NOTE: no bridge-span retrofit here — deserialize(serialize(s)) must
+  // reproduce s exactly (lockstep resync depends on it). Saves from before
+  // destructible bridges simply keep their spans-less, indestructible decks.
   return {
     ...raw,
     terrain: Uint8Array.from(raw.terrain),

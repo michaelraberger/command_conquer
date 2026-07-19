@@ -8,6 +8,7 @@ import { ControlGroups } from './input/groups.js';
 import { Hotkeys, type CheatCodes, type CheatKind } from './input/hotkeys.js';
 import { LocalDriver, startLoop, type TickDriver } from './loop.js';
 import { BuildRadiusOverlay } from './render/buildRadius.js';
+import { RallyOverlay } from './render/rally.js';
 import { Effects } from './render/effects.js';
 import { EntityRenderer } from './render/entities.js';
 import { FogRenderer } from './render/fog.js';
@@ -155,6 +156,9 @@ async function boot(): Promise<void> {
 /** Dispatches a start-screen action; each branch ends in a running game. */
 async function runAction(app: Application, action: StartAction): Promise<void> {
   if (action.kind === 'editor') {
+    // The editor edits a flat top-down draft — no elevation while editing.
+    const { clearHeightField } = await import('./render/height.js');
+    clearHeightField();
     const { openEditor } = await import('./editor/editor.js');
     await openEditor(app, action.map ? { map: action.map, cloudId: action.cloudId ?? null } : undefined);
     return;
@@ -232,10 +236,15 @@ export async function startGame(
   driver: TickDriver,
   meta: GameMeta = {},
 ): Promise<void> {
+  // Elevation is part of the projection — install BEFORE any layer is built
+  // so terrain, doodads, buildings and units all agree on the same hills.
+  const { installHeightField } = await import('./render/height.js');
+  installHeightField(state);
   const textures = createTextures(app.renderer);
 
   const world = new Container();
-  const terrainLayer = buildTerrainLayer(state, textures);
+  const terrainView = buildTerrainLayer(state, textures);
+  const terrainLayer = terrainView.layer;
   const ore = new OreRenderer(textures);
   const ghostLayer = new Container();
   const entityLayer = new Container();
@@ -274,6 +283,7 @@ export async function startGame(
   camera.attach(app.canvas);
   const entities = new EntityRenderer(entityLayer, textures, state);
   const buildRadius = new BuildRadiusOverlay(ghostLayer);
+  const rally = new RallyOverlay(ghostLayer);
   const placement = new PlacementMode(ghostLayer, state, sendCommand);
   const controls = new Controls(app, world, state, sendCommand, placement);
   controls.isPanning = () => camera.spaceHeld;
@@ -322,6 +332,7 @@ export async function startGame(
       ore,
       fog,
       buildRadius,
+      rally,
       sidebar,
       minimap,
       debug,
@@ -331,6 +342,14 @@ export async function startGame(
       groupBar,
       onGameOver: (winner) =>
         showEndScreen(winner === session.localPlayer, { backToEditor: meta.testPlay === true }),
+      onSimEvents: (events) => {
+        for (const e of events) {
+          if (e.type === 'BRIDGE_DOWN') {
+            terrainView.collapseBridge(e.cx, e.cy);
+            minimap.refreshTerrain();
+          }
+        }
+      },
     },
     driver,
   );

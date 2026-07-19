@@ -1,5 +1,5 @@
-import { releaseCell } from '../map.js';
-import { buildingRule } from '../rules.js';
+import { TERRAIN_BRIDGE_WRECK, cellIndex, releaseCell } from '../map.js';
+import { buildingRule, unitRule } from '../rules.js';
 import { storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
 import { crashBoundJets } from './airbase.js';
 
@@ -13,6 +13,23 @@ export function deathSystem(state: GameState): void {
   // jet first so the unit sweep below removes it in the same tick.
   for (const b of state.buildings) {
     if (b.hp <= 0 && b.type === 'FLUGFELD') crashBoundJets(state, b);
+  }
+
+  // A collapsing bridge span leaves an impassable wreck cell and drops
+  // everyone standing on the deck into the water (ships passing beneath and
+  // aircraft above are spared). Runs before the unit sweep so victims are
+  // removed in the same tick.
+  for (const b of state.buildings) {
+    if (b.hp > 0 || b.type !== 'BRIDGE') continue;
+    const idx = cellIndex(state, b.cx, b.cy);
+    state.terrain[idx] = TERRAIN_BRIDGE_WRECK;
+    for (const u of state.units) {
+      const rule = unitRule(u.type);
+      if (u.hp > 0 && u.cell === idx && rule.air !== true && rule.category !== 'naval') {
+        u.hp = 0;
+      }
+    }
+    state.events.push({ type: 'BRIDGE_DOWN', cx: b.cx, cy: b.cy });
   }
 
   if (state.units.some((u) => u.hp <= 0)) {

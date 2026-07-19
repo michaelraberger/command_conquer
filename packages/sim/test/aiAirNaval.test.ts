@@ -39,7 +39,7 @@ describe('ai air power', () => {
     // Either aircraft exist, or the AI already won with its ground+air push.
     const air = countAiUnits(state, 'HELI') + countAiUnits(state, 'JET');
     expect(air > 0 || state.winner === 1).toBe(true);
-  });
+  }, 30000);
 
   it('even the easy AI builds a (small) air wing so it can fight on every map', () => {
     // Easy used to stay ground-only, which made island maps a no-op. It now

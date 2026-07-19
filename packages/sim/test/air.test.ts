@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TERRAIN_DIRT,
   TERRAIN_ROCK,
   TRANSPORT_CAPACITY,
   cellCenter,
@@ -17,13 +18,15 @@ function runTicks(state: GameState, n: number): void {
   for (let i = 0; i < n; i++) tick(state);
 }
 
-/** Empty battlefield with both HQs so nobody auto-loses. */
+/** Empty battlefield with both HQs so nobody auto-loses. Terrain normalised
+ *  to plain dirt so generator changes never shift the movement targets. */
 function arena(seed = 7): GameState {
   const state = createGame(seed);
   state.units = [];
   state.buildings = [];
   state.occupancy.fill(0);
   state.structures.fill(0);
+  state.terrain.fill(TERRAIN_DIRT);
   constructBuilding(state, 'CONYARD', 0, 5, 5);
   constructBuilding(state, 'CONYARD', 1, 55, 55);
   return state;

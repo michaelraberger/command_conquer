@@ -36,6 +36,11 @@ export class Minimap {
     });
   }
 
+  /** Re-bake the terrain base after a runtime change (bridge collapse). */
+  refreshTerrain(): void {
+    this.bakeTerrain();
+  }
+
   private bakeTerrain(): void {
     const ctx = this.base.getContext('2d')!;
     const img = ctx.createImageData(this.state.mapWidth, this.state.mapHeight);

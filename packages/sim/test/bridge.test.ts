@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   TERRAIN_BRIDGE,
+  TERRAIN_BRIDGE_WRECK,
   TERRAIN_WATER,
   canPlaceBuilding,
+  cellIndex,
   createGame,
+  deserialize,
   emptyCustomMap,
   findPath,
   isBuildableKind,
   isNavigableWater,
   isOpenWater,
   isPassableKind,
+  serialize,
+  spawnUnit,
+  tick,
   validateCustomMap,
   type CustomMapData,
+  type GameState,
 } from '../src/index.js';
 
 /** 48×48 dirt map with a vertical water channel at x=20..22 and a bridge
@@ -69,5 +76,76 @@ describe('Brücke (TERRAIN_BRIDGE)', () => {
     const state = createGame(7, { customMap: map });
     expect(canPlaceBuilding(state, 0, 'POWER', sx + 5, sy)).toBe(false);
     expect(canPlaceBuilding(state, 0, 'POWER', sx - 4, sy - 4)).toBe(true);
+  });
+});
+
+/** Ticks until the span at (cx,cy) is gone (or the safety budget runs out). */
+function shellSpan(state: GameState, cx: number, cy: number): void {
+  const span = state.buildings.find((b) => b.type === 'BRIDGE' && b.cx === cx && b.cy === cy)!;
+  const tank = spawnUnit(state, 'TANK', 0, cx - 5, cy);
+  tick(state, [
+    { type: 'ATTACK', playerId: 0, unitIds: [tank.id], targetId: span.id },
+  ]);
+  for (let i = 0; i < 600 && state.buildings.some((b) => b.id === span.id); i++) {
+    tick(state, []);
+  }
+}
+
+describe('Zerstörbare Brücken', () => {
+  it('spawns one neutral, non-blocking span per bridge cell', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    const spans = state.buildings.filter((b) => b.type === 'BRIDGE');
+    expect(spans).toHaveLength(3);
+    for (const s of spans) {
+      expect(s.owner).toBe(-1);
+      // Never in the structures grid: units drive over, ships sail beneath.
+      expect(state.structures[cellIndex(state, s.cx, s.cy)]).toBe(0);
+    }
+  });
+
+  it('a shelled span collapses into an impassable wreck that ships can cross', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    shellSpan(state, 21, 24);
+    expect(state.buildings.some((b) => b.type === 'BRIDGE' && b.cx === 21)).toBe(false);
+    expect(state.terrain[cellIndex(state, 21, 24)]).toBe(TERRAIN_BRIDGE_WRECK);
+    expect(isPassableKind(TERRAIN_BRIDGE_WRECK)).toBe(false);
+    expect(isNavigableWater(state, 21, 24)).toBe(true);
+    // The ground route across the row is severed once the middle span is out:
+    // best-effort pathing stops at the west side of the gap (cx ≤ 20).
+    const ground = findPath(state, 10, 24, 30, 24, { avoidUnits: false, selfId: 0, owner: 0 });
+    expect(ground).not.toBeNull();
+    expect(ground![ground!.length - 1]!.cx).toBeLessThanOrEqual(20);
+  });
+
+  it('drops ground units standing on the collapsing span', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    const victim = spawnUnit(state, 'RIFLEMAN', 1, 21, 24);
+    // Hold position so auto-defense doesn't walk the victim off the deck.
+    tick(state, [{ type: 'HOLD', playerId: 1, unitIds: [victim.id] }]);
+    shellSpan(state, 21, 24);
+    expect(state.units.some((u) => u.id === victim.id)).toBe(false);
+  });
+
+  it('the river map crossing is a real bridge with spans (2-player fast path)', () => {
+    const state = createGame(7, { mapType: 'RIVER' });
+    const cells: number[] = [];
+    for (let i = 0; i < state.terrain.length; i++) {
+      if (state.terrain[i] === TERRAIN_BRIDGE) cells.push(i);
+    }
+    expect(cells.length).toBeGreaterThan(0);
+    const spans = state.buildings.filter((b) => b.type === 'BRIDGE');
+    expect(spans).toHaveLength(cells.length);
+  });
+
+  it('bridge spans survive a save/load roundtrip exactly once', () => {
+    const state = createGame(7, { customMap: bridgeMap() });
+    const loaded = deserialize(serialize(state));
+    expect(loaded.buildings.filter((b) => b.type === 'BRIDGE')).toHaveLength(3);
+    // Roundtrip must reproduce the state EXACTLY — no spans invented on load
+    // (saves from before the feature keep indestructible decks).
+    const legacy = deserialize(
+      serialize({ ...state, buildings: state.buildings.filter((b) => b.type !== 'BRIDGE') }),
+    );
+    expect(legacy.buildings.filter((b) => b.type === 'BRIDGE')).toHaveLength(0);
   });
 });

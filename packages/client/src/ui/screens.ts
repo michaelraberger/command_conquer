@@ -21,7 +21,11 @@ type MapState = ReturnType<typeof createGame>;
 function paintMap(ctx: CanvasRenderingContext2D, state: MapState): void {
   paintMapData(ctx, state);
   for (const b of state.buildings) {
-    ctx.fillStyle = colorCss(state.players[b.owner]!.color);
+    // Neutral map furniture (bridge spans, ore drills) has no player record —
+    // the terrain already shows it, only player bases get a colour dot.
+    const owner = state.players[b.owner];
+    if (!owner) continue;
+    ctx.fillStyle = colorCss(owner.color);
     ctx.fillRect(b.cx - 1, b.cy - 1, 4, 4);
   }
 }

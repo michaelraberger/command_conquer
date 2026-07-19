@@ -15,6 +15,9 @@ export const TERRAIN_GRASS = 4;
 export const TERRAIN_ICE = 5;
 export const TERRAIN_SAND = 6;
 export const TERRAIN_BRIDGE = 7;
+/** A collapsed bridge cell: impassable for ground units, open for ships.
+ *  Never authored in the editor — only bridge destruction produces it. */
+export const TERRAIN_BRIDGE_WRECK = 8;
 
 /** Resource field kinds (per cell, permanent — fields regrow on them). */
 export const RESOURCE_NONE = 0;
@@ -85,12 +88,16 @@ export function passableFor(grid: GridView, cx: number, cy: number, owner: numbe
   return grid.gateOwner[idx] === owner + 1;
 }
 
-/** Sailable for ships: water or the passage under a bridge, no structure. */
+/** Sailable for ships: water or the passage under a (possibly collapsed)
+ *  bridge, no structure. */
 export function isNavigableWater(grid: GridView, cx: number, cy: number): boolean {
   if (!inBounds(grid, cx, cy)) return false;
   const idx = cellIndex(grid, cx, cy);
   const t = grid.terrain[idx];
-  return (t === TERRAIN_WATER || t === TERRAIN_BRIDGE) && grid.structures[idx] === 0;
+  return (
+    (t === TERRAIN_WATER || t === TERRAIN_BRIDGE || t === TERRAIN_BRIDGE_WRECK) &&
+    grid.structures[idx] === 0
+  );
 }
 
 /* ---------------------- unit occupancy bookkeeping ----------------------- *
@@ -221,14 +228,116 @@ export function generateTerrain(
   mapType: MapType = 'BADLANDS',
   spawns: ReadonlyArray<readonly [number, number]> = SPAWN_LAYOUTS[2]!,
 ): Uint8Array {
-  if (mapType === 'RIVER') return generateRiver(width, height, rng);
   if (mapType === 'ISLANDS') return generateIslands(width, height, rng, spawns);
-  return generateBadlands(width, height, rng);
+  const terrain =
+    mapType === 'RIVER'
+      ? generateRiver(width, height, rng)
+      : generateBadlands(width, height, rng, spawns);
+  carveTrails(terrain, width, height, rng, spawns);
+  const nearSpawn = (cx: number, cy: number): boolean =>
+    spawns.some(([sx, sy]) => (cx - sx) * (cx - sx) + (cy - sy) * (cy - sy) < 49);
+  stoneRiverBanks(terrain, width, height, rng, nearSpawn);
+  return terrain;
 }
 
-/** Classic badlands: dirt base, grass patches, lakes, rocks, tree clusters. */
-function generateBadlands(width: number, height: number, rng: RngCarrier): Uint8Array {
-  const terrain = new Uint8Array(width * height).fill(TERRAIN_DIRT);
+/**
+ * Trampled DIRT trails from each base toward the map centre — pure flavour
+ * in the spirit of the Tiberian-Dawn maps (worn brown tracks through the
+ * grass). Only soft ground is painted; water, rock and trees stay untouched,
+ * so the trail fades where the terrain gets rough (and never bridges the
+ * river). Runs in straight-ish segments instead of per-step jitter so the
+ * track reads as a smooth path, not a staircase. Deterministic via the rng.
+ */
+function carveTrails(
+  terrain: Uint8Array,
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  spawns: ReadonlyArray<readonly [number, number]>,
+): void {
+  const midX = Math.floor(width / 2);
+  const midY = Math.floor(height / 2);
+  const paint = (cx: number, cy: number): void => {
+    if (cx < 1 || cy < 1 || cx >= width - 1 || cy >= height - 1) return;
+    const idx = cy * width + cx;
+    if (terrain[idx] === TERRAIN_GRASS || terrain[idx] === TERRAIN_SAND) {
+      terrain[idx] = TERRAIN_DIRT;
+    }
+  };
+  for (const [sx, sy] of spawns) {
+    let x = sx;
+    let y = sy;
+    let guard = width + height;
+    // Walk in segments: pick an axis, follow it for a few cells, re-decide.
+    let axisX = Math.abs(midX - x) > Math.abs(midY - y);
+    let run = 0;
+    while ((x !== midX || y !== midY) && guard-- > 0) {
+      paint(x, y);
+      paint(x + 1, y);
+      paint(x, y + 1);
+      if (run <= 0) {
+        // New segment: mostly toward the centre, occasionally a sidestep.
+        axisX = nextInt(rng, 5) === 0 ? !axisX : Math.abs(midX - x) >= Math.abs(midY - y);
+        run = 2 + nextInt(rng, 4);
+      }
+      if (axisX && midX !== x) x += Math.sign(midX - x);
+      else if (midY !== y) y += Math.sign(midY - y);
+      else if (midX !== x) x += Math.sign(midX - x);
+      run--;
+      x = Math.max(1, Math.min(width - 2, x));
+      y = Math.max(1, Math.min(height - 2, y));
+    }
+  }
+}
+
+/**
+ * A narrow meandering stream across the whole map (Tiberian-Dawn look):
+ * momentum walk from one edge to the other, 1–2 cells wide, with shallow
+ * DIRT fords at regular intervals so ground armies always find crossings.
+ */
+function carveStream(
+  terrain: Uint8Array,
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  nearSpawn: (cx: number, cy: number) => boolean,
+): void {
+  const vertical = nextInt(rng, 2) === 0;
+  const long = vertical ? height : width;
+  let cross = 8 + nextInt(rng, (vertical ? width : height) - 16);
+  const fordEvery = Math.floor(long / 3);
+  let drift = 0;
+  let breadth = 2;
+  for (let along = 0; along < long; along++) {
+    // Momentum: the drift changes rarely, so the stream bends in soft curves;
+    // the breadth swells and narrows slowly (1–3 cells) like the original.
+    if (nextInt(rng, 4) === 0) drift = nextInt(rng, 3) - 1;
+    if (nextInt(rng, 6) === 0) breadth = 1 + nextInt(rng, 3);
+    cross = Math.max(6, Math.min((vertical ? width : height) - 7, cross + drift));
+    // Crossings are real bridges (classic C&C): destructible spans over the
+    // stream instead of dirt fords.
+    const ford = along % fordEvery === Math.floor(fordEvery / 2);
+    for (let w = 0; w < breadth; w++) {
+      const cx = vertical ? cross + w : along;
+      const cy = vertical ? along : cross + w;
+      if (nearSpawn(cx, cy)) continue;
+      terrain[cy * width + cx] = ford ? TERRAIN_BRIDGE : TERRAIN_WATER;
+    }
+  }
+}
+
+/** Tiberian-Dawn-style badlands: GRASS base, a meandering stream with fords,
+ *  dirt clearings, long rock ridges and plenty of scattered conifers. */
+function generateBadlands(
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  spawns: ReadonlyArray<readonly [number, number]> = [],
+): Uint8Array {
+  const terrain = new Uint8Array(width * height).fill(TERRAIN_GRASS);
+  /** Ridges must never crowd a base: keep a clear apron around every spawn. */
+  const nearSpawn = (cx: number, cy: number): boolean =>
+    spawns.some(([sx, sy]) => (cx - sx) * (cx - sx) + (cy - sy) * (cy - sy) < 49);
 
   const stampBlob = (kind: number, minR: number, maxR: number): void => {
     const bx = 4 + nextInt(rng, width - 8);
@@ -244,28 +353,42 @@ function generateBadlands(width: number, height: number, rng: RngCarrier): Uint8
     }
   };
 
-  for (let i = 0; i < 10; i++) stampBlob(TERRAIN_GRASS, 2, 5); // grass first, others carve into it
-  for (let i = 0; i < 5; i++) stampBlob(TERRAIN_WATER, 2, 4);
-  for (let i = 0; i < 8; i++) {
-    // Rock ridges: a center cell plus a few neighbors.
-    const bx = 2 + nextInt(rng, width - 4);
-    const by = 2 + nextInt(rng, height - 4);
-    terrain[by * width + bx] = TERRAIN_ROCK;
-    for (let n = 0; n < 5; n++) {
-      const cx = bx + nextInt(rng, 3) - 1;
-      const cy = by + nextInt(rng, 3) - 1;
-      terrain[cy * width + cx] = TERRAIN_ROCK;
+  // Soft dirt clearings break up the green, plus a couple of small ponds.
+  for (let i = 0; i < 6; i++) stampBlob(TERRAIN_DIRT, 2, 4);
+  for (let i = 0; i < 2; i++) stampBlob(TERRAIN_WATER, 2, 3);
+  // One winding stream across the map with shallow ford crossings.
+  carveStream(terrain, width, height, rng, nearSpawn);
+  // Long rock RIDGES: orthogonally connected stair-step walks (like classic
+  // cliff lines), occasionally thickened by a shoulder cell.
+  for (let i = 0; i < 5; i++) {
+    let x = 4 + nextInt(rng, width - 8);
+    let y = 4 + nextInt(rng, height - 8);
+    const dirX = nextInt(rng, 2) === 0 ? 1 : -1;
+    const dirY = nextInt(rng, 2) === 0 ? 1 : -1;
+    const len = 7 + nextInt(rng, 8);
+    for (let s = 0; s < len; s++) {
+      const widen = nextInt(rng, 3) === 0;
+      if (!nearSpawn(x, y)) {
+        terrain[y * width + x] = TERRAIN_ROCK;
+        if (widen && !nearSpawn(x + 1, y)) {
+          terrain[y * width + Math.min(width - 2, x + 1)] = TERRAIN_ROCK;
+        }
+      }
+      if (nextInt(rng, 2) === 0) x += dirX;
+      else y += dirY;
+      x = Math.max(2, Math.min(width - 3, x));
+      y = Math.max(2, Math.min(height - 3, y));
     }
   }
-  scatterTrees(terrain, width, height, rng, 14);
+  scatterTrees(terrain, width, height, rng, 20, true);
   return terrain;
 }
 
 /** A wide meandering river splits the map; one narrow land bridge crosses it. */
 function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Array {
-  // Start from a badlands-style land base with fewer lakes.
-  const terrain = new Uint8Array(width * height).fill(TERRAIN_DIRT);
-  const grassBlob = (): void => {
+  // Tiberian-Dawn look: green base with soft dirt clearings.
+  const terrain = new Uint8Array(width * height).fill(TERRAIN_GRASS);
+  const dirtBlob = (): void => {
     const bx = 4 + nextInt(rng, width - 8);
     const by = 4 + nextInt(rng, height - 8);
     const r = 2 + nextInt(rng, 4);
@@ -274,13 +397,13 @@ function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Arr
         if (cx < 0 || cy < 0 || cx >= width || cy >= height) continue;
         const dx = cx - bx;
         const dy = cy - by;
-        if (dx * dx + dy * dy <= r * r && terrain[cy * width + cx] === TERRAIN_DIRT) {
-          terrain[cy * width + cx] = TERRAIN_GRASS;
+        if (dx * dx + dy * dy <= r * r && terrain[cy * width + cx] === TERRAIN_GRASS) {
+          terrain[cy * width + cx] = TERRAIN_DIRT;
         }
       }
     }
   };
-  for (let i = 0; i < 8; i++) grassBlob();
+  for (let i = 0; i < 6; i++) dirtBlob();
 
   // Carve the river top→bottom around the map middle, meandering.
   const riverX: number[] = [];
@@ -294,14 +417,22 @@ function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Arr
       terrain[y * width + cx] = TERRAIN_WATER;
     }
   }
-  // One narrow land bridge — THE ground chokepoint; air flies anywhere.
+  // One narrow crossing — THE ground chokepoint; air flies anywhere. Classic
+  // C&C style: a real bridge deck spans the water (each cell gets a neutral,
+  // destructible span at game start), with dirt trail mouths on both banks.
   const bridgeY = 16 + nextInt(rng, height - 32);
   for (let y = bridgeY; y < bridgeY + 3 && y < height; y++) {
     for (let cx = riverX[y]! - 5; cx <= riverX[y]! + 5; cx++) {
-      terrain[y * width + cx] = TERRAIN_DIRT;
+      if (terrain[y * width + cx] !== TERRAIN_WATER) terrain[y * width + cx] = TERRAIN_DIRT;
     }
   }
-  scatterTrees(terrain, width, height, rng, 10);
+  const spanY = Math.min(bridgeY + 1, height - 1);
+  for (let cx = riverX[spanY]! - 5; cx <= riverX[spanY]! + 5; cx++) {
+    if (terrain[spanY * width + cx] === TERRAIN_WATER) {
+      terrain[spanY * width + cx] = TERRAIN_BRIDGE;
+    }
+  }
+  scatterTrees(terrain, width, height, rng, 10, true);
   return terrain;
 }
 
@@ -438,6 +569,10 @@ function scatterTrees(
   height: number,
   rng: RngCarrier,
   clusters: number,
+  /** Also pepper lone conifers between the woods (Tiberian-Dawn look).
+   *  Off for island maps: grass is rare there and the extra rng draws would
+   *  reshuffle the whole coastline layout for nothing. */
+  singles = false,
 ): void {
   for (let i = 0; i < clusters; i++) {
     const bx = 2 + nextInt(rng, width - 4);
@@ -450,6 +585,53 @@ function scatterTrees(
       if (terrain[idx] === TERRAIN_DIRT || terrain[idx] === TERRAIN_GRASS) {
         terrain[idx] = TERRAIN_TREE;
       }
+    }
+  }
+  if (!singles) return;
+  const lone = Math.floor((width * height) / 90);
+  for (let i = 0; i < lone; i++) {
+    const cx = 2 + nextInt(rng, width - 4);
+    const cy = 2 + nextInt(rng, height - 4);
+    const idx = cy * width + cx;
+    if (terrain[idx] === TERRAIN_GRASS) terrain[idx] = TERRAIN_TREE;
+  }
+}
+
+/**
+ * Rocky river banks (Tiberian-Dawn look): grass cells hugging the water may
+ * turn into rock piles. Anything within two cells of DIRT stays clear — that
+ * one rule protects fords, the river-map bridge and trail mouths at once.
+ */
+function stoneRiverBanks(
+  terrain: Uint8Array,
+  width: number,
+  height: number,
+  rng: RngCarrier,
+  nearSpawn: (cx: number, cy: number) => boolean,
+): void {
+  const at = (cx: number, cy: number): number | undefined =>
+    cx < 0 || cy < 0 || cx >= width || cy >= height ? undefined : terrain[cy * width + cx];
+  const nearDirt = (cx: number, cy: number): boolean => {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const t = at(cx + dx, cy + dy);
+        // Bridges count like dirt: their mouths must stay rock-free.
+        if (t === TERRAIN_DIRT || t === TERRAIN_BRIDGE) return true;
+      }
+    }
+    return false;
+  };
+  for (let cy = 1; cy < height - 1; cy++) {
+    for (let cx = 1; cx < width - 1; cx++) {
+      if (terrain[cy * width + cx] !== TERRAIN_GRASS) continue;
+      const touchesWater =
+        at(cx + 1, cy) === TERRAIN_WATER ||
+        at(cx - 1, cy) === TERRAIN_WATER ||
+        at(cx, cy + 1) === TERRAIN_WATER ||
+        at(cx, cy - 1) === TERRAIN_WATER;
+      if (!touchesWater) continue;
+      if (nearSpawn(cx, cy) || nearDirt(cx, cy)) continue;
+      if (nextInt(rng, 4) === 0) terrain[cy * width + cx] = TERRAIN_ROCK;
     }
   }
 }

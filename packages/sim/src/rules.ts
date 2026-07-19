@@ -1076,6 +1076,26 @@ export const BUILDING_RULES = {
     // uncovers a huge patch of map. Also the launch key for the V3 (requires).
     sight: 11,
   },
+  BRIDGE: {
+    name: 'Brücke',
+    // One destructible span per TERRAIN_BRIDGE cell, spawned NEUTRAL at game
+    // start (never queued, never captured). Heavy armor: small arms barely
+    // scratch it — classic C&C, dropping a bridge takes cannon fire.
+    maxHp: 700,
+    cost: 0,
+    buildTime: 1,
+    power: 0,
+    width: 1,
+    height: 1,
+    armor: 'heavy',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: [],
+    buildable: false,
+    factions: null,
+    sight: 0,
+  },
   ERZ_BOHRTURM: {
     name: 'Erz-Bohrturm',
     maxHp: 600,

@@ -483,7 +483,7 @@ export class Sidebar {
     if (rule.produces !== null) {
       const hint = document.createElement('div');
       hint.className = 'bhint';
-      hint.textContent = 'Rechtsklick auf Karte: Sammelpunkt';
+      hint.textContent = 'Rechtsklick auf Karte: Sammelpunkt — Einheiten spawnen dann hier';
       this.binfoEl.append(hint);
     }
     if (building.type === 'TECHCENTER') this.renderResearchMenu();

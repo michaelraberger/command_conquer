@@ -41,9 +41,26 @@ export interface GameTextures {
   sand: Texture[];
   water: Texture;
   ice: Texture;
-  bridge: Texture;
+  /** Bridge deck sprites, one per span axis: `bridgeCx` runs toward the lower
+   *  right (+cx), `bridgeCy` toward the lower left (+cy). */
+  bridgeCx: Texture;
+  bridgeCy: Texture;
+  /** Collapsed-span debris drawn on TERRAIN_BRIDGE_WRECK cells. */
+  bridgeWreck: Texture;
+  /** Trampled-ground patches under buildings, tinted per underlying terrain. */
+  wornPatch: Texture[];
   /** 3D rock outcrop variants, drawn in the entity layer like trees. */
   rocks: Texture[];
+  /** Raised cliff plateaus for ROCK cells, indexed by open-edge bitmask
+   *  (bit0 +cx wall, bit1 +cy wall, bit2 -cx rim, bit3 -cy rim). */
+  cliffs: Texture[];
+  /** Soft shade a ridge casts onto the ground cell left-below it (+cy). */
+  cliffShadow: Texture;
+  /** Generic soft round drop shadow (ground units, buildings). */
+  softShadow: Texture;
+  /** Tiny scatter details: grey pebble clusters and grass tufts. */
+  pebbles: Texture[];
+  tufts: Texture[];
   ore: Texture;
   gems: Texture;
   tree: Texture;
@@ -106,6 +123,13 @@ function diamondPath(): number[] {
   return [TILE_W / 2, 0, TILE_W, TILE_H / 2, TILE_W / 2, TILE_H, 0, TILE_H / 2];
 }
 
+/** Diamond grown past the frame edge: ground tiles are sampled by terrain
+ *  MESHES whose UVs touch the diamond border — transparent bake margins
+ *  would bleed in as bright seams between cells. */
+function overshootDiamondPath(): number[] {
+  return [TILE_W / 2, -3, TILE_W + 5, TILE_H / 2, TILE_W / 2, TILE_H + 3, -5, TILE_H / 2];
+}
+
 function bakeTile(renderer: Renderer, g: Graphics): Texture {
   return renderer.generateTexture({
     target: g,
@@ -121,18 +145,302 @@ function speckle(i: number): { x: number; y: number } {
   return { x, y };
 }
 
-function groundTile(renderer: Renderer, base: number, dots: number, dotColor: number, seedOff: number): Texture {
-  const g = new Graphics().poly(diamondPath()).fill(base);
-  for (let i = 0; i < dots; i++) {
-    const p = speckle(i + seedOff);
-    // Keep speckles inside the diamond.
-    const dx = Math.abs(p.x - TILE_W / 2) / (TILE_W / 2);
-    const dy = Math.abs(p.y - TILE_H / 2) / (TILE_H / 2);
-    if (dx + dy > 0.85) continue;
-    g.circle(p.x, p.y, 1 + (i % 2)).fill({ color: dotColor, alpha: 0.5 });
+/** Inside-the-diamond test for speckle positions. */
+function inDiamond(x: number, y: number, margin = 0.85): boolean {
+  const dx = Math.abs(x - TILE_W / 2) / (TILE_W / 2);
+  const dy = Math.abs(y - TILE_H / 2) / (TILE_H / 2);
+  return dx + dy <= margin;
+}
+
+/** Mottled ground diamond: dark + light speckles over soft blotches, so the
+ *  terrain reads busy like classic C&C ground instead of flat colour. */
+function groundTile(renderer: Renderer, base: number, seedOff: number): Texture {
+  const g = new Graphics().poly(overshootDiamondPath()).fill(base);
+  // Big soft blotches first (slight value variation across the tile).
+  for (let i = 0; i < 3; i++) {
+    const p = speckle(i * 3 + seedOff + 51);
+    if (!inDiamond(p.x, p.y, 0.6)) continue;
+    g.ellipse(p.x, p.y, 7 + (i % 3) * 3, 4 + (i % 2) * 2).fill({
+      color: shade(base, i % 2 === 0 ? 0.92 : 1.06),
+      alpha: 0.35,
+    });
   }
-  g.poly(diamondPath()).stroke({ width: 1, color: shade(base, 0.8), alpha: 0.35 });
+  // Fine grain: dark and light speckles.
+  for (let i = 0; i < 9; i++) {
+    const p = speckle(i + seedOff);
+    if (!inDiamond(p.x, p.y)) continue;
+    g.circle(p.x, p.y, 1 + (i % 2)).fill({ color: shade(base, 0.72), alpha: 0.55 });
+  }
+  for (let i = 0; i < 6; i++) {
+    const p = speckle(i * 7 + seedOff + 29);
+    if (!inDiamond(p.x, p.y)) continue;
+    g.circle(p.x, p.y, 1).fill({ color: shade(base, 1.22), alpha: 0.5 });
+  }
+  // No outline stroke: on terrain meshes any edge line renders as a seam.
   return bakeTile(renderer, g);
+}
+
+/* ------------------------------- cliffs --------------------------------- */
+
+/** Screen-pixel height of the raised cliff plateau on ROCK cells. */
+export const CLIFF_H = 14;
+const CLIFF_TOP = 0x968b74;
+
+/**
+ * One cliff cell as a raised plateau. `mask` says which grid sides border
+ * non-rock: bit0 = +cx (camera-facing SE wall), bit1 = +cy (SW wall, darkest),
+ * bit2 = -cx (back rim), bit3 = -cy (back rim). Adjacent rock cells share
+ * their plateau edges seamlessly because every top sits at the same height.
+ */
+function bakeCliff(renderer: Renderer, mask: number): Texture {
+  const g = new Graphics();
+  const top: [number, number] = [TILE_W / 2, 0];
+  const right: [number, number] = [TILE_W, TILE_H / 2];
+  const bottom: [number, number] = [TILE_W / 2, TILE_H];
+  const left: [number, number] = [0, TILE_H / 2];
+  const lift = (p: [number, number]): [number, number] => [p[0], p[1] - CLIFF_H];
+
+  // Camera-facing walls down to ground level.
+  if (mask & 1) {
+    // +cx side: right→bottom edge, mid shade with vertical striations.
+    const [r, b] = [right, bottom];
+    g.poly([...lift(r), ...lift(b), ...b, ...r]).fill(shade(CLIFF_TOP, 0.6));
+    for (let i = 1; i < 4; i++) {
+      const t = i / 4;
+      const x = r[0] + (b[0] - r[0]) * t;
+      const y = r[1] + (b[1] - r[1]) * t;
+      g.moveTo(x, y - CLIFF_H + 2).lineTo(x + 1, y - 1).stroke({ width: 1, color: shade(CLIFF_TOP, 0.45), alpha: 0.8 });
+    }
+  }
+  if (mask & 2) {
+    // +cy side: bottom→left edge, in deep shadow.
+    const [b, l] = [bottom, left];
+    g.poly([...lift(b), ...lift(l), ...l, ...b]).fill(shade(CLIFF_TOP, 0.38));
+    for (let i = 1; i < 4; i++) {
+      const t = i / 4;
+      const x = b[0] + (l[0] - b[0]) * t;
+      const y = b[1] + (l[1] - b[1]) * t;
+      g.moveTo(x, y - CLIFF_H + 2).lineTo(x - 1, y - 1).stroke({ width: 1, color: shade(CLIFF_TOP, 0.28), alpha: 0.8 });
+    }
+  }
+
+  // Raised rocky top.
+  const topPoly = [...lift(top), ...lift(right), ...lift(bottom), ...lift(left)];
+  g.poly(topPoly).fill(CLIFF_TOP);
+  for (let i = 0; i < 8; i++) {
+    const p = speckle(i * 5 + mask * 17);
+    if (!inDiamond(p.x, p.y, 0.7)) continue;
+    g.circle(p.x, p.y - CLIFF_H, 1 + (i % 2)).fill({
+      color: shade(CLIFF_TOP, i % 2 === 0 ? 0.7 : 1.2),
+      alpha: 0.6,
+    });
+  }
+  // Cracks across the plateau.
+  g.moveTo(20, TILE_H / 2 - CLIFF_H + 2).lineTo(30, TILE_H / 2 - CLIFF_H - 3).lineTo(40, TILE_H / 2 - CLIFF_H + 4)
+    .stroke({ width: 1, color: shade(CLIFF_TOP, 0.6), alpha: 0.6 });
+
+  // Sunlit rim along open back edges, shadow lip along open front edges.
+  if (mask & 4) g.moveTo(...lift(left)).lineTo(...lift(top)).stroke({ width: 2, color: shade(CLIFF_TOP, 1.35), alpha: 0.9 });
+  if (mask & 8) g.moveTo(...lift(top)).lineTo(...lift(right)).stroke({ width: 2, color: shade(CLIFF_TOP, 1.3), alpha: 0.9 });
+  if (mask & 1) g.moveTo(...lift(right)).lineTo(...lift(bottom)).stroke({ width: 1.5, color: shade(CLIFF_TOP, 0.5), alpha: 0.9 });
+  if (mask & 2) g.moveTo(...lift(bottom)).lineTo(...lift(left)).stroke({ width: 1.5, color: shade(CLIFF_TOP, 0.4), alpha: 0.9 });
+
+  return renderer.generateTexture({
+    target: g,
+    frame: new Rectangle(0, -CLIFF_H - 2, TILE_W, TILE_H + CLIFF_H + 4),
+    resolution: 2,
+  });
+}
+
+/** Shade band a ridge throws onto the ground tile on its shadow side: hugs
+ *  the tile's upper-right edge (which faces the rock) and fades inward. */
+function bakeCliffShadow(renderer: Renderer): Texture {
+  const g = new Graphics();
+  const top: [number, number] = [TILE_W / 2, 0];
+  const right: [number, number] = [TILE_W, TILE_H / 2];
+  // Inward normal of that edge (unit ≈ (-1,2)/√5), stepped in 3px bands.
+  const nx = -1.34;
+  const ny = 2.68;
+  const alphas = [0.26, 0.17, 0.1, 0.05];
+  for (let k = 0; k < alphas.length; k++) {
+    g.poly([
+      top[0] + nx * k, top[1] + ny * k,
+      right[0] + nx * k, right[1] + ny * k,
+      right[0] + nx * (k + 1), right[1] + ny * (k + 1),
+      top[0] + nx * (k + 1), top[1] + ny * (k + 1),
+    ]).fill({ color: 0x000000, alpha: alphas[k]! });
+  }
+  return bakeTile(renderer, g);
+}
+
+/** Soft radial drop shadow (scaled per user: units small, buildings big). */
+function bakeSoftShadow(renderer: Renderer): Texture {
+  const g = new Graphics();
+  for (let i = 5; i >= 1; i--) {
+    g.ellipse(0, 0, (i / 5) * 30, (i / 5) * 15).fill({ color: 0x000000, alpha: 0.09 });
+  }
+  return renderer.generateTexture({
+    target: g,
+    frame: new Rectangle(-32, -17, 64, 34),
+    resolution: 2,
+  });
+}
+
+/** Tiny detail sprinkles: pebble clusters and grass tufts. */
+function bakePebble(renderer: Renderer, seed: number): Texture {
+  const g = new Graphics();
+  for (let i = 0; i < 3 + (seed % 2); i++) {
+    const a = ((seed * 7 + i * 5) % 8) / 8;
+    const x = Math.cos(a * Math.PI * 2) * (2 + (i % 3));
+    const y = Math.sin(a * Math.PI * 2) * (1 + (i % 2));
+    g.ellipse(x, y, 2 + (i % 2), 1.4).fill(shade(0x8d8676, 0.85 + (i % 3) * 0.12));
+  }
+  return renderer.generateTexture({ target: g, frame: new Rectangle(-7, -5, 14, 10), resolution: 2 });
+}
+
+function bakeTuft(renderer: Renderer, seed: number): Texture {
+  const g = new Graphics();
+  for (let i = 0; i < 4; i++) {
+    const x = (i - 1.5) * 2 + ((seed + i) % 2);
+    g.moveTo(x, 2).lineTo(x + ((i % 2) * 2 - 1), -3 - (i % 3))
+      .stroke({ width: 1, color: i % 2 === 0 ? 0x6f9c4a : 0x5c8a42, alpha: 0.9 });
+  }
+  return renderer.generateTexture({ target: g, frame: new Rectangle(-6, -7, 12, 11), resolution: 2 });
+}
+
+/* ------------------------------- bridges -------------------------------- */
+
+/** Bake-frame overhang of bridge deck/wreck sprites around the tile rect:
+ *  place them at cellTopLeft - (BRIDGE_PAD_X, BRIDGE_PAD_Y). */
+export const BRIDGE_PAD_X = 6;
+export const BRIDGE_PAD_Y = 14;
+
+const bridgeFrame = (): Rectangle =>
+  new Rectangle(-BRIDGE_PAD_X, -BRIDGE_PAD_Y, TILE_W + BRIDGE_PAD_X * 2, TILE_H + BRIDGE_PAD_Y + 8);
+
+/**
+ * One bridge deck cell in the classic C&C style: a raised STONE span with
+ * weathered paving, low stone parapets along both edges and a dark masonry
+ * side wall, running along `axis` (+cx = toward the lower right of the
+ * screen, +cy = toward the lower left). Adjacent deck cells share their
+ * raised edges, so spans tile seamlessly.
+ */
+function bakeBridgeDeck(renderer: Renderer, axis: 'cx' | 'cy'): Texture {
+  const g = new Graphics();
+  const e = 5; // deck lift above the water line
+  const top = { x: TILE_W / 2, y: 0 };
+  const right = { x: TILE_W, y: TILE_H / 2 };
+  const bottom = { x: TILE_W / 2, y: TILE_H };
+  const left = { x: 0, y: TILE_H / 2 };
+  // Long edges run along the axis; entry corners overhang backwards, exit
+  // corners forwards, so consecutive cells overlap without hairline seams.
+  const [backA, backB, frontA, frontB] =
+    axis === 'cx' ? [top, right, left, bottom] : [top, left, right, bottom];
+  const dir =
+    axis === 'cx'
+      ? { x: 2 / Math.sqrt(5), y: 1 / Math.sqrt(5) }
+      : { x: -2 / Math.sqrt(5), y: 1 / Math.sqrt(5) };
+  const o = 2.4;
+  const raise = (p: { x: number; y: number }, sgn: number): { x: number; y: number } => ({
+    x: p.x + dir.x * o * sgn,
+    y: p.y + dir.y * o * sgn - e,
+  });
+  const bA = raise(backA, -1);
+  const bB = raise(backB, 1);
+  const fA = raise(frontA, -1);
+  const fB = raise(frontB, 1);
+  // Soft shadow the raised deck throws onto the water below.
+  g.poly([
+    bA.x - 4, bA.y + e + 4,
+    bB.x - 4, bB.y + e + 4,
+    fB.x - 4, fB.y + e + 4,
+    fA.x - 4, fA.y + e + 4,
+  ]).fill({ color: 0x000000, alpha: 0.18 });
+  // Dark masonry side wall under the camera-facing long edge.
+  g.poly([fA.x, fA.y, fB.x, fB.y, fB.x, fB.y + e, fA.x, fA.y + e]).fill(0x57514a);
+  g.moveTo(fA.x, fA.y + e - 1).lineTo(fB.x, fB.y + e - 1)
+    .stroke({ width: 1, color: 0x3d3831, alpha: 0.85 });
+  // Weathered stone paving with a dusty worn track down the middle.
+  g.poly([bA.x, bA.y, bB.x, bB.y, fB.x, fB.y, fA.x, fA.y]).fill(0x9b9384);
+  const m0 = lerp(bA, fA, 0.3);
+  const m1 = lerp(bB, fB, 0.3);
+  const m2 = lerp(bB, fB, 0.7);
+  const m3 = lerp(bA, fA, 0.7);
+  g.poly([m0.x, m0.y, m1.x, m1.y, m2.x, m2.y, m3.x, m3.y]).fill({ color: 0xa8a193, alpha: 0.65 });
+  // Stone joints across the span + a few weathering blotches.
+  for (let i = 1; i < 5; i++) {
+    const t = i / 5;
+    const a = lerp(bA, bB, t);
+    const b = lerp(fA, fB, t);
+    g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1, color: 0x6f6759, alpha: 0.7 });
+  }
+  for (const [ta, tb, r] of [[0.3, 0.42, 2.4], [0.62, 0.55, 1.8], [0.82, 0.4, 2] ] as const) {
+    const p = lerp(lerp(bA, bB, ta), lerp(fA, fB, ta), tb);
+    g.circle(p.x, p.y, r).fill({ color: 0x847c6e, alpha: 0.7 });
+  }
+  // Low stone parapets along both long edges: dark base, light sunlit top,
+  // broken into segments like the original's masonry rail.
+  for (const [pA, pB, base, topC] of [
+    [bA, bB, 0x7d7568, 0xbab2a2],
+    [fA, fB, 0x6e6759, 0xa8a092],
+  ] as const) {
+    for (let i = 0; i < 4; i++) {
+      const s = lerp(pA, pB, i / 4 + 0.02);
+      const eSeg = lerp(pA, pB, (i + 1) / 4 - 0.02);
+      g.poly([s.x, s.y - 3.6, eSeg.x, eSeg.y - 3.6, eSeg.x, eSeg.y, s.x, s.y]).fill(base);
+      g.moveTo(s.x, s.y - 3.6).lineTo(eSeg.x, eSeg.y - 3.6)
+        .stroke({ width: 1.4, color: topC, alpha: 0.95 });
+    }
+  }
+  return renderer.generateTexture({ target: g, frame: bridgeFrame(), resolution: 2 });
+}
+
+/** Collapsed span: jagged stone stubs and masonry rubble in the water. */
+function bakeBridgeWreck(renderer: Renderer): Texture {
+  const g = new Graphics();
+  const cx = TILE_W / 2;
+  const cy = TILE_H / 2;
+  // Broken masonry stubs poking up at both ends of the former span.
+  g.poly([cx - 22, cy - 8, cx - 10, cy - 11, cx - 8, cy - 2, cx - 20, cy + 1]).fill(0x8f887a);
+  g.poly([cx - 10, cy - 11, cx - 6, cy - 10, cx - 4, cy - 3, cx - 8, cy - 2]).fill(0x655e52);
+  g.poly([cx + 10, cy + 2, cx + 22, cy - 1, cx + 24, cy + 7, cx + 12, cy + 10]).fill(0x8f887a);
+  g.poly([cx + 8, cy + 3, cx + 12, cy + 2, cx + 12, cy + 10, cx + 9, cy + 9]).fill(0x655e52);
+  // Rubble blocks between the stubs.
+  g.rect(cx - 6, cy + 2, 10, 3).fill({ color: 0x9b9384, alpha: 0.95 });
+  g.rect(cx - 1, cy - 4, 7, 2.5).fill({ color: 0x7d7568, alpha: 0.95 });
+  g.circle(cx + 2, cy + 6, 2.6).fill(0x6f675a);
+  g.circle(cx - 9, cy + 7, 2).fill(0x7b7366);
+  // Foam where the debris meets the water.
+  g.ellipse(cx - 14, cy + 1, 9, 2.6).stroke({ width: 1.2, color: 0x9cc3de, alpha: 0.55 });
+  g.ellipse(cx + 16, cy + 8, 10, 2.8).stroke({ width: 1.2, color: 0x9cc3de, alpha: 0.5 });
+  g.ellipse(cx, cy + 4, 16, 4).stroke({ width: 1, color: 0x7fa9c9, alpha: 0.35 });
+  return renderer.generateTexture({ target: g, frame: bridgeFrame(), resolution: 2 });
+}
+
+/** Trampled-ground blob under buildings — baked white, tinted per terrain. */
+function bakeWornPatch(renderer: Renderer, seed: number): Texture {
+  const g = new Graphics();
+  // Irregular iso-flattened blob from overlapping soft ellipses.
+  for (let i = 0; i < 7; i++) {
+    const a = ((seed * 5 + i * 7) % 12) / 12;
+    const rx = 34 - i * 3.4;
+    const ry = 17 - i * 1.7;
+    const ox = Math.cos(a * Math.PI * 2) * (10 - i);
+    const oy = Math.sin(a * Math.PI * 2) * (5 - i * 0.5);
+    g.ellipse(ox, oy, rx, ry).fill({ color: 0xffffff, alpha: 0.28 });
+  }
+  // Fine wear speckles.
+  for (let i = 0; i < 14; i++) {
+    const p = speckle(i * 3 + seed * 17);
+    const x = ((p.x - TILE_W / 2) / (TILE_W / 2)) * 30;
+    const y = ((p.y - TILE_H / 2) / (TILE_H / 2)) * 14;
+    g.circle(x, y, 1 + (i % 2)).fill({ color: 0xffffff, alpha: 0.35 });
+  }
+  return renderer.generateTexture({
+    target: g,
+    frame: new Rectangle(-42, -22, 84, 44),
+    resolution: 2,
+  });
 }
 
 /** Extruded iso box; origin (0,0) is the projected top-left footprint corner. */
@@ -190,6 +498,86 @@ interface BuildingArt {
 function teamMark(g: Graphics, w: number, h: number, e: number): void {
   const c = iso(w / 2, h / 2);
   g.poly([c.x, c.y - e - 6, c.x + 13, c.y - e, c.x, c.y - e + 6, c.x - 13, c.y - e]).fill(0xffffff);
+}
+
+/** Interpolate between two projected points. */
+function lerp(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  t: number,
+): { x: number; y: number } {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+/**
+ * Canvas ridge tent in the classic C&C style: alternating light/dark panel
+ * segments with seam lines, a sun-lit and a shaded slope, and an orange
+ * gable end with a dark door opening. Ridge runs along the cx axis.
+ */
+function tent(
+  g: Graphics,
+  ox: number,
+  oy: number,
+  l: number,
+  wd: number,
+  e: number,
+  canvas: number,
+  door: number,
+): void {
+  const p0 = iso(ox, oy);
+  const p1 = iso(ox + l, oy);
+  const p2 = iso(ox + l, oy + wd);
+  const p3 = iso(ox, oy + wd);
+  const ra = { x: iso(ox + 0.05, oy + wd / 2).x, y: iso(ox + 0.05, oy + wd / 2).y - e };
+  const rb = { x: iso(ox + l - 0.05, oy + wd / 2).x, y: iso(ox + l - 0.05, oy + wd / 2).y - e };
+  // Segmented canvas panels — the ribbed look that reads "tent" at a glance.
+  const SEG = 4;
+  for (let i = 0; i < SEG; i++) {
+    const a = i / SEG;
+    const b = (i + 1) / SEG;
+    const alt = i % 2 === 0;
+    const n0 = lerp(p0, p1, a);
+    const n1 = lerp(p0, p1, b);
+    const s0 = lerp(p3, p2, a);
+    const s1 = lerp(p3, p2, b);
+    const q0 = lerp(ra, rb, a);
+    const q1 = lerp(ra, rb, b);
+    g.poly([n0.x, n0.y, n1.x, n1.y, q1.x, q1.y, q0.x, q0.y])
+      .fill(shade(canvas, alt ? 1.14 : 1.0));
+    g.poly([s0.x, s0.y, s1.x, s1.y, q1.x, q1.y, q0.x, q0.y])
+      .fill(shade(canvas, alt ? 0.72 : 0.62));
+  }
+  // Seam lines between the panels.
+  for (let i = 1; i < SEG; i++) {
+    const t = i / SEG;
+    const n = lerp(p0, p1, t);
+    const s = lerp(p3, p2, t);
+    const q = lerp(ra, rb, t);
+    g.moveTo(n.x, n.y).lineTo(q.x, q.y).lineTo(s.x, s.y)
+      .stroke({ width: 1, color: shade(canvas, 0.5), alpha: 0.6 });
+  }
+  // Orange gable end with the dark door opening (front, +cx).
+  g.poly([p1.x, p1.y, p2.x, p2.y, rb.x, rb.y]).fill(door);
+  g.poly([p1.x, p1.y, p2.x, p2.y, rb.x, rb.y])
+    .stroke({ width: 1, color: shade(door, 0.6), alpha: 0.8 });
+  const dm = iso(ox + l, oy + wd / 2);
+  g.poly([dm.x, dm.y - e * 0.62, dm.x + 4.5, dm.y + 1.5, dm.x - 4.5, dm.y + 1.5]).fill(0x3a2b20);
+  // Ridge highlight + soft ground outline.
+  g.moveTo(ra.x, ra.y).lineTo(rb.x, rb.y).stroke({ width: 1.5, color: shade(canvas, 1.35) });
+  g.poly([p0.x, p0.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y])
+    .stroke({ width: 1, color: 0x37322a, alpha: 0.55 });
+}
+
+/** Flag pole (body layer); the flag itself lives in the team layer. */
+function flagPole(g: Graphics, px: number, py: number, h: number): void {
+  g.rect(px - 0.7, py - h, 1.4, h).fill(0x8f8775);
+  g.circle(px, py - h, 1.5).fill(0xc4bba8);
+}
+
+/** Waving flag at the pole top, white → tinted to the owner's colour. */
+function teamFlag(g: Graphics, px: number, py: number, h: number): void {
+  const t = py - h;
+  g.poly([px + 1, t, px + 13, t + 2, px + 13, t + 9.5, px + 1, t + 7.5]).fill(0xffffff);
 }
 
 const BUILDING_ART: Record<BuildingType, BuildingArt> = {
@@ -266,14 +654,32 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     team: (g) => teamMark(g, 1, 1, 20),
   },
   BARRACKS: {
-    frameTop: 30,
-    fx: 0x9fd66b,
-    body: (g, w, h) => {
-      concretePlate(g, w, h);
-      prismAt(g, 0.15, 0.15, 1.7, 1.1, 13, 0xb0a794);
-      prismAt(g, 0.35, 1.25, 1.3, 0.55, 8, 0xa39a87); // annex
+    // Classic C&C tent camp: two green ridge tents side by side on trampled
+    // dirt, flag between them in the owner's colour.
+    frameTop: 40,
+    fx: 0xb4633a, // canvas door orange
+    body: (g, w, h, fx) => {
+      // Trampled camp ground instead of a concrete plate.
+      const c00 = iso(0, 0);
+      const cw0 = iso(w, 0);
+      const cwh = iso(w, h);
+      const c0h = iso(0, h);
+      g.poly([c00.x, c00.y, cw0.x, cw0.y, cwh.x, cwh.y, c0h.x, c0h.y])
+        .fill(0x8d7c60)
+        .stroke({ width: 1, color: 0x5d5344 });
+      const b1 = iso(0.7, 1.0);
+      const b2 = iso(1.35, 0.95);
+      g.ellipse(b1.x, b1.y, 12, 5).fill({ color: 0x7c6c52, alpha: 0.6 });
+      g.ellipse(b2.x, b2.y, 9, 4).fill({ color: 0x9c8a6b, alpha: 0.5 });
+      tent(g, 0.12, 0.14, 1.75, 0.72, 15, 0x86b45a, fx);
+      tent(g, 0.28, 1.12, 1.75, 0.72, 15, 0x7dab52, fx);
+      const p = iso(1.5, 1.0);
+      flagPole(g, p.x, p.y, 36);
     },
-    team: (g) => teamMark(g, 1, 0.7, 13),
+    team: (g) => {
+      const p = iso(1.5, 1.0);
+      teamFlag(g, p.x, p.y, 36);
+    },
   },
   FACTORY: {
     frameTop: 50,
@@ -348,6 +754,18 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.circle(r.x, r.y - 18, 7).stroke({ width: 1, color: fx, alpha: 0.4 });
     },
     team: (g) => teamMark(g, 0.75, 1.7, 14),
+  },
+  BRIDGE: {
+    // Spans render in the terrain layer (deck sprite per cell); the building
+    // itself only carries hp and the damage bar — nothing to draw here.
+    frameTop: 10,
+    fx: 0x9a7648,
+    body: (g) => {
+      g.rect(0, 0, 1, 1).fill({ color: 0x000000, alpha: 0 });
+    },
+    team: (g) => {
+      g.rect(0, 0, 1, 1).fill({ color: 0x000000, alpha: 0 });
+    },
   },
   ERZ_BOHRTURM: {
     frameTop: 58,
@@ -1341,7 +1759,8 @@ export function createTextures(renderer: Renderer): GameTextures {
   }
 
   const tree = new Graphics();
-  tree.ellipse(0, 2, 12, 6).fill({ color: 0x000000, alpha: 0.3 });
+  // Shadow thrown left like every other shadow (light from the east).
+  tree.ellipse(-6, 2, 12, 6).fill({ color: 0x000000, alpha: 0.3 });
   tree.rect(-2, -8, 4, 10).fill(0x5d4326);
   tree.circle(0, -16, 10).fill(0x2e4a1e).stroke({ width: 1, color: 0x1d3013, alpha: 0.8 });
   tree.circle(-6, -10, 7).fill(0x3a5c27);
@@ -1350,30 +1769,20 @@ export function createTextures(renderer: Renderer): GameTextures {
 
   const shell = new Graphics().circle(0, 0, 3).fill(0xffe08a).stroke({ width: 1, color: 0xffb347 });
 
-  const fog = new Graphics().poly([TILE_W / 2, -1, TILE_W + 1, TILE_H / 2, TILE_W / 2, TILE_H + 1, -1, TILE_H / 2]).fill(0x06080a);
+  // Generous overhang: on hills the fog sprites shift per cell, and hidden
+  // fog is uniform black — overlap is invisible, gaps would leak terrain.
+  const fog = new Graphics().poly([TILE_W / 2, -6, TILE_W + 8, TILE_H / 2, TILE_W / 2, TILE_H + 6, -8, TILE_H / 2]).fill(0x06080a);
 
-  const water = new Graphics().poly(diamondPath()).fill(0x2b5d8a);
+  const water = new Graphics().poly(overshootDiamondPath()).fill(0x2b5d8a);
   water.moveTo(18, 14).quadraticCurveTo(26, 11, 34, 14).stroke({ width: 1.5, color: 0x4a83b3, alpha: 0.8 });
   water.moveTo(30, 21).quadraticCurveTo(38, 18, 46, 21).stroke({ width: 1.5, color: 0x4a83b3, alpha: 0.6 });
-  water.poly(diamondPath()).stroke({ width: 1, color: 0x1d4266, alpha: 0.5 });
 
-  // Bridge deck: water peeking out at the corners, wooden planks across the
-  // middle band and two darker bearer beams along the edges.
-  const bridge = new Graphics().poly(diamondPath()).fill(0x2b5d8a);
-  bridge.poly([TILE_W / 2, 4, TILE_W - 8, TILE_H / 2, TILE_W / 2, TILE_H - 4, 8, TILE_H / 2]).fill(0x9a7648);
-  for (let i = 1; i < 5; i++) {
-    const t = i / 5;
-    const ax = 8 + (TILE_W / 2 - 8) * t;
-    const bx = TILE_W / 2 + (TILE_W / 2 - 8) * t;
-    bridge.moveTo(ax, TILE_H / 2 + (4 - TILE_H / 2) * t).lineTo(bx, TILE_H - 4 + (TILE_H / 2 - (TILE_H - 4)) * t)
-      .stroke({ width: 1, color: 0x77582f, alpha: 0.8 });
-  }
-  bridge
-    .poly([TILE_W / 2, 4, TILE_W - 8, TILE_H / 2, TILE_W / 2, TILE_H - 4, 8, TILE_H / 2])
-    .stroke({ width: 1.5, color: 0x5f4526, alpha: 0.95 });
+  // Bridge decks are baked by bakeBridgeDeck below (raised span with stone
+  // side wall and curbs, one texture per axis) — the ground pass renders
+  // plain water beneath them.
 
   // Frozen surface: pale blue sheet with angular cracks and a cool outline.
-  const ice = new Graphics().poly(diamondPath()).fill(0xbcdbe9);
+  const ice = new Graphics().poly(overshootDiamondPath()).fill(0xbcdbe9);
   ice.moveTo(14, 15).lineTo(24, 12).lineTo(31, 16).stroke({ width: 1, color: 0x8fb8cc, alpha: 0.8 });
   ice.moveTo(24, 12).lineTo(27, 8).stroke({ width: 1, color: 0x8fb8cc, alpha: 0.6 });
   ice.moveTo(33, 22).lineTo(42, 19).lineTo(49, 23).stroke({ width: 1, color: 0x9fc4d6, alpha: 0.7 });
@@ -1381,22 +1790,29 @@ export function createTextures(renderer: Renderer): GameTextures {
   ice.poly(diamondPath()).stroke({ width: 1, color: 0x7fa9bf, alpha: 0.5 });
 
   return {
-    dirt: [
-      groundTile(renderer, 0x8a6f4d, 7, 0x6e5539, 0),
-      groundTile(renderer, 0x84693f + 0x030303, 6, 0x6e5539, 13),
-    ],
-    grass: [
-      groundTile(renderer, 0x4d7a35, 6, 0x3a5c27, 5),
-      groundTile(renderer, 0x487233, 7, 0x5c8a42, 17),
-    ],
-    sand: [
-      groundTile(renderer, 0xd6bd82, 6, 0xbaa065, 9),
-      groundTile(renderer, 0xcfb478, 7, 0xe4d3a0, 21),
-    ],
+    // Variant BASE tones stay nearly identical — the visual variety comes
+    // from the speckle patterns and the macro tint, not from patchwork tiles.
+    dirt: [0x8a6f4d, 0x896e4b, 0x8b704e, 0x886d4a, 0x8a6f4c].map((c, i) =>
+      groundTile(renderer, c, i * 13),
+    ),
+    grass: [0x4d7a35, 0x4c7834, 0x4e7b36, 0x4b7733, 0x4d7935].map((c, i) =>
+      groundTile(renderer, c, 5 + i * 11),
+    ),
+    sand: [0xd6bd82, 0xd4bb80, 0xd7bf84, 0xd3ba7e, 0xd5bc81].map((c, i) =>
+      groundTile(renderer, c, 9 + i * 7),
+    ),
     water: bakeTile(renderer, water),
     ice: bakeTile(renderer, ice),
-    bridge: bakeTile(renderer, bridge),
+    bridgeCx: bakeBridgeDeck(renderer, 'cx'),
+    bridgeCy: bakeBridgeDeck(renderer, 'cy'),
+    bridgeWreck: bakeBridgeWreck(renderer),
+    wornPatch: [bakeWornPatch(renderer, 0), bakeWornPatch(renderer, 1)],
     rocks: [bakeRock(renderer, 0), bakeRock(renderer, 1), bakeRock(renderer, 2)],
+    cliffs: Array.from({ length: 16 }, (_, mask) => bakeCliff(renderer, mask)),
+    cliffShadow: bakeCliffShadow(renderer),
+    softShadow: bakeSoftShadow(renderer),
+    pebbles: [bakePebble(renderer, 0), bakePebble(renderer, 1)],
+    tufts: [bakeTuft(renderer, 0), bakeTuft(renderer, 1)],
     ore: bakeTile(renderer, oreOverlay),
     gems: bakeTile(renderer, gemOverlay),
     tree: renderer.generateTexture({
@@ -1406,7 +1822,7 @@ export function createTextures(renderer: Renderer): GameTextures {
     }),
     fogTile: renderer.generateTexture({
       target: fog,
-      frame: new Rectangle(-1, -1, TILE_W + 2, TILE_H + 2),
+      frame: new Rectangle(-8, -6, TILE_W + 16, TILE_H + 12),
       resolution: 1,
     }),
     tank,

@@ -62,7 +62,10 @@ function paintProcedural(canvas: HTMLCanvasElement, mapType: MapType, size: numb
   const ctx = canvas.getContext('2d')!;
   paintMapData(ctx, state);
   for (const b of state.buildings) {
-    ctx.fillStyle = colorCss(state.players[b.owner]!.color);
+    // Neutral structures (bridge spans) have no player record — skip the dot.
+    const owner = state.players[b.owner];
+    if (!owner) continue;
+    ctx.fillStyle = colorCss(owner.color);
     ctx.fillRect(b.cx - 1, b.cy - 1, 4, 4);
   }
 }

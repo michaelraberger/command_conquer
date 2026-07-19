@@ -1,5 +1,6 @@
 import {
   FOG_VISIBLE,
+  TERRAIN_BRIDGE,
   buildingRule,
   cellIndex,
   inBounds,
@@ -466,6 +467,24 @@ export class Controls {
           this.send({ type: 'MOVE', playerId: session.localPlayer, unitIds: rest, cx, cy });
         }
         return;
+      }
+    }
+
+    // Force-fire on a bridge (classic C&C): Ctrl+right-click a span cell
+    // attacks the bridge itself so it can be dropped. The deck renders a few
+    // pixels above its cell, so clicks near its upper edge resolve to the
+    // neighbouring water cell — probe those neighbours too.
+    if (e.ctrlKey) {
+      for (const [bx, by] of [[cx, cy], [cx + 1, cy], [cx, cy + 1]] as const) {
+        if (!inBounds(this.state, bx, by)) continue;
+        if (this.state.terrain[cellIndex(this.state, bx, by)] !== TERRAIN_BRIDGE) continue;
+        const span = this.state.buildings.find(
+          (b) => b.type === 'BRIDGE' && b.cx === bx && b.cy === by,
+        );
+        if (span) {
+          this.send({ type: 'ATTACK', playerId: session.localPlayer, unitIds, targetId: span.id });
+          return;
+        }
       }
     }
 

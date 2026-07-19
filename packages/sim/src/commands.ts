@@ -328,10 +328,12 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       }
       case 'CAPTURE': {
-        // An engineer takes over any ENEMY or NEUTRAL building (never own/allied).
+        // An engineer takes over any ENEMY or NEUTRAL building (never own/allied
+        // — and never a bridge span, that's just map furniture).
         const target = state.buildings.find((b) => b.id === cmd.targetId);
         if (
           !target ||
+          target.type === 'BRIDGE' ||
           target.owner === cmd.playerId ||
           (target.owner >= 0 && !areEnemies(state, cmd.playerId, target.owner))
         ) {
@@ -429,9 +431,15 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         const building = state.buildings.find(
           (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
         );
-        if (!building || buildingRule(building.type).produces === null) break;
+        if (!building) break;
+        const produces = buildingRule(building.type).produces;
+        if (produces === null) break;
         building.rallyCx = cmd.cx;
         building.rallyCy = cmd.cy;
+        // Setting a rally also makes this the primary producer of its
+        // category — finished units spawn here from now on.
+        const player = state.players[cmd.playerId];
+        if (player) (player.primaryBuildings ??= {})[produces] = building.id;
         break;
       }
     }

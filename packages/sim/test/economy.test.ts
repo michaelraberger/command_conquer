@@ -107,6 +107,22 @@ describe('production', () => {
     const cy = (recruit.cell - cx) / state.mapWidth;
     expect(Math.max(Math.abs(cx - 16), Math.abs(cy - 20))).toBeLessThanOrEqual(2);
   });
+
+  it('spawns from the barracks whose rally point was set (primary building)', () => {
+    const state = createGame(7);
+    constructBuilding(state, 'POWER', 0, 17, 17);
+    constructBuilding(state, 'BARRACKS', 0, 19, 19); // first producer
+    const second = constructBuilding(state, 'BARRACKS', 0, 24, 19);
+    tick(state, [
+      { type: 'SET_RALLY', playerId: 0, buildingId: second.id, cx: 27, cy: 21 },
+      { type: 'BUILD_START', playerId: 0, item: 'RIFLEMAN' },
+    ]);
+    runTicks(state, 400);
+    const recruit = state.units[state.units.length - 1]!;
+    const cx = recruit.cell % state.mapWidth;
+    const cy = (recruit.cell - cx) / state.mapWidth;
+    expect(Math.max(Math.abs(cx - 27), Math.abs(cy - 21))).toBeLessThanOrEqual(2);
+  });
 });
 
 describe('placement rules', () => {

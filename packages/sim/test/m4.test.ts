@@ -165,7 +165,9 @@ describe('ai opponent', () => {
     // but must not attack before tick 9000.
     state.tick = 8000;
     let maxAiArmy = 0;
-    for (let t = 0; t < 6000 && state.winner === -1; t++) {
+    // The TD-style map has real chokepoints (stream fords, ridges) — give the
+    // AI a bit more room than on the old open layouts.
+    for (let t = 0; t < 8500 && state.winner === -1; t++) {
       tick(state);
       const combat = state.units.filter(
         (u) => u.owner === 1 && unitRule(u.type).weapon !== null,

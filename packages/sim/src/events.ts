@@ -17,6 +17,9 @@ export type SimEvent =
    *  defenders that are actually able to fight that attacker. */
   | { type: 'AGGRO'; owner: number; x: number; y: number; ax: number; ay: number; akind: AggroKind }
   | { type: 'DEATH'; x: number; y: number; big: boolean }
+  /** A bridge span collapsed: cell (cx,cy) turned into TERRAIN_BRIDGE_WRECK —
+   *  the client patches its terrain view and minimap. */
+  | { type: 'BRIDGE_DOWN'; cx: number; cy: number }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
   | { type: 'REPAIR'; x: number; y: number }
   | { type: 'PARADROP'; x: number; y: number };

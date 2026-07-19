@@ -2,6 +2,9 @@ import {
   FOG_HIDDEN,
   FOG_VISIBLE,
   SUBCELL,
+  TERRAIN_DIRT,
+  TERRAIN_GRASS,
+  TERRAIN_SAND,
   buildingMaxHp,
   buildingRule,
   isInfantryType,
@@ -85,6 +88,38 @@ const PACK_OFFSETS = [
   { dx: 0, dy: SUBCELL * 0.2 },
 ];
 
+/** Worn-ground colour for the terrain a building's footprint sits on: earthy
+ *  brown on grass/dirt, packed tan on sand — null (no apron) on anything
+ *  else, e.g. water-based structures. */
+function wornTintFor(state: GameState, building: Building): number | null {
+  const rule = buildingRule(building.type);
+  const counts = new Map<number, number>();
+  for (let y = building.cy; y < building.cy + rule.height; y++) {
+    for (let x = building.cx; x < building.cx + rule.width; x++) {
+      const t = state.terrain[y * state.mapWidth + x]!;
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+  }
+  let best = -1;
+  let bestCount = 0;
+  for (const [t, n] of counts) {
+    if (n > bestCount) {
+      best = t;
+      bestCount = n;
+    }
+  }
+  switch (best) {
+    case TERRAIN_GRASS:
+      return 0x6d5c3c;
+    case TERRAIN_DIRT:
+      return 0x64553d;
+    case TERRAIN_SAND:
+      return 0xa08c60;
+    default:
+      return null;
+  }
+}
+
 /**
  * Presentation layer: keeps one sprite tree per sim entity and interpolates
  * between the previous and current tick positions. The sim never sees any of
@@ -96,12 +131,15 @@ export class EntityRenderer {
   private buildingViews = new Map<number, BuildingView>();
   private strikeViews = new Map<number, Graphics>();
   private playerColors = new Map<number, number>();
+  /** Live game state (stable identity) — read for terrain under buildings. */
+  private readonly world: GameState;
 
   constructor(
     private layer: Container,
     private tex: GameTextures,
     state: GameState,
   ) {
+    this.world = state;
     for (const p of state.players) this.playerColors.set(p.id, p.color);
   }
 
@@ -376,6 +414,35 @@ export class EntityRenderer {
         ? this.tex.walls[building.level - 1]!
         : this.tex.buildings[building.type];
     const root = new Container();
+    // Trampled apron + soft drop shadow under the footprint (shadow thrown to
+    // the left — light from the east, like the tree/cliff shading). Walls,
+    // gates and bridge spans stay bare.
+    if (building.type !== 'WALL' && building.type !== 'GATE' && building.type !== 'BRIDGE') {
+      const rule0 = buildingRule(building.type);
+      const centre = worldToScreen(
+        (building.cx + rule0.width / 2) * SUBCELL,
+        (building.cy + rule0.height / 2) * SUBCELL,
+      );
+      const corner0 = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
+      // Worn ground around the structure, classic C&C "bib": an irregular
+      // trampled patch tinted to match whatever terrain the building sits on,
+      // bulging toward the entrance side (screen-down).
+      const worn = wornTintFor(this.world, building);
+      if (worn !== null) {
+        const patch = new Sprite(this.tex.wornPatch[building.id % this.tex.wornPatch.length]!);
+        patch.anchor.set(0.5);
+        patch.position.set(centre.x - corner0.x, centre.y - corner0.y + 5 + rule0.height * 3);
+        patch.scale.set(rule0.width * 0.68 + 0.6, rule0.height * 0.66 + 0.55);
+        patch.tint = worn;
+        root.addChild(patch);
+      }
+      const shadow = new Sprite(this.tex.softShadow);
+      shadow.anchor.set(0.5);
+      shadow.position.set(centre.x - corner0.x - rule0.width * 5, centre.y - corner0.y + 3);
+      shadow.scale.set(rule0.width * 0.62, rule0.height * 0.55);
+      shadow.alpha = 0.8;
+      root.addChild(shadow);
+    }
     // Neutral structure stays untinted; the team accent carries the faction.
     const body = new Sprite(def.texture);
     body.anchor.set(def.anchorX, def.anchorY);
@@ -469,6 +536,13 @@ export class EntityRenderer {
     if (air) {
       // Ground shadow directly under the aircraft.
       const shadow = new Graphics().ellipse(0, 0, 11, 6).fill({ color: 0x000000, alpha: 0.28 });
+      root.addChild(shadow);
+    } else if (unitRule(unit.type).category !== 'naval') {
+      // Land units: soft contact shadow nudged left (light from the east).
+      const shadow = new Sprite(this.tex.softShadow);
+      shadow.anchor.set(0.5);
+      shadow.position.set(-3, big ? 3 : 4);
+      shadow.scale.set(big ? 0.42 : 0.26, big ? 0.36 : 0.24);
       root.addChild(shadow);
     }
     root.addChild(sel, body, team, bar, groupLabel);
