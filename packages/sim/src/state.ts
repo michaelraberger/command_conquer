@@ -4,17 +4,22 @@ import { cellCenter, SUBCELL } from './fixed.js';
 import {
   INFANTRY_STACK,
   RESOURCE_GEMS,
+  RESOURCE_NONE,
   RESOURCE_ORE,
   TERRAIN_BRIDGE,
+  TERRAIN_DIRT,
+  TERRAIN_GRASS,
   cellIndex,
   clearArea,
   generateTerrain,
+  isBuildableKind,
   isInfantryType,
   reserveCell,
   spawnCenters,
   stampResourcePatch,
   type MapType,
 } from './map.js';
+import { nextInt } from './rng.js';
 import {
   FACTION_COLORS,
   PARADROP_COOLDOWN_TICKS,
@@ -115,6 +120,8 @@ export interface Building {
   charge: number;
   /** Iron curtain: remaining ticks of invulnerability (0 = none). */
   curtainTicks: number;
+  /** Credit-fed self-repair mode (sidebar wrench). Auto-clears at full hp. */
+  repairing: boolean;
   /** In-place upgrade in progress (Wachturm → AGT, Kraftwerk → Fortschr.):
    *  the building keeps working as its current type until `progress` reaches the
    *  target's buildTime, then becomes `to`. null/absent = not upgrading. */
@@ -131,6 +138,17 @@ export interface Strike {
   y: number;
   /** Ticks until detonation. */
   countdown: number;
+}
+
+/** What a crate grants on pickup. */
+export type CrateKind = 'MONEY' | 'HEAL' | 'REVEAL' | 'UNIT';
+
+/** A collectible crate on the map (classic C&C goodie box). */
+export interface Crate {
+  id: number;
+  cx: number;
+  cy: number;
+  kind: CrateKind;
 }
 
 export interface Projectile {
@@ -237,6 +255,8 @@ export interface GameState {
   buildings: Building[];
   projectiles: Projectile[];
   strikes: Strike[];
+  /** Collectible crates on the map (see systems/crates.ts). */
+  crates: Crate[];
   /** Presentation events of the current tick (see events.ts). */
   events: SimEvent[];
 }
@@ -347,6 +367,7 @@ export function constructBuilding(
     cooldown: 0,
     charge: 0,
     curtainTicks: 0,
+    repairing: false,
   };
   // Bridge spans never enter the structures grid: ground units drive over
   // them and ships sail beneath — the span is only a damage target.
@@ -361,6 +382,68 @@ export function constructBuilding(
   }
   state.buildings.push(building);
   return building;
+}
+
+/**
+ * Neutral tech buildings on procedural maps: one capturable Lazarett plus one
+ * or two civilian villages (2–4 houses around an anchor), all owner -1 and
+ * clear of every base. Deterministic via the seeded sim RNG (bounded attempt
+ * loops with fixed draw counts per attempt). Skipped on ISLANDS — home
+ * islands have no room and the ocean has no ground.
+ */
+export function placeNeutralTechBuildings(
+  state: GameState,
+  spawns: ReadonlyArray<readonly [number, number]>,
+): void {
+  if (state.mapType === 'ISLANDS') return;
+  const margin = 6;
+  const keepoutSq = 12 * 12;
+
+  const fits = (type: BuildingType, cx: number, cy: number): boolean => {
+    const rule = buildingRule(type);
+    if (cx < margin || cy < margin) return false;
+    if (cx + rule.width > state.mapWidth - margin) return false;
+    if (cy + rule.height > state.mapHeight - margin) return false;
+    for (let y = cy; y < cy + rule.height; y++) {
+      for (let x = cx; x < cx + rule.width; x++) {
+        const idx = cellIndex(state, x, y);
+        if (!isBuildableKind(state.terrain[idx]!)) return false;
+        if (state.structures[idx] !== 0) return false;
+        if (state.ore[idx] !== 0 || state.resourceKind[idx] !== RESOURCE_NONE) return false;
+      }
+    }
+    const mx = cx + rule.width / 2;
+    const my = cy + rule.height / 2;
+    return spawns.every(([sx, sy]) => (mx - sx) * (mx - sx) + (my - sy) * (my - sy) >= keepoutSq);
+  };
+
+  const tryPlace = (type: BuildingType, attempts: number): Building | null => {
+    for (let i = 0; i < attempts; i++) {
+      const cx = margin + nextInt(state, Math.max(1, state.mapWidth - 2 * margin));
+      const cy = margin + nextInt(state, Math.max(1, state.mapHeight - 2 * margin));
+      if (!fits(type, cx, cy)) continue;
+      return constructBuilding(state, type, NEUTRAL_OWNER, cx, cy);
+    }
+    return null;
+  };
+
+  tryPlace('HOSPITAL', 40);
+
+  const villages = 1 + nextInt(state, 2);
+  for (let v = 0; v < villages; v++) {
+    const anchor = tryPlace('HAUS2', 40);
+    if (!anchor) continue;
+    const houses = 1 + nextInt(state, 3); // 2–4 buildings per village incl. anchor
+    for (let h = 0; h < houses; h++) {
+      const dx = nextInt(state, 9) - 4;
+      const dy = nextInt(state, 9) - 4;
+      const type: BuildingType = nextInt(state, 3) === 0 ? 'HAUS2' : 'HAUS1';
+      const cx = anchor.cx + dx;
+      const cy = anchor.cy + dy;
+      if (!fits(type, cx, cy)) continue;
+      constructBuilding(state, type, NEUTRAL_OWNER, cx, cy);
+    }
+  }
 }
 
 /**
@@ -563,6 +646,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     buildings: [],
     projectiles: [],
     strikes: [],
+    crates: [],
     events: [],
   };
 
@@ -580,9 +664,9 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
   }
 
   if (!customMap && playerCount === 2 && mapWidth === 64 && mapHeight === 64) {
-    // Classic hand-tuned 1v1 setup (kept byte-for-byte so existing maps/tests
-    // are unchanged); the N-player generator below runs for 3+ players or any
-    // non-default map size.
+    // Classic hand-tuned 1v1 setup (fixed anchor coordinates); neutral tech
+    // buildings join via the shared generator below, so seeds from before
+    // that feature produce a different (but still deterministic) layout.
     if (mapType === 'ISLANDS') {
       stampResourcePatch(state, state, 23, 17, 2, RESOURCE_ORE);
       stampResourcePatch(state, state, 39, 45, 2, RESOURCE_ORE);
@@ -596,6 +680,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       stampResourcePatch(state, state, 20, 44, 1, RESOURCE_GEMS);
       stampResourcePatch(state, state, 44, 20, 1, RESOURCE_GEMS);
     }
+    placeNeutralTechBuildings(state, spawns);
     constructBuilding(state, 'CONYARD', 0, 13, 13);
     spawnUnit(state, 'TANK', 0, 17, 13);
     spawnUnit(state, 'TANK', 0, 18, 13);
@@ -631,6 +716,29 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
       stampResourcePatch(state, state, Math.round((mapWidth * 29) / 64), Math.round((mapHeight * 35) / 64), 1, RESOURCE_GEMS);
       stampResourcePatch(state, state, Math.round((mapWidth * 35) / 64), Math.round((mapHeight * 29) / 64), 1, RESOURCE_GEMS);
     }
+    // Big maps: scatter extra fields across the outlands, or expansion play is
+    // pointless on 9× the ground with 64²-era resources. Deterministic bounded
+    // attempts on open soft ground, clear of every base. None at ≤64 (f = 1).
+    const f = Math.max(1, Math.round((mapWidth * mapHeight) / 4096));
+    const extras: Array<[number, number, number]> = []; // [radius, kind, count]
+    if (f > 1) {
+      extras.push([2, RESOURCE_ORE, 2 * (f - 1)], [1, RESOURCE_GEMS, Math.floor(f / 3)]);
+    }
+    for (const [radius, kind, count] of extras) {
+      for (let i = 0; i < count; i++) {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const cx = 6 + nextInt(state, Math.max(1, mapWidth - 12));
+          const cy = 6 + nextInt(state, Math.max(1, mapHeight - 12));
+          const t = state.terrain[cy * mapWidth + cx]!;
+          if (t !== TERRAIN_GRASS && t !== TERRAIN_DIRT) continue;
+          if (spawns.some(([sx, sy]) => (cx - sx) ** 2 + (cy - sy) ** 2 < 16 * 16)) continue;
+          if (state.resourceKind[cy * mapWidth + cx] !== RESOURCE_NONE) continue;
+          stampResourcePatch(state, state, cx, cy, radius, kind);
+          break;
+        }
+      }
+    }
+    placeNeutralTechBuildings(state, spawns);
   }
 
   // Construction yard, harvester and a small guard force at each base.
@@ -691,6 +799,12 @@ export function deserialize(json: string): GameState {
       if (typeof p.ammo !== 'number') p.ammo = unitRule(p.type).ammo ?? 0;
     }
   }
+  // Saves from before the building-repair mode: default the flag off.
+  for (const b of raw.buildings) {
+    if (typeof b.repairing !== 'boolean') b.repairing = false;
+  }
+  // Saves from before crates: default to none on the map.
+  if (!Array.isArray(raw.crates)) raw.crates = [];
   // NOTE: no bridge-span retrofit here — deserialize(serialize(s)) must
   // reproduce s exactly (lockstep resync depends on it). Saves from before
   // destructible bridges simply keep their spans-less, indestructible decks.

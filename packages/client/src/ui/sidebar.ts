@@ -67,6 +67,7 @@ export class Sidebar {
    *  states). Running these instead of rebuilding keeps buttons clickable. */
   private binfoUpdaters: Array<() => void> = [];
   private swEl = document.getElementById('superweapon')!;
+  private repairBtn = document.getElementById('repair-toggle') as HTMLButtonElement;
   /** One row (label + charge bar + fire button) per owned support power:
    *  one per superweapon SILO (keyed `sw:<buildingId>`, so two Raketensilos
    *  charge and fire independently) plus the paradrop (keyed 'PARADROP'). */
@@ -99,6 +100,11 @@ export class Sidebar {
       this.tabsEl.appendChild(btn);
     }
     this.factionEl.textContent = FACTION_NAMES[this.player().faction];
+    // Wrench toggle: enter/leave the building self-repair mode.
+    this.repairBtn.addEventListener('click', () => {
+      if (this.placement.repair) this.placement.cancel();
+      else this.placement.activateRepair();
+    });
     this.renderTabs();
     this.buildItems();
   }
@@ -290,6 +296,9 @@ export class Sidebar {
 
     this.updateBuildingInfo();
     this.updateSuperweapon();
+    // Wrench pressed-state mirrors the placement mode (Escape/right-click
+    // leaves it without going through this button).
+    this.repairBtn.classList.toggle('pressed', this.placement.repair);
   }
 
   /** Charge bar + fire button per superweapon SILO the player owns — two

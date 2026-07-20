@@ -24,9 +24,10 @@ function arena(seed = 7): GameState {
 }
 
 describe('radar tower', () => {
-  it('is a Soviet-only power drain with the widest sight in the game', () => {
+  it('is a faction-free power drain with the widest sight in the game', () => {
+    // Both factions build it now — the radar tower gates the minimap.
     const rule = buildingRule('RADAR');
-    expect(rule.factions).toEqual(['SOVIETS']);
+    expect(rule.factions).toBeNull();
     expect(rule.cost).toBe(1000);
     expect(rule.power).toBe(-50);
     const maxUnitSight = Math.max(...Object.values(UNIT_RULES).map((r) => r.sight));

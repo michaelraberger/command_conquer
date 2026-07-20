@@ -12,6 +12,9 @@ Cloud-Funktionen sind dann ausgeblendet ("Gefecht gegen KI" braucht kein Login).
 2. **Schema einspielen**: Dashboard → *SQL Editor* → Inhalt von
    [`migrations/0001_init.sql`](migrations/0001_init.sql) einfügen und ausführen.
    (Alternativ mit der Supabase-CLI: `supabase db push`.)
+   **Bestehende Projekte:** zusätzlich
+   [`migrations/0002_map_sizes.sql`](migrations/0002_map_sizes.sql) ausführen —
+   sonst schlägt das Cloud-Speichern von Karten größer als 96×96 fehl.
 
 3. **E-Mail-Login konfigurieren**: Dashboard → *Authentication → Sign In / Up →
    Email*. Für die einfachste Variante **"Confirm email" deaktivieren**

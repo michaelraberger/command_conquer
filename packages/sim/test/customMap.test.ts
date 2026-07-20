@@ -47,7 +47,15 @@ describe('validateCustomMap', () => {
   it('rejects wrong sizes and wrong layer lengths', () => {
     const map = makeMap();
     expect(validateCustomMap({ ...map, width: 50 }).ok).toBe(false);
+    expect(validateCustomMap({ ...map, width: 100 }).ok).toBe(false);
     expect(validateCustomMap({ ...map, terrain: map.terrain.slice(1) }).ok).toBe(false);
+  });
+
+  it('accepts every legal side length up to 192', () => {
+    for (const size of [48, 64, 96, 128, 144, 192]) {
+      const map = emptyCustomMap(size, size, `Größe ${size}`);
+      expect(validateCustomMap(map).ok).toBe(true);
+    }
   });
 
   it('rejects fewer than 2 spawns, edge-hugging and clustered spawns', () => {

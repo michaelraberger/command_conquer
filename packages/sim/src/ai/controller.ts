@@ -27,6 +27,15 @@ import {
 /** Grace period: the AI never launches an offensive before this tick (10 min). */
 const FIRST_ATTACK_TICK = 10 * 60 * 15;
 
+/**
+ * Search radii below are tuned for 64² maps; larger maps scale them up so the
+ * AI still finds beaches/placement spots. 48/64 → 1 (byte-identical behavior),
+ * 96–144 → 2, 192 → 3.
+ */
+function mapScale(state: GameState): number {
+  return Math.max(1, Math.round(Math.min(state.mapWidth, state.mapHeight) / 64));
+}
+
 /** Difficulty tuning ("Schwierigkeitsgrad"). */
 interface AiParams {
   /** Ticks between AI decision passes. */
@@ -99,7 +108,7 @@ const BUILD_GOALS: Record<Faction, readonly BuildingType[]> = {
     'NUKESILO',
   ],
   ALLIES: [
-    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'TECHCENTER', 'PILLBOX',
+    'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'GUARDTOWER', 'SILO', 'RADAR', 'TECHCENTER', 'PILLBOX',
     'POWER', 'PILLBOX', 'WERKSTATT', 'HELIPAD', 'FLUGFELD', 'PRISM', 'SILO', 'FLAKTOWER', 'POWER',
     'PRISM', 'WEATHER',
   ],
@@ -128,7 +137,7 @@ function goalsFor(state: GameState, player: Player, params: AiParams): BuildingT
     const defense: BuildingType = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
     const superweapon: BuildingType = faction === 'SOVIETS' ? 'NUKESILO' : 'WEATHER';
     order = [
-      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'TECHCENTER', 'HELIPAD', 'FLUGFELD',
+      'POWER', 'REFINERY', 'BARRACKS', 'FACTORY', 'SILO', 'RADAR', 'TECHCENTER', 'HELIPAD', 'FLUGFELD',
       'SHIPYARD', 'FLAKTOWER', 'POWER', defense, 'WERKSTATT', 'SILO', 'POWER', superweapon,
     ];
   } else {
@@ -283,12 +292,12 @@ function manageMcv(state: GameState, player: Player): void {
   }
 }
 
-/** Neutral map structures worth taking (Erz-Bohrtürme). */
+/** Neutral map structures worth taking (Erz-Bohrtürme, Lazarett). */
 function neutralCapturables(state: GameState): Building[] {
   return state.buildings.filter((b) => {
     if (b.owner >= 0) return false;
     const rule = buildingRule(b.type);
-    return (rule.income ?? 0) > 0 || (rule.captureBonus ?? 0) > 0;
+    return (rule.income ?? 0) > 0 || (rule.captureBonus ?? 0) > 0 || (rule.heal ?? 0) > 0;
   });
 }
 
@@ -494,7 +503,8 @@ function manageArmy(state: GameState, player: Player, params: AiParams): void {
       if (!areEnemies(state, player.id, u.owner)) return false;
       const dx = (u.cell % state.mapWidth) - home.cx;
       const dy = Math.floor(u.cell / state.mapWidth) - home.cy;
-      return dx * dx + dy * dy < 12 * 12;
+      const r = 12 * mapScale(state);
+      return dx * dx + dy * dy < r * r;
     });
     if (threat) {
       applyCommands(state, [
@@ -609,7 +619,7 @@ function findBeach(state: GameState, bx: number, by: number): { cx: number; cy: 
   const w = state.mapWidth;
   const isWater = (x: number, y: number): boolean =>
     inBounds(state, x, y) && state.terrain[y * w + x] === TERRAIN_WATER;
-  for (let r = 0; r <= 24; r++) {
+  for (let r = 0; r <= 24 * mapScale(state); r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -677,7 +687,7 @@ function findPlacementSpot(
     state.buildings.find((b) => b.owner === player.id);
   if (!anchor) return null;
   const aRule = buildingRule(anchor.type);
-  const maxR = buildingRule(type).onWater ? 16 : 8;
+  const maxR = (buildingRule(type).onWater ? 16 : 8) * mapScale(state);
   const seaward = state.mapType === 'ISLANDS';
 
   let best: { cx: number; cy: number } | null = null;
@@ -699,7 +709,7 @@ function findPlacementSpot(
 /** Chebyshev distance to the nearest water cell within a small window (else large). */
 function distToWater(state: GameState, cx: number, cy: number): number {
   const w = state.mapWidth;
-  for (let r = 0; r <= 6; r++) {
+  for (let r = 0; r <= 6 * mapScale(state); r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;

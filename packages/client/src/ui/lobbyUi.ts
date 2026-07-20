@@ -138,9 +138,15 @@ export function initLobbyUi(): void {
     } else {
       title.textContent = MAP_TYPE_LABELS[settings.mapType] ?? settings.mapType;
       const sub = document.createElement('small');
-      sub.textContent = `Größe: ${
-        settings.mapSize === 48 ? 'Klein' : settings.mapSize === 96 ? 'Groß' : 'Normal'
-      }`;
+      const sizeLabel =
+        settings.mapSize === 96
+          ? 'Klein'
+          : settings.mapSize === 144
+            ? 'Normal'
+            : settings.mapSize === 192
+              ? 'Groß'
+              : `${settings.mapSize} × ${settings.mapSize}`;
+      sub.textContent = `Größe: ${sizeLabel}`;
       title.append(sub);
     }
     box.append(canvas, title);

@@ -29,7 +29,7 @@ import {
 import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
 import { crashBoundJets } from './systems/airbase.js';
 import { launchParadrop } from './systems/paradrop.js';
-import { findTarget, isAir, isNaval, targetOwner } from './targeting.js';
+import { buildingMaxHp, findTarget, isAir, isNaval, targetOwner } from './targeting.js';
 import { canPlaceBuilding } from './systems/placement.js';
 import {
   cancelProduction,
@@ -56,6 +56,8 @@ export type Command =
   | { type: 'PLACE_WALL'; playerId: number; cx: number; cy: number }
   | { type: 'UPGRADE_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
+  /** Sidebar wrench: toggle the credit-fed self-repair mode of an own building. */
+  | { type: 'TOGGLE_REPAIR'; playerId: number; buildingId: number }
   | { type: 'SET_RALLY'; playerId: number; buildingId: number; cx: number; cy: number }
   | { type: 'FIRE_SUPERWEAPON'; playerId: number; cx: number; cy: number; kind?: SuperweaponKind }
   | { type: 'PARADROP'; playerId: number; cx: number; cy: number }
@@ -229,6 +231,16 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         if (player.credits < rule.upgradeCost) break;
         player.credits -= rule.upgradeCost;
         building.upgrade = { to: rule.upgradeTo as BuildingType, progress: 0 };
+        break;
+      }
+      case 'TOGGLE_REPAIR': {
+        const building = state.buildings.find(
+          (b) => b.id === cmd.buildingId && b.owner === cmd.playerId,
+        );
+        if (!building) break;
+        // Turning repair on at full hp is a no-op (nothing to fix).
+        if (!building.repairing && building.hp >= buildingMaxHp(building)) break;
+        building.repairing = !building.repairing;
         break;
       }
       case 'SELL_BUILDING': {

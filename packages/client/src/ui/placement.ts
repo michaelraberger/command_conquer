@@ -4,6 +4,7 @@ import {
   SUPERWEAPON_STATS,
   buildingRule,
   canPlaceBuilding,
+  type Building,
   type BuildingType,
   type Command,
   type GameState,
@@ -25,6 +26,8 @@ export class PlacementMode {
   active: BuildingType | null = null;
   /** Superweapon/paradrop targeting mode ("Ziel wählen"). */
   strike: StrikeKind | null = null;
+  /** Repair mode (sidebar wrench): clicks toggle self-repair on own buildings. */
+  repair = false;
   private readonly ghost = new Graphics();
   private lastCell = { cx: -1, cy: -1 };
 
@@ -42,11 +45,12 @@ export class PlacementMode {
 
   /** True while any placement/targeting mode consumes canvas clicks. */
   get busy(): boolean {
-    return this.active !== null || this.strike !== null;
+    return this.active !== null || this.strike !== null || this.repair;
   }
 
   activate(type: BuildingType): void {
     this.strike = null;
+    this.repair = false;
     this.active = type;
     this.lastCell = { cx: -1, cy: -1 };
     this.ghost.visible = true;
@@ -55,7 +59,18 @@ export class PlacementMode {
 
   activateStrike(kind: StrikeKind): void {
     this.active = null;
+    this.repair = false;
     this.strike = kind;
+    this.lastCell = { cx: -1, cy: -1 };
+    this.ghost.visible = true;
+    this.ghost.clear();
+  }
+
+  /** Sidebar wrench: clicks now toggle self-repair on own buildings. */
+  activateRepair(): void {
+    this.active = null;
+    this.strike = null;
+    this.repair = true;
     this.lastCell = { cx: -1, cy: -1 };
     this.ghost.visible = true;
     this.ghost.clear();
@@ -64,6 +79,7 @@ export class PlacementMode {
   cancel(): void {
     this.active = null;
     this.strike = null;
+    this.repair = false;
     this.ghost.visible = false;
   }
 
@@ -74,8 +90,45 @@ export class PlacementMode {
     this.lastCell = { cx, cy };
     if (this.strike) {
       this.redrawStrike(cx, cy);
+    } else if (this.repair) {
+      this.redrawRepair(cx, cy);
     } else {
       this.redraw(cx, cy);
+    }
+  }
+
+  /** The building whose footprint covers the cell, if any. */
+  private buildingAt(cx: number, cy: number): Building | null {
+    if (cx < 0 || cy < 0 || cx >= this.state.mapWidth || cy >= this.state.mapHeight) return null;
+    const id = this.state.structures[cy * this.state.mapWidth + cx]!;
+    if (id === 0) return null;
+    return this.state.buildings.find((b) => b.id === id) ?? null;
+  }
+
+  /** Repair mode: gold outline over the hovered own building's footprint. */
+  private redrawRepair(cx: number, cy: number): void {
+    this.ghost.clear();
+    const building = this.buildingAt(cx, cy);
+    const own = building !== null && building.owner === session.localPlayer;
+    const rule = own ? buildingRule(building.type) : null;
+    const x0 = own ? building.cx : cx;
+    const y0 = own ? building.cy : cy;
+    const w = rule?.width ?? 1;
+    const h = rule?.height ?? 1;
+    const color = own ? 0xffd94d : 0x8a94a0;
+    for (let y = y0; y < y0 + h; y++) {
+      for (let x = x0; x < x0 + w; x++) {
+        const { x: sx, y: sy } = cellToScreen(x, y);
+        this.ghost
+          .poly([
+            sx, sy - TILE_H / 2,
+            sx + TILE_W / 2, sy,
+            sx, sy + TILE_H / 2,
+            sx - TILE_W / 2, sy,
+          ])
+          .fill({ color, alpha: own ? 0.22 : 0.1 })
+          .stroke({ width: 1, color, alpha: 0.9 });
+      }
     }
   }
 
@@ -127,6 +180,15 @@ export class PlacementMode {
     if (this.strike) {
       this.send({ type: 'FIRE_SUPERWEAPON', playerId: session.localPlayer, cx, cy, kind: this.strike });
       this.cancel();
+      return true;
+    }
+    if (this.repair) {
+      const building = this.buildingAt(cx, cy);
+      if (building && building.owner === session.localPlayer) {
+        this.send({ type: 'TOGGLE_REPAIR', playerId: session.localPlayer, buildingId: building.id });
+      }
+      // Stay active (chain like walls) — right-click/Escape leaves the mode.
+      this.lastCell = { cx: -1, cy: -1 };
       return true;
     }
     if (!this.active) return false;

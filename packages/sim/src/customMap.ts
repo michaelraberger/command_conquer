@@ -11,7 +11,7 @@ import {
 import { buildingRule, isBuildingType } from './rules.js';
 
 /** Legal side lengths for hand-authored maps (square not required). */
-export const CUSTOM_MAP_SIZES: readonly number[] = [48, 64, 96];
+export const CUSTOM_MAP_SIZES: readonly number[] = [48, 64, 96, 128, 144, 192];
 
 /** Spawns must keep this margin to the map edge (room for base + units). */
 export const SPAWN_EDGE_MARGIN = 5;

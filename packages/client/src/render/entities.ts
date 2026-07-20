@@ -7,6 +7,7 @@ import {
   TERRAIN_SAND,
   buildingMaxHp,
   buildingRule,
+  cellCenter,
   isInfantryType,
   powerBalance,
   toCell,
@@ -48,6 +49,8 @@ interface BuildingView {
   /** White faction accent, tinted to the owner's colour. */
   team: Sprite;
   bar: Graphics;
+  /** Pulsing wrench while the building's self-repair mode is on (own only). */
+  wrench: Graphics;
   lastHp: number;
   lastLevel: number;
   /** Last rendered building type — swaps the sprite on in-place upgrades. */
@@ -130,6 +133,7 @@ export class EntityRenderer {
   private projectileViews = new Map<number, ProjectileView>();
   private buildingViews = new Map<number, BuildingView>();
   private strikeViews = new Map<number, Graphics>();
+  private crateViews = new Map<number, Sprite>();
   private playerColors = new Map<number, number>();
   /** Live game state (stable identity) — read for terrain under buildings. */
   private readonly world: GameState;
@@ -169,6 +173,7 @@ export class EntityRenderer {
   ): void {
     const fog = state.fogs[session.localPlayer]!;
     this.syncBuildings(state, fog);
+    this.syncCrates(state, fog);
 
     const seen = new Set<number>();
     for (const unit of state.units) {
@@ -282,6 +287,31 @@ export class EntityRenderer {
       if (!seen.has(id)) {
         marker.destroy();
         this.strikeViews.delete(id);
+      }
+    }
+  }
+
+  /** Goodie crates: static sprites, hidden inside unexplored fog. */
+  private syncCrates(state: GameState, fog: Uint8Array): void {
+    const seen = new Set<number>();
+    for (const crate of state.crates) {
+      seen.add(crate.id);
+      let sprite = this.crateViews.get(crate.id);
+      if (!sprite) {
+        sprite = new Sprite(this.tex.crate);
+        sprite.anchor.set(0.5, 0.6);
+        const { x, y } = worldToScreen(cellCenter(crate.cx), cellCenter(crate.cy));
+        sprite.position.set(x, y);
+        sprite.zIndex = depthOf(cellCenter(crate.cx), cellCenter(crate.cy));
+        this.layer.addChild(sprite);
+        this.crateViews.set(crate.id, sprite);
+      }
+      sprite.visible = fog[crate.cy * state.mapWidth + crate.cx] !== FOG_HIDDEN;
+    }
+    for (const [id, sprite] of this.crateViews) {
+      if (!seen.has(id)) {
+        sprite.destroy();
+        this.crateViews.delete(id);
       }
     }
   }
@@ -400,6 +430,12 @@ export class EntityRenderer {
         view.lastShielded = shielded;
       }
       this.updateBuildingBar(building, view, bridgeBars);
+      // Self-repair indicator: pulsing wrench, own buildings only.
+      const showWrench = building.owner === session.localPlayer && building.repairing;
+      view.wrench.visible = showWrench;
+      if (showWrench) {
+        view.wrench.alpha = 0.55 + 0.45 * Math.abs((state.tick % 12) / 6 - 1);
+      }
     }
     for (const [id, view] of this.buildingViews) {
       if (!seen.has(id)) {
@@ -460,7 +496,15 @@ export class EntityRenderer {
     const corner = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     bar.position.set(roof.x - corner.x, -18);
     bar.visible = false;
-    root.addChild(body, team, bar);
+    // Pulsing gold wrench above the roof while self-repair is running.
+    const wrench = new Graphics();
+    wrench.arc(0, -6, 4, 0.9, 5.4).stroke({ width: 4, color: 0x2b241a });
+    wrench.moveTo(2.5, -3.5).lineTo(7.5, 4.5).stroke({ width: 4.5, color: 0x2b241a });
+    wrench.arc(0, -6, 4, 0.9, 5.4).stroke({ width: 2.4, color: 0xffd94d });
+    wrench.moveTo(2.5, -3.5).lineTo(7, 4).stroke({ width: 3, color: 0xffd94d });
+    wrench.position.set(roof.x - corner.x, -30);
+    wrench.visible = false;
+    root.addChild(body, team, bar, wrench);
     const { x, y } = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     root.position.set(x, y);
     root.zIndex = depthOf((building.cx + rule.width) * SUBCELL, (building.cy + rule.height) * SUBCELL);
@@ -470,6 +514,7 @@ export class EntityRenderer {
       body,
       team,
       bar,
+      wrench,
       lastHp: -1,
       lastLevel: building.level,
       lastType: building.type,

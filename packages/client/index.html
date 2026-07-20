@@ -877,9 +877,31 @@
         opacity: 0.4;
         cursor: not-allowed;
       }
+      #repair-row {
+        padding: 6px 10px 0;
+      }
+      #repair-toggle {
+        width: 100%;
+        padding: 5px 8px;
+        background: #1b232d;
+        color: #d7e0ea;
+        border: 1px solid #2c3a4a;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+      }
+      #repair-toggle:hover {
+        border-color: #4a5c70;
+      }
+      #repair-toggle.pressed {
+        background: #4a3d18;
+        border-color: #ffd94d;
+        color: #ffd94d;
+      }
       #minimap-wrap {
         padding: 10px;
         border-top: 1px solid #2c3a4a;
+        position: relative;
       }
       #minimap {
         width: 100%;
@@ -887,6 +909,23 @@
         border: 1px solid #2c3a4a;
         cursor: crosshair;
         display: block;
+      }
+      /* Classic C&C: no powered radar tower → the minimap stays dark. */
+      #minimap-hint {
+        position: absolute;
+        inset: 10px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: #3d4c5c;
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        pointer-events: none;
+        text-shadow: 0 0 6px #000;
+      }
+      #minimap-hint.visible {
+        display: flex;
       }
 
       /* Start & end screens */
@@ -1891,10 +1930,14 @@
       <div id="tabs"></div>
       <div id="items"></div>
       <div id="binfo"></div>
+      <div id="repair-row">
+        <button id="repair-toggle" title="Reparaturmodus: eigene Gebäude anklicken">🔧 Reparieren</button>
+      </div>
       <div id="superweapon"><!-- one .sw-row per owned superweapon, built by sidebar.ts -->
       </div>
       <div id="minimap-wrap">
         <canvas id="minimap" width="64" height="64"></canvas>
+        <div id="minimap-hint">Kein Radar</div>
       </div>
     </div>
     <div id="debug" class="overlay"></div>
@@ -2050,9 +2093,9 @@
             <div class="field-label">Karte</div>
             <div id="sp-map-picker"></div>
             <div class="seg seg-inline" id="sp-size-row">
-              <label><input type="radio" name="mapsize" value="48" /> Klein</label>
-              <label><input type="radio" name="mapsize" value="64" checked /> Normal</label>
-              <label><input type="radio" name="mapsize" value="96" /> Groß</label>
+              <label><input type="radio" name="mapsize" value="96" /> Klein</label>
+              <label><input type="radio" name="mapsize" value="144" checked /> Normal</label>
+              <label><input type="radio" name="mapsize" value="192" /> Groß</label>
             </div>
             <div id="sp-map-hint" class="field-hint"></div>
           </div>
@@ -2129,9 +2172,9 @@
               <div id="mp-settings-host" style="display: none">
                 <div id="mp-map-picker"></div>
                 <div class="seg seg-inline" id="mp-size-row">
-                  <label><input type="radio" name="mp-mapsize" value="48" /> Klein</label>
-                  <label><input type="radio" name="mp-mapsize" value="64" checked /> Normal</label>
-                  <label><input type="radio" name="mp-mapsize" value="96" /> Groß</label>
+                  <label><input type="radio" name="mp-mapsize" value="96" /> Klein</label>
+                  <label><input type="radio" name="mp-mapsize" value="144" checked /> Normal</label>
+                  <label><input type="radio" name="mp-mapsize" value="192" /> Groß</label>
                 </div>
                 <div id="mp-map-hint" class="field-hint"></div>
               </div>
@@ -2209,9 +2252,12 @@
         <strong>Karteneditor</strong>
         <input id="ed-name" type="text" maxlength="60" placeholder="Kartenname" />
         <select id="ed-size">
-          <option value="48">48 × 48 (klein)</option>
-          <option value="64" selected>64 × 64 (normal)</option>
-          <option value="96">96 × 96 (groß)</option>
+          <option value="48">48 × 48</option>
+          <option value="64" selected>64 × 64</option>
+          <option value="96">96 × 96</option>
+          <option value="128">128 × 128</option>
+          <option value="144">144 × 144</option>
+          <option value="192">192 × 192</option>
         </select>
         <span style="flex: 1"></span>
         <button id="ed-check" class="subtle">Prüfen</button>

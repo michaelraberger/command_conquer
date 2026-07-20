@@ -1,4 +1,4 @@
-import { FOG_EXPLORED, FOG_HIDDEN, type GameState } from '@cac/sim';
+import { powerBalance, type GameState } from '@cac/sim';
 import { cellToScreen } from '../render/iso.js';
 import { colorCss, resourceCss, terrainRgb } from '../render/palette.js';
 import { session } from '../session.js';
@@ -6,16 +6,24 @@ import type { Camera } from '../input/camera.js';
 
 /**
  * Top-down minimap on a plain 2D canvas: terrain baked once, ore/buildings/
- * units repainted on sync, fog burned in last. Clicking centers the camera.
+ * units repainted on sync, fog composited last (straight from the
+ * FogRenderer's canvas). Clicking centers the camera.
+ *
+ * Classic C&C radar rule: without a powered radar tower the minimap stays
+ * dark ("KEIN RADAR") and clicks are ignored. The REVEAL/MOTHERLOAD cheat
+ * (mapRevealed) lights it up without a tower.
  */
 export class Minimap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly base: HTMLCanvasElement;
+  private readonly hint: HTMLElement | null;
 
   constructor(
     private state: GameState,
     camera: Camera,
+    /** The FogRenderer's 1-px-per-cell canvas, composited on top directly. */
+    private readonly fogCanvas: HTMLCanvasElement,
   ) {
     this.canvas = document.getElementById('minimap') as HTMLCanvasElement;
     this.canvas.width = state.mapWidth;
@@ -24,9 +32,11 @@ export class Minimap {
     this.base = document.createElement('canvas');
     this.base.width = state.mapWidth;
     this.base.height = state.mapHeight;
+    this.hint = document.getElementById('minimap-hint');
     this.bakeTerrain();
 
     this.canvas.addEventListener('pointerdown', (e) => {
+      if (!this.radarActive()) return; // no radar, no map intel, no jumps
       const rect = this.canvas.getBoundingClientRect();
       const cx = Math.floor(((e.clientX - rect.left) / rect.width) * state.mapWidth);
       const cy = Math.floor(((e.clientY - rect.top) / rect.height) * state.mapHeight);
@@ -39,6 +49,19 @@ export class Minimap {
   /** Re-bake the terrain base after a runtime change (bridge collapse). */
   refreshTerrain(): void {
     this.bakeTerrain();
+  }
+
+  /** Minimap intel needs a powered radar tower (or the reveal cheat). */
+  private radarActive(): boolean {
+    const player = this.state.players[session.localPlayer];
+    if (!player) return true; // observer fallback: never lock the map away
+    if (player.mapRevealed) return true;
+    const hasRadar = this.state.buildings.some(
+      (b) => b.owner === player.id && b.type === 'RADAR' && b.hp > 0,
+    );
+    if (!hasRadar) return false;
+    const power = powerBalance(this.state, player.id);
+    return power.used <= power.produced;
   }
 
   private bakeTerrain(): void {
@@ -57,6 +80,16 @@ export class Minimap {
   sync(ping?: { cx: number; cy: number } | null): void {
     const { ctx, state } = this;
     const w = state.mapWidth;
+
+    if (!this.radarActive()) {
+      // No radar: flat dark noise-free screen, no terrain intel at all.
+      ctx.fillStyle = '#05070a';
+      ctx.fillRect(0, 0, w, state.mapHeight);
+      this.hint?.classList.add('visible');
+      return;
+    }
+    this.hint?.classList.remove('visible');
+
     ctx.drawImage(this.base, 0, 0);
 
     for (let i = 0; i < state.ore.length; i++) {
@@ -77,19 +110,9 @@ export class Minimap {
       ctx.fillRect(cx, Math.floor((u.cell - cx) / w), 1, 1);
     }
 
-    // Fog on top.
-    const fog = state.fogs[session.localPlayer]!;
-    for (let i = 0; i < fog.length; i++) {
-      const f = fog[i]!;
-      if (f === FOG_HIDDEN) {
-        ctx.fillStyle = 'rgba(4,6,8,1)';
-      } else if (f === FOG_EXPLORED) {
-        ctx.fillStyle = 'rgba(4,6,8,0.45)';
-      } else {
-        continue;
-      }
-      ctx.fillRect(i % w, Math.floor(i / w), 1, 1);
-    }
+    // Fog on top — the FogRenderer already keeps a 1-px-per-cell canvas
+    // current, so one drawImage replaces tens of thousands of fillRects.
+    ctx.drawImage(this.fogCanvas, 0, 0);
 
     // Attack ping: a red ring at the spot where own units/buildings are hit.
     if (ping) {

@@ -12,7 +12,8 @@ function captureTarget(state: GameState, unit: Unit): Building | null {
   if (
     !building ||
     building.owner === unit.owner ||
-    (building.owner >= 0 && !areEnemies(state, unit.owner, building.owner))
+    (building.owner >= 0 && !areEnemies(state, unit.owner, building.owner)) ||
+    buildingRule(building.type).civilian === true // village houses: never capturable
   ) {
     return null; // gone, already ours, or an ally captured it first
   }

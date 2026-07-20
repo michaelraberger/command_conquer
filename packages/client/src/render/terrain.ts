@@ -13,7 +13,7 @@ import {
   cellIndex,
   type GameState,
 } from '@cac/sim';
-import { Container, MeshSimple, Sprite, type Texture } from 'pixi.js';
+import { Container, MeshSimple, Sprite, Texture } from 'pixi.js';
 import { heightAtWorld, slopeShade } from './height.js';
 import { cellToScreen, depthOf, TILE_H, TILE_W } from './iso.js';
 import { BRIDGE_PAD_X, BRIDGE_PAD_Y, CLIFF_H, type GameTextures } from './placeholders.js';
@@ -42,12 +42,6 @@ function macroNoise(cx: number, cy: number): number {
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 
-/** Grey multiply tint from a 0..1 brightness factor. */
-function greyTint(f: number): number {
-  const v = Math.max(0, Math.min(255, Math.round(255 * f)));
-  return (v << 16) | (v << 8) | v;
-}
-
 function terrainAt(state: GameState, cx: number, cy: number, fallback: number): number {
   if (cx < 0 || cy < 0 || cx >= state.mapWidth || cy >= state.mapHeight) return fallback;
   return state.terrain[cellIndex(state, cx, cy)]!;
@@ -59,6 +53,11 @@ const N8 = [
   [-1, 1], [0, 1], [1, 1],
 ] as const;
 
+/** Cells per chunk-mesh side. Every legal map size is a multiple of 16, but
+ *  the builders clamp anyway so odd sizes would merely get a smaller edge
+ *  chunk instead of breaking. */
+const CHUNK = 16;
+
 /** Screen position of grid CORNER (cx,cy), lifted by the height field. */
 function cornerScreen(cx: number, cy: number): { x: number; y: number } {
   return {
@@ -68,32 +67,109 @@ function cornerScreen(cx: number, cy: number): { x: number; y: number } {
 }
 
 /**
- * One ground cell as a 4-triangle mesh whose corners sit on the height
- * lattice — adjacent cells share corners, so sloped terrain stays seamless
- * (plain shifted sprites would tear gaps open on every slope).
+ * The vertex lattice of one chunk: per cell 5 vertices (4 corners on the
+ * shared height lattice + a centre) and 4 triangles, so sloped terrain stays
+ * seamless across cells while the centre vertex keeps the hill crowns from
+ * flattening. `linearUvs` are plain map-space coordinates (u = gx / mapW) —
+ * the shading and fog overlays sample a 1-px-per-cell canvas texture with
+ * them, which bilinear filtering turns into smooth gradients.
  */
-function groundMesh(texture: Texture, cx: number, cy: number): MeshSimple {
-  const top = cornerScreen(cx, cy);
-  const right = cornerScreen(cx + 1, cy);
-  const bottom = cornerScreen(cx + 1, cy + 1);
-  const left = cornerScreen(cx, cy + 1);
-  const centre = {
-    x: (top.x + bottom.x) / 2,
-    y:
-      (cx + cy + 1) * (TILE_H / 2) -
-      heightAtWorld((cx + 0.5) * SUBCELL, (cy + 0.5) * SUBCELL),
-  };
-  const vertices = new Float32Array([
-    top.x, top.y,
-    right.x, right.y,
-    bottom.x, bottom.y,
-    left.x, left.y,
-    centre.x, centre.y,
-  ]);
-  // The diamond's corners in the rectangular tile texture.
-  const uvs = new Float32Array([0.5, 0, 1, 0.5, 0.5, 1, 0, 0.5, 0.5, 0.5]);
-  const indices = new Uint32Array([0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4]);
-  return new MeshSimple({ texture, vertices, uvs, indices });
+interface ChunkGeometry {
+  vertices: Float32Array;
+  linearUvs: Float32Array;
+  indices: Uint32Array;
+  /** Cell range covered (x0/y0 inclusive, x1/y1 exclusive). */
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+function buildChunkGeometries(state: GameState): ChunkGeometry[] {
+  const chunks: ChunkGeometry[] = [];
+  const mapW = state.mapWidth;
+  const mapH = state.mapHeight;
+  for (let y0 = 0; y0 < mapH; y0 += CHUNK) {
+    for (let x0 = 0; x0 < mapW; x0 += CHUNK) {
+      const x1 = Math.min(x0 + CHUNK, mapW);
+      const y1 = Math.min(y0 + CHUNK, mapH);
+      const cells = (x1 - x0) * (y1 - y0);
+      const vertices = new Float32Array(cells * 10);
+      const linearUvs = new Float32Array(cells * 10);
+      const indices = new Uint32Array(cells * 12);
+      let cell = 0;
+      for (let cy = y0; cy < y1; cy++) {
+        for (let cx = x0; cx < x1; cx++) {
+          const top = cornerScreen(cx, cy);
+          const right = cornerScreen(cx + 1, cy);
+          const bottom = cornerScreen(cx + 1, cy + 1);
+          const left = cornerScreen(cx, cy + 1);
+          const centreY =
+            (cx + cy + 1) * (TILE_H / 2) -
+            heightAtWorld((cx + 0.5) * SUBCELL, (cy + 0.5) * SUBCELL);
+          const v = cell * 10;
+          vertices[v] = top.x;
+          vertices[v + 1] = top.y;
+          vertices[v + 2] = right.x;
+          vertices[v + 3] = right.y;
+          vertices[v + 4] = bottom.x;
+          vertices[v + 5] = bottom.y;
+          vertices[v + 6] = left.x;
+          vertices[v + 7] = left.y;
+          vertices[v + 8] = (top.x + bottom.x) / 2;
+          vertices[v + 9] = centreY;
+          // Corner UVs sit on the canvas texel boundaries, so bilinear
+          // sampling blends the 4 cells sharing that lattice corner.
+          linearUvs[v] = cx / mapW;
+          linearUvs[v + 1] = cy / mapH;
+          linearUvs[v + 2] = (cx + 1) / mapW;
+          linearUvs[v + 3] = cy / mapH;
+          linearUvs[v + 4] = (cx + 1) / mapW;
+          linearUvs[v + 5] = (cy + 1) / mapH;
+          linearUvs[v + 6] = cx / mapW;
+          linearUvs[v + 7] = (cy + 1) / mapH;
+          linearUvs[v + 8] = (cx + 0.5) / mapW;
+          linearUvs[v + 9] = (cy + 0.5) / mapH;
+          const base = cell * 5;
+          const t = cell * 12;
+          indices[t] = base;
+          indices[t + 1] = base + 1;
+          indices[t + 2] = base + 4;
+          indices[t + 3] = base + 1;
+          indices[t + 4] = base + 2;
+          indices[t + 5] = base + 4;
+          indices[t + 6] = base + 2;
+          indices[t + 7] = base + 3;
+          indices[t + 8] = base + 4;
+          indices[t + 9] = base + 3;
+          indices[t + 10] = base;
+          indices[t + 11] = base + 4;
+          cell++;
+        }
+      }
+      chunks.push({ vertices, linearUvs, indices, x0, y0, x1, y1 });
+    }
+  }
+  return chunks;
+}
+
+/**
+ * Chunk meshes spanning the whole map on the height lattice, sampling the
+ * given texture with linear map-space UVs. Both the terrain shading overlay
+ * and the fog of war render this way: a canvas with one pixel per cell,
+ * stretched over the terrain relief.
+ */
+export function buildOverlayChunkMeshes(state: GameState, texture: Texture): MeshSimple[] {
+  return buildChunkGeometries(state).map((chunk) => {
+    const mesh = new MeshSimple({
+      texture,
+      vertices: chunk.vertices,
+      uvs: chunk.linearUvs,
+      indices: chunk.indices,
+    });
+    mesh.cullable = true;
+    return mesh;
+  });
 }
 
 /** The terrain layer plus the hooks the loop uses when a bridge span falls
@@ -111,56 +187,117 @@ function isWaterKind(t: number): boolean {
   return t === TERRAIN_WATER || t === TERRAIN_BRIDGE || t === TERRAIN_BRIDGE_WRECK;
 }
 
+/** Atlas tile key for a cell (bridge cells render as water; deck on top). */
+function groundKey(t: number, variant: number): string {
+  if (isWaterKind(t)) return 'water';
+  if (t === TERRAIN_ICE) return 'ice';
+  if (t === TERRAIN_GRASS) return `grass${variant}`;
+  if (t === TERRAIN_SAND) return `sand${variant}`;
+  return `dirt${variant}`;
+}
+
 /**
- * Builds the static ground layer: one diamond sprite per map cell, tinted by
- * large-scale brightness noise plus edge shading (cells hugging cliffs and
- * woods darken, open water darkens away from the shore), then ridge-cast
- * shadow bands and tiny detail sprinkles on top. All flavour derives from the
- * cell coordinates — deterministic and purely presentational. Bridge cells
- * render as water with a raised deck sprite on top; `collapseBridge` swaps a
- * deck for wreck debris when the sim reports a span collapse.
+ * Per-cell brightness factor (≤ 1): soft macro patches + ambient occlusion at
+ * hard edges + slope lighting from the height field; open water darkens away
+ * from the shore. Exactly the factors the old per-mesh tint applied.
+ */
+function shadeFactor(state: GameState, cx: number, cy: number): number {
+  const t = state.terrain[cellIndex(state, cx, cy)]!;
+  if (isWaterKind(t)) {
+    let open = 0;
+    for (const [dx, dy] of N8) {
+      if (isWaterKind(terrainAt(state, cx + dx, cy + dy, TERRAIN_WATER))) open++;
+    }
+    return 1 - open * 0.022;
+  }
+  if (t === TERRAIN_ICE) return 1;
+  let occl = 0;
+  for (const [dx, dy] of N8) {
+    const n = terrainAt(state, cx + dx, cy + dy, t);
+    if (n === TERRAIN_ROCK || n === TERRAIN_TREE) occl++;
+  }
+  const ao = 1 - Math.min(0.16, occl * 0.045);
+  const macro = 0.88 + 0.12 * macroNoise(cx, cy);
+  // The factor stays below 1 on purpose — lit east slopes then genuinely
+  // read brighter than level ground.
+  return Math.max(0.68, Math.min(1, macro * ao * slopeShade(cx, cy) * 0.94));
+}
+
+/**
+ * The static shading overlay: since every factor only darkens (≤ 1), it is
+ * baked as BLACK with alpha = 1 − factor on a 1-px-per-cell canvas and drawn
+ * with normal blending — visually identical to a multiply tint, but fully
+ * batchable, and bilinear sampling makes the shading smoother than the old
+ * per-cell tint ever was.
+ */
+function buildShadingTexture(state: GameState): Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = state.mapWidth;
+  canvas.height = state.mapHeight;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(state.mapWidth, state.mapHeight);
+  for (let cy = 0; cy < state.mapHeight; cy++) {
+    for (let cx = 0; cx < state.mapWidth; cx++) {
+      const i = (cy * state.mapWidth + cx) * 4;
+      img.data[i + 3] = Math.round((1 - shadeFactor(state, cx, cy)) * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return Texture.from(canvas);
+}
+
+/**
+ * Builds the static ground layer: chunk meshes (16×16 cells each) over the
+ * ground-tile atlas, corners on the shared height lattice, then a canvas-based
+ * shading overlay, ridge-cast shadow bands and tiny detail sprinkles on top.
+ * All flavour derives from the cell coordinates — deterministic and purely
+ * presentational. Bridge cells render as water with a raised deck sprite on
+ * top; `collapseBridge` swaps a deck for wreck debris when the sim reports a
+ * span collapse.
  */
 export function buildTerrainLayer(state: GameState, tex: GameTextures): TerrainView {
   const layer = new Container();
   layer.interactiveChildren = false;
-  for (let cy = 0; cy < state.mapHeight; cy++) {
-    for (let cx = 0; cx < state.mapWidth; cx++) {
-      const t = state.terrain[cellIndex(state, cx, cy)];
-      const variant = Math.floor(hash01(cx * 3 + 1, cy * 5 + 2) * 5) % 5;
-      const texture = isWaterKind(t!)
-        ? tex.water
-        : t === TERRAIN_ICE
-          ? tex.ice
-          : t === TERRAIN_GRASS
-            ? tex.grass[variant % tex.grass.length]!
-            : t === TERRAIN_SAND
-              ? tex.sand[variant % tex.sand.length]!
-              : tex.dirt[variant % tex.dirt.length]!;
-      const mesh = groundMesh(texture, cx, cy);
+  const atlas = tex.groundAtlas;
 
-      // Brightness: soft macro patches + ambient occlusion at hard edges +
-      // slope lighting from the height field (east faces lit, west in shade).
-      if (isWaterKind(t!)) {
-        let open = 0;
-        for (const [dx, dy] of N8) {
-          if (isWaterKind(terrainAt(state, cx + dx, cy + dy, TERRAIN_WATER))) open++;
-        }
-        // Deep water (fully surrounded) darker, shoreline stays bright.
-        mesh.tint = greyTint(1 - open * 0.022);
-      } else if (t !== TERRAIN_ICE) {
-        let occl = 0;
-        for (const [dx, dy] of N8) {
-          const n = terrainAt(state, cx + dx, cy + dy, t!);
-          if (n === TERRAIN_ROCK || n === TERRAIN_TREE) occl++;
-        }
-        const ao = 1 - Math.min(0.16, occl * 0.045);
-        const macro = 0.88 + 0.12 * macroNoise(cx, cy);
-        // Tints only darken, so the baseline sits below 1 — lit east slopes
-        // then genuinely read brighter than level ground.
-        mesh.tint = greyTint(Math.max(0.68, Math.min(1, macro * ao * slopeShade(cx, cy) * 0.94)));
+  // Ground: one mesh per chunk, per-cell UVs into the atlas slot.
+  for (const chunk of buildChunkGeometries(state)) {
+    const uvs = new Float32Array(chunk.linearUvs.length);
+    let cell = 0;
+    for (let cy = chunk.y0; cy < chunk.y1; cy++) {
+      for (let cx = chunk.x0; cx < chunk.x1; cx++) {
+        const t = state.terrain[cellIndex(state, cx, cy)]!;
+        const variant = Math.floor(hash01(cx * 3 + 1, cy * 5 + 2) * 5) % 5;
+        const [u0, v0, u1, v1] = atlas.uv[groundKey(t, variant)]!;
+        const uMid = (u0 + u1) / 2;
+        const vMid = (v0 + v1) / 2;
+        const v = cell * 10;
+        uvs[v] = uMid;
+        uvs[v + 1] = v0;
+        uvs[v + 2] = u1;
+        uvs[v + 3] = vMid;
+        uvs[v + 4] = uMid;
+        uvs[v + 5] = v1;
+        uvs[v + 6] = u0;
+        uvs[v + 7] = vMid;
+        uvs[v + 8] = uMid;
+        uvs[v + 9] = vMid;
+        cell++;
       }
-      layer.addChild(mesh);
     }
+    const mesh = new MeshSimple({
+      texture: atlas.texture,
+      vertices: chunk.vertices,
+      uvs,
+      indices: chunk.indices,
+    });
+    mesh.cullable = true;
+    layer.addChild(mesh);
+  }
+
+  // Static shading overlay above the ground, below shadows and sprinkles.
+  for (const mesh of buildOverlayChunkMeshes(state, buildShadingTexture(state))) {
+    layer.addChild(mesh);
   }
 
   // Ridge-cast shade: ground cells whose upper-right neighbour (-cy) is rock

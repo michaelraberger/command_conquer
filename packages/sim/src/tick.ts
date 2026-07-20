@@ -2,6 +2,9 @@ import { aiSystem } from './ai/controller.js';
 import { applyCommands, type Command } from './commands.js';
 import type { GameState } from './state.js';
 import { airbaseSystem } from './systems/airbase.js';
+import { buildingRepairSystem } from './systems/buildingRepair.js';
+import { crateSystem } from './systems/crates.js';
+import { hospitalSystem } from './systems/hospital.js';
 import { combatSystem } from './systems/combat.js';
 import { deathSystem } from './systems/death.js';
 import { defenseReactionSystem } from './systems/defenseReaction.js';
@@ -58,11 +61,15 @@ export function tick(state: GameState, commands: Command[] = []): void {
   paradropSystem(state);
   // Combat aircraft that just went idle turn for home / rearm at the pad.
   airbaseSystem(state);
+  // After movement/paradrop: units stand on their final cell — collect crates.
+  crateSystem(state);
   projectileSystem(state);
   // After every damage source (combat, towers, projectiles): rally idle
   // defenders toward whoever just hit friendly units or buildings.
   defenseReactionSystem(state);
   repairSystem(state);
+  buildingRepairSystem(state);
+  hospitalSystem(state);
   deathSystem(state);
   victorySystem(state);
   fogSystem(state);

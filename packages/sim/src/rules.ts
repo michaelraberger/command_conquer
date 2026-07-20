@@ -660,7 +660,14 @@ export interface BuildingRule {
    *  a circular reference through BuildingType. */
   upgradeTo?: string;
   upgradeCost?: number;
+  /** Civilian scenery (village houses): destroyable but never capturable. */
+  civilian?: boolean;
+  /** Hospital: the owner's infantry regenerates this many hp per tick. */
+  heal?: number;
 }
+
+/** Lazarett: infantry hp regenerated per tick for the hospital's owner. */
+export const HOSPITAL_HP_PER_TICK = 1;
 
 export const BUILDING_RULES = {
   CONYARD: {
@@ -1071,9 +1078,12 @@ export const BUILDING_RULES = {
     superweapon: null,
     requires: ['REFINERY'],
     buildable: true,
-    factions: ['SOVIETS'],
+    // Both factions: the radar tower is what turns the minimap on (classic
+    // C&C radar), so everyone must be able to build it. Soviets additionally
+    // need it as the launch key for the V3 (requires).
+    factions: null,
     // The radar sweep: by far the widest sight in the game — the tower itself
-    // uncovers a huge patch of map. Also the launch key for the V3 (requires).
+    // uncovers a huge patch of map.
     sight: 11,
   },
   BRIDGE: {
@@ -1119,6 +1129,64 @@ export const BUILDING_RULES = {
     sight: 3,
     income: 10,
     captureBonus: 500,
+  },
+  HOSPITAL: {
+    name: 'Lazarett',
+    // Neutral tech building (owner -1 on procedural maps): engineers capture
+    // it like the Bohrturm; the owner's infantry then self-heals (see
+    // systems/hospital.ts). Cost only feeds the sell refund.
+    maxHp: 800,
+    cost: 1000,
+    buildTime: 100,
+    power: 0,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: [],
+    buildable: false,
+    factions: null,
+    sight: 3,
+    heal: HOSPITAL_HP_PER_TICK,
+  },
+  HAUS1: {
+    name: 'Wohnhaus',
+    // Civilian village scenery: destroyable cover, never capturable.
+    maxHp: 300,
+    cost: 200,
+    buildTime: 50,
+    power: 0,
+    width: 1,
+    height: 1,
+    armor: 'none',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: [],
+    buildable: false,
+    factions: null,
+    sight: 0,
+    civilian: true,
+  },
+  HAUS2: {
+    name: 'Bauernhaus',
+    maxHp: 350,
+    cost: 250,
+    buildTime: 50,
+    power: 0,
+    width: 2,
+    height: 1,
+    armor: 'none',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: [],
+    buildable: false,
+    factions: null,
+    sight: 0,
+    civilian: true,
   },
   WALL: {
     name: 'Mauer',
@@ -1348,6 +1416,22 @@ export const REPAIR_RADIUS = 2;
 export const VEHICLE_REPAIR_HP_PER_TICK = 8;
 export const VEHICLE_REPAIR_COST_PER_TICK = 1;
 export const VEHICLE_REPAIR_REACH = 1.6;
+/**
+ * Building self-repair mode (sidebar wrench, classic C&C): hp per tick, and a
+ * cost divisor such that a full 0→max repair costs 1/DIVISOR of the build
+ * price. The per-tick fee derives from the building's own cost/maxHp (see
+ * systems/buildingRepair.ts), so expensive buildings pay more per point.
+ */
+export const BUILDING_REPAIR_HP_PER_TICK = 2;
+export const BUILDING_REPAIR_COST_DIVISOR = 2;
+/** Crates ("Kisten"): spawn cadence, money payout, and map-size-scaled cap. */
+export const CRATE_INTERVAL_TICKS = 600; // one spawn attempt every 40 s
+export const CRATE_MONEY = 700;
+/** Radius (cells) a heal crate cures own units around the collector. */
+export const CRATE_HEAL_RADIUS = 3;
+export function crateMax(area: number): number {
+  return Math.min(8, Math.max(2, Math.round(area / 4096)));
+}
 /** Ground units a transport ship can carry. */
 export const TRANSPORT_CAPACITY = 5;
 /** Board/unload reach between a shore unit and the ship, in cells. */

@@ -35,12 +35,17 @@ export interface UnitSprite {
   team: Texture;
 }
 
+/** All ground tiles in one texture so the terrain chunk meshes batch into a
+ *  handful of draw calls. `uv` maps a tile key ("dirt0"…"dirt4", "grass0"…,
+ *  "sand0"…, "water", "ice") to the normalized inner rect [x0, y0, x1, y1]
+ *  of its slot (the gutter padding around each slot is excluded). */
+export interface GroundAtlas {
+  texture: Texture;
+  uv: Record<string, readonly [number, number, number, number]>;
+}
+
 export interface GameTextures {
-  dirt: Texture[];
-  grass: Texture[];
-  sand: Texture[];
-  water: Texture;
-  ice: Texture;
+  groundAtlas: GroundAtlas;
   /** Bridge deck sprites, one per span axis: `bridgeCx` runs toward the lower
    *  right (+cx), `bridgeCy` toward the lower left (+cy). */
   bridgeCx: Texture;
@@ -64,7 +69,8 @@ export interface GameTextures {
   ore: Texture;
   gems: Texture;
   tree: Texture;
-  fogTile: Texture;
+  /** Collectible goodie crate (iso wooden box). */
+  crate: Texture;
   tank: UnitSprite[];
   mammoth: UnitSprite[];
   artillery: UnitSprite[];
@@ -154,7 +160,7 @@ function inDiamond(x: number, y: number, margin = 0.85): boolean {
 
 /** Mottled ground diamond: dark + light speckles over soft blotches, so the
  *  terrain reads busy like classic C&C ground instead of flat colour. */
-function groundTile(renderer: Renderer, base: number, seedOff: number): Texture {
+function groundTileGraphics(base: number, seedOff: number): Graphics {
   const g = new Graphics().poly(overshootDiamondPath()).fill(base);
   // Big soft blotches first (slight value variation across the tile).
   for (let i = 0; i < 3; i++) {
@@ -177,7 +183,51 @@ function groundTile(renderer: Renderer, base: number, seedOff: number): Texture 
     g.circle(p.x, p.y, 1).fill({ color: shade(base, 1.22), alpha: 0.5 });
   }
   // No outline stroke: on terrain meshes any edge line renders as a seam.
-  return bakeTile(renderer, g);
+  return g;
+}
+
+/* ---------------------------- ground atlas ------------------------------- */
+
+/** Gutter around each atlas slot. The overshoot diamond (±5/±3) stays well
+ *  inside it, so bilinear filtering at a slot's inner-rect border never
+ *  samples a neighbouring slot or transparency. */
+const ATLAS_PAD_X = 8;
+const ATLAS_PAD_Y = 6;
+const ATLAS_COLS = 6;
+
+/** Bakes every ground tile into one atlas texture (6×3 slot grid). */
+function bakeGroundAtlas(
+  renderer: Renderer,
+  tiles: ReadonlyArray<readonly [string, Graphics]>,
+): GroundAtlas {
+  const slotW = TILE_W + 2 * ATLAS_PAD_X;
+  const slotH = TILE_H + 2 * ATLAS_PAD_Y;
+  const rows = Math.ceil(tiles.length / ATLAS_COLS);
+  const atlasW = ATLAS_COLS * slotW;
+  const atlasH = rows * slotH;
+
+  const root = new Container();
+  const uv: Record<string, readonly [number, number, number, number]> = {};
+  tiles.forEach(([key, g], i) => {
+    const col = i % ATLAS_COLS;
+    const row = Math.floor(i / ATLAS_COLS);
+    g.position.set(col * slotW + ATLAS_PAD_X, row * slotH + ATLAS_PAD_Y);
+    root.addChild(g);
+    uv[key] = [
+      (col * slotW + ATLAS_PAD_X) / atlasW,
+      (row * slotH + ATLAS_PAD_Y) / atlasH,
+      (col * slotW + ATLAS_PAD_X + TILE_W) / atlasW,
+      (row * slotH + ATLAS_PAD_Y + TILE_H) / atlasH,
+    ];
+  });
+
+  const texture = renderer.generateTexture({
+    target: root,
+    frame: new Rectangle(0, 0, atlasW, atlasH),
+    resolution: 2,
+  });
+  root.destroy({ children: true });
+  return { texture, uv };
 }
 
 /* ------------------------------- cliffs --------------------------------- */
@@ -568,6 +618,45 @@ function tent(
     .stroke({ width: 1, color: 0x37322a, alpha: 0.55 });
 }
 
+/**
+ * Small civilian gabled house: box walls plus a ridge roof along the cx axis,
+ * with a dark door in the +cx gable. Shared by the village scenery buildings.
+ */
+function houseAt(
+  g: Graphics,
+  ox: number,
+  oy: number,
+  l: number,
+  wd: number,
+  wallH: number,
+  rise: number,
+  wall: number,
+  roof: number,
+): void {
+  const p0 = iso(ox, oy);
+  const p1 = iso(ox + l, oy);
+  const p2 = iso(ox + l, oy + wd);
+  const p3 = iso(ox, oy + wd);
+  // Walls: the two camera-facing faces.
+  g.poly([p3.x, p3.y - wallH, p2.x, p2.y - wallH, p2.x, p2.y, p3.x, p3.y]).fill(shade(wall, 0.8));
+  g.poly([p2.x, p2.y - wallH, p1.x, p1.y - wallH, p1.x, p1.y, p2.x, p2.y]).fill(shade(wall, 0.58));
+  // Ridge along the cx axis, roof slopes down to the wall tops.
+  const raBase = iso(ox, oy + wd / 2);
+  const rbBase = iso(ox + l, oy + wd / 2);
+  const ra = { x: raBase.x, y: raBase.y - wallH - rise };
+  const rb = { x: rbBase.x, y: rbBase.y - wallH - rise };
+  g.poly([p0.x, p0.y - wallH, p1.x, p1.y - wallH, rb.x, rb.y, ra.x, ra.y]).fill(shade(roof, 1.08));
+  g.poly([p3.x, p3.y - wallH, p2.x, p2.y - wallH, rb.x, rb.y, ra.x, ra.y]).fill(shade(roof, 0.66));
+  // +cx gable end with the door.
+  g.poly([p1.x, p1.y - wallH, p2.x, p2.y - wallH, rb.x, rb.y]).fill(shade(wall, 0.7));
+  const dm = iso(ox + l, oy + wd / 2);
+  g.poly([dm.x, dm.y - wallH * 0.9, dm.x + 3, dm.y + 1, dm.x - 3, dm.y + 1]).fill(0x33281f);
+  // Ridge highlight + soft ground outline.
+  g.moveTo(ra.x, ra.y).lineTo(rb.x, rb.y).stroke({ width: 1.2, color: shade(roof, 1.4) });
+  g.poly([p0.x, p0.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y])
+    .stroke({ width: 1, color: 0x37322a, alpha: 0.5 });
+}
+
 /** Flag pole (body layer); the flag itself lives in the team layer. */
 function flagPole(g: Graphics, px: number, py: number, h: number): void {
   g.rect(px - 0.7, py - h, 1.4, h).fill(0x8f8775);
@@ -785,6 +874,48 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.circle(m.x + 8, m.y - 34, 2.2).fill(fx);
     },
     team: (g) => teamMark(g, 1, 1.85, 10),
+  },
+  HOSPITAL: {
+    // Neutral tech building: white clinic block with a fixed red cross —
+    // capturable like the Bohrturm, so the team accent stays small.
+    frameTop: 40,
+    fx: 0xd93b3b, // red cross (never faction-tinted)
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      prismAt(g, 0.2, 0.2, 1.6, 1.6, 20, 0xe8e4dc); // white main block
+      prismAt(g, 1.1, 1.05, 0.65, 0.65, 12, 0xd6d1c6); // entrance annex
+      // Red cross on the flat roof.
+      const c = iso(1, 1);
+      g.rect(c.x - 2.5, c.y - 28, 5, 14).fill(fx);
+      g.rect(c.x - 7, c.y - 23.5, 14, 5).fill(fx);
+      // Dark entrance door on the annex front.
+      const d = iso(1.75, 1.4);
+      g.poly([d.x, d.y - 8, d.x + 3.5, d.y - 6, d.x + 3.5, d.y + 1, d.x, d.y - 1]).fill(0x3a352c);
+    },
+    team: (g) => teamMark(g, 1.7, 0.35, 8),
+  },
+  HAUS1: {
+    // Civilian cottage (village scenery, never capturable).
+    frameTop: 30,
+    fx: 0xc9a86a,
+    body: (g) => {
+      houseAt(g, 0.12, 0.12, 0.76, 0.76, 9, 8, 0xb8ab93, 0x8a5c40);
+    },
+    team: (g) => teamMark(g, 0.5, 0.5, 4),
+  },
+  HAUS2: {
+    // Civilian farmhouse: longer body, weathered roof.
+    frameTop: 32,
+    fx: 0xc9a86a,
+    body: (g) => {
+      houseAt(g, 0.12, 0.15, 1.76, 0.7, 10, 9, 0xb0a08a, 0x7d6a4f);
+      // Small woodpile at the gable end.
+      const wp = iso(0.35, 1.0);
+      g.rect(wp.x - 6, wp.y - 4, 12, 4).fill(0x6e543a);
+      g.circle(wp.x - 3, wp.y - 4, 1.6).fill(0x8a6a48);
+      g.circle(wp.x + 2, wp.y - 4, 1.6).fill(0x8a6a48);
+    },
+    team: (g) => teamMark(g, 1, 0.5, 4),
   },
   TESLA: {
     frameTop: 52,
@@ -1769,9 +1900,21 @@ export function createTextures(renderer: Renderer): GameTextures {
 
   const shell = new Graphics().circle(0, 0, 3).fill(0xffe08a).stroke({ width: 1, color: 0xffb347 });
 
-  // Generous overhang: on hills the fog sprites shift per cell, and hidden
-  // fog is uniform black — overlap is invisible, gaps would leak terrain.
-  const fog = new Graphics().poly([TILE_W / 2, -6, TILE_W + 8, TILE_H / 2, TILE_W / 2, TILE_H + 6, -8, TILE_H / 2]).fill(0x06080a);
+  // Goodie crate: small iso wooden box with bright edge strapping, sitting on
+  // a soft drop shadow so it pops against any ground.
+  const crateG = new Graphics();
+  {
+    const top = 0xc9a35c;
+    crateG.ellipse(0, 6, 11, 5).fill({ color: 0x000000, alpha: 0.28 });
+    crateG.poly([0, -12, 10, -7, 10, 3, 0, 8, -10, 3, -10, -7]).fill(shade(top, 0.72));
+    crateG.poly([0, -12, 10, -7, 0, -2, -10, -7]).fill(top); // lid
+    crateG.poly([0, -2, 10, -7, 10, 3, 0, 8]).fill(shade(top, 0.58)); // right face
+    crateG.poly([0, -2, -10, -7, -10, 3, 0, 8]).fill(shade(top, 0.82)); // left face
+    // Strapping.
+    crateG.moveTo(-10, -7).lineTo(0, -2).lineTo(10, -7).stroke({ width: 1.2, color: 0x8a6a3a });
+    crateG.moveTo(0, -2).lineTo(0, 8).stroke({ width: 1.2, color: 0x8a6a3a });
+    crateG.poly([0, -12, 10, -7, 0, -2, -10, -7]).stroke({ width: 1, color: 0xe8cf96, alpha: 0.9 });
+  }
 
   const water = new Graphics().poly(overshootDiamondPath()).fill(0x2b5d8a);
   water.moveTo(18, 14).quadraticCurveTo(26, 11, 34, 14).stroke({ width: 1.5, color: 0x4a83b3, alpha: 0.8 });
@@ -1789,20 +1932,24 @@ export function createTextures(renderer: Renderer): GameTextures {
   ice.moveTo(20, 20).lineTo(26, 24).stroke({ width: 1, color: 0xdfeef5, alpha: 0.9 });
   ice.poly(diamondPath()).stroke({ width: 1, color: 0x7fa9bf, alpha: 0.5 });
 
+  // Variant BASE tones stay nearly identical — the visual variety comes
+  // from the speckle patterns and the macro tint, not from patchwork tiles.
+  const groundAtlas = bakeGroundAtlas(renderer, [
+    ...[0x8a6f4d, 0x896e4b, 0x8b704e, 0x886d4a, 0x8a6f4c].map(
+      (c, i) => [`dirt${i}`, groundTileGraphics(c, i * 13)] as const,
+    ),
+    ...[0x4d7a35, 0x4c7834, 0x4e7b36, 0x4b7733, 0x4d7935].map(
+      (c, i) => [`grass${i}`, groundTileGraphics(c, 5 + i * 11)] as const,
+    ),
+    ...[0xd6bd82, 0xd4bb80, 0xd7bf84, 0xd3ba7e, 0xd5bc81].map(
+      (c, i) => [`sand${i}`, groundTileGraphics(c, 9 + i * 7)] as const,
+    ),
+    ['water', water] as const,
+    ['ice', ice] as const,
+  ]);
+
   return {
-    // Variant BASE tones stay nearly identical — the visual variety comes
-    // from the speckle patterns and the macro tint, not from patchwork tiles.
-    dirt: [0x8a6f4d, 0x896e4b, 0x8b704e, 0x886d4a, 0x8a6f4c].map((c, i) =>
-      groundTile(renderer, c, i * 13),
-    ),
-    grass: [0x4d7a35, 0x4c7834, 0x4e7b36, 0x4b7733, 0x4d7935].map((c, i) =>
-      groundTile(renderer, c, 5 + i * 11),
-    ),
-    sand: [0xd6bd82, 0xd4bb80, 0xd7bf84, 0xd3ba7e, 0xd5bc81].map((c, i) =>
-      groundTile(renderer, c, 9 + i * 7),
-    ),
-    water: bakeTile(renderer, water),
-    ice: bakeTile(renderer, ice),
+    groundAtlas,
     bridgeCx: bakeBridgeDeck(renderer, 'cx'),
     bridgeCy: bakeBridgeDeck(renderer, 'cy'),
     bridgeWreck: bakeBridgeWreck(renderer),
@@ -1820,10 +1967,10 @@ export function createTextures(renderer: Renderer): GameTextures {
       frame: new Rectangle(-16, -36, 32, 44),
       resolution: 2,
     }),
-    fogTile: renderer.generateTexture({
-      target: fog,
-      frame: new Rectangle(-8, -6, TILE_W + 16, TILE_H + 12),
-      resolution: 1,
+    crate: renderer.generateTexture({
+      target: crateG,
+      frame: new Rectangle(-13, -14, 26, 26),
+      resolution: 2,
     }),
     tank,
     mammoth,

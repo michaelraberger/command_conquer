@@ -357,10 +357,15 @@ export class Controls {
         const unitById = new Map(this.state.units.map((u) => [u.id, u]));
         const special = new Set<number>();
 
-        const engineers = unitIds.filter((id) => {
-          const unit = unitById.get(id);
-          return unit !== undefined && unitRule(unit.type).captures === true;
-        });
+        // Civilian scenery (village houses) is never capturable — engineers
+        // simply walk there like everyone else.
+        const capturable = buildingRule(building.type).civilian !== true;
+        const engineers = !capturable
+          ? []
+          : unitIds.filter((id) => {
+              const unit = unitById.get(id);
+              return unit !== undefined && unitRule(unit.type).captures === true;
+            });
         if (engineers.length > 0) {
           this.send({
             type: 'CAPTURE',

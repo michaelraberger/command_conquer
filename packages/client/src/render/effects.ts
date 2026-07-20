@@ -141,6 +141,28 @@ export class Effects {
             g.position.y = p.y - 12 - t * 14; // floats up
           },
         );
+      } else if (e.type === 'CRATE_PICKUP') {
+        // Gold sparkle burst where a crate was collected.
+        const p = worldToScreen(e.x, e.y);
+        this.add(
+          520,
+          (g) => {
+            g.circle(0, 0, 8).fill({ color: 0xffd94d, alpha: 0.75 });
+            g.circle(0, 0, 3.5).fill(0xfff3c2);
+            for (let i = 0; i < 6; i++) {
+              const a = (i / 6) * Math.PI * 2;
+              g.moveTo(Math.cos(a) * 5, Math.sin(a) * 3)
+                .lineTo(Math.cos(a) * 13, Math.sin(a) * 8)
+                .stroke({ width: 1.5, color: 0xffe89a, alpha: 0.9 });
+            }
+            g.position.set(p.x, p.y - 8);
+          },
+          (g, t) => {
+            g.alpha = 1 - t;
+            g.scale.set(0.7 + t * 0.9);
+            g.position.y = p.y - 8 - t * 10;
+          },
+        );
       } else if (e.type === 'DEATH') {
         const p = worldToScreen(e.x, e.y);
         const r = e.big ? 22 : 13;

@@ -253,7 +253,7 @@ export async function startGame(
   const effects = new Effects();
   const prismLinks = new PrismLinkOverlay();
   const patrolRoutes = new PatrolRouteOverlay();
-  const fog = new FogRenderer(state, textures);
+  const fog = new FogRenderer(state);
   world.addChild(
     terrainLayer,
     ore.layer,
@@ -291,7 +291,7 @@ export async function startGame(
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
-  const minimap = new Minimap(state, camera);
+  const minimap = new Minimap(state, camera, fog.canvas);
   const debug = new DebugOverlay();
   const solo = meta.multiplayer !== true;
   const hotkeys = new Hotkeys(
@@ -317,6 +317,16 @@ export async function startGame(
   ore.sync(state);
   fog.sync(state, session.localPlayer);
   minimap.sync();
+
+  // Dev aid (headless tabs never fire rAF): re-run the loop's slow-sync layer
+  // updates after manual __cacTick calls, so fog/minimap can be inspected.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __cacSync?: unknown }).__cacSync = (): void => {
+      ore.sync(state);
+      fog.sync(state, session.localPlayer);
+      minimap.sync();
+    };
+  }
 
   startLoop(
     app,

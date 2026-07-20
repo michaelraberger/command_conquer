@@ -20,6 +20,37 @@ const COST_DIAGONAL = 14;
 const MAX_EXPANSIONS = 6000;
 const INF = 0x7fffffff;
 
+/**
+ * Module-level scratch buffers, grown to the largest map seen. Repaths fire
+ * every few ticks per moving unit; allocating ~330 KB per call on a 192² map
+ * would hammer the GC. A generation stamp per cell replaces the O(size)
+ * refill: an entry is only valid when its stamp matches the current call's
+ * generation. Pure scratch — results stay deterministic by construction.
+ */
+let scratchSize = 0;
+let gScore = new Int32Array(0);
+let cameFrom = new Int32Array(0);
+let gStamp = new Int32Array(0);
+let closedStamp = new Int32Array(0);
+let generation = 0;
+
+function ensureScratch(size: number): void {
+  if (size > scratchSize) {
+    scratchSize = size;
+    gScore = new Int32Array(size);
+    cameFrom = new Int32Array(size);
+    gStamp = new Int32Array(size);
+    closedStamp = new Int32Array(size);
+    generation = 0;
+  }
+  generation++;
+  if (generation === INF) {
+    gStamp.fill(0);
+    closedStamp.fill(0);
+    generation = 1;
+  }
+}
+
 /** Octile distance heuristic in integer costs. */
 function heuristic(dx: number, dy: number): number {
   const ax = dx < 0 ? -dx : dx;
@@ -51,9 +82,9 @@ export function findPath(
   const startIdx = startCy * w + startCx;
   const targetIdx = targetCy * w + targetCx;
 
-  const gScore = new Int32Array(size).fill(INF);
-  const cameFrom = new Int32Array(size).fill(-1);
-  const closed = new Uint8Array(size);
+  ensureScratch(size);
+  const gen = generation;
+  const gAt = (i: number): number => (gStamp[i] === gen ? gScore[i]! : INF);
   const open = new MinHeap();
 
   const owner = opts.owner ?? -1;
@@ -76,6 +107,7 @@ export function findPath(
   };
 
   gScore[startIdx] = 0;
+  gStamp[startIdx] = gen;
   open.push(startIdx, heuristic(targetCx - startCx, targetCy - startCy));
 
   let bestIdx = startIdx;
@@ -84,8 +116,8 @@ export function findPath(
 
   while (open.size > 0 && expansions < MAX_EXPANSIONS) {
     const cur = open.pop();
-    if (closed[cur] === 1) continue;
-    closed[cur] = 1;
+    if (closedStamp[cur] === gen) continue;
+    closedStamp[cur] = gen;
     expansions++;
 
     if (cur === targetIdx) {
@@ -96,7 +128,7 @@ export function findPath(
     const cx = cur % w;
     const cy = (cur - cx) / w;
     const curH = heuristic(targetCx - cx, targetCy - cy);
-    if (curH < bestH || (curH === bestH && gScore[cur]! < gScore[bestIdx]!)) {
+    if (curH < bestH || (curH === bestH && gAt(cur) < gAt(bestIdx))) {
       bestH = curH;
       bestIdx = cur;
     }
@@ -112,11 +144,12 @@ export function findPath(
           continue;
         }
         const nIdx = ny * w + nx;
-        if (closed[nIdx] === 1) continue;
+        if (closedStamp[nIdx] === gen) continue;
         const step = dx !== 0 && dy !== 0 ? COST_DIAGONAL : COST_STRAIGHT;
         const g = gScore[cur]! + step;
-        if (g >= gScore[nIdx]!) continue;
+        if (g >= gAt(nIdx)) continue;
         gScore[nIdx] = g;
+        gStamp[nIdx] = gen;
         cameFrom[nIdx] = cur;
         open.push(nIdx, g + heuristic(targetCx - nx, targetCy - ny));
       }

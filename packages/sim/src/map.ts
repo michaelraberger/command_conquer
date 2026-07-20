@@ -190,8 +190,11 @@ const SPAWN_LAYOUTS: Record<number, ReadonlyArray<readonly [number, number]>> = 
 
 /**
  * Spawn centres for a game with `playerCount` players (clamped to 2–6), scaled
- * from the 64² reference layout to the actual map size (so map size just spreads
- * the same arrangement out or in).
+ * from the 64² reference layout to the actual map size. Small maps (≤64) scale
+ * proportionally; LARGER maps stretch the layout's bounding box out to a fixed
+ * edge margin instead — a plain proportional scale would keep the bases
+ * huddled in the 64²-layout's span and leave the outer third of a 192² map
+ * dead. Opponents start genuinely far apart and the whole map is in play.
  */
 export function spawnCenters(
   playerCount: number,
@@ -200,12 +203,30 @@ export function spawnCenters(
 ): ReadonlyArray<readonly [number, number]> {
   const base = SPAWN_LAYOUTS[Math.max(2, Math.min(6, playerCount))]!;
   if (width === 64 && height === 64) return base;
-  return base.map(([x, y]) => [Math.round((x / 64) * width), Math.round((y / 64) * height)] as const);
+  if (Math.min(width, height) <= 64) {
+    return base.map(([x, y]) => [Math.round((x / 64) * width), Math.round((y / 64) * height)] as const);
+  }
+  const margin = Math.max(10, Math.round(Math.min(width, height) / 12));
+  const xs = base.map((p) => p[0]);
+  const ys = base.map((p) => p[1]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const stretch = (v: number, lo: number, hi: number, dim: number): number =>
+    hi === lo
+      ? Math.round(dim / 2)
+      : Math.round(margin + ((v - lo) / (hi - lo)) * (dim - 1 - 2 * margin));
+  return base.map(
+    ([x, y]) => [stretch(x, minX, maxX, width), stretch(y, minY, maxY, height)] as const,
+  );
 }
 
-/** Home-island radius shrinks as more islands must share the ocean. */
-function islandRadius(playerCount: number): number {
-  return playerCount <= 2 ? 12 : playerCount <= 4 ? 10 : playerCount === 5 ? 9 : 8;
+/** Home-island radius shrinks as more islands must share the ocean and grows
+ *  with the map (tuned for 64²; identical there by construction). */
+function islandRadius(playerCount: number, minDim: number): number {
+  const base = playerCount <= 2 ? 12 : playerCount <= 4 ? 10 : playerCount === 5 ? 9 : 8;
+  return Math.round((base * minDim) / 64);
 }
 
 /** True when a home island sits close enough to the centre to skip the islet. */
@@ -335,6 +356,10 @@ function generateBadlands(
   spawns: ReadonlyArray<readonly [number, number]> = [],
 ): Uint8Array {
   const terrain = new Uint8Array(width * height).fill(TERRAIN_GRASS);
+  /** Feature counts are tuned for 64²; larger maps multiply them by the area
+   *  ratio so the landscape stays as busy per screen, not per map. ×1 at ≤64
+   *  by construction (existing seeds unchanged there). */
+  const f = Math.max(1, Math.round((width * height) / 4096));
   /** Ridges must never crowd a base: keep a clear apron around every spawn. */
   const nearSpawn = (cx: number, cy: number): boolean =>
     spawns.some(([sx, sy]) => (cx - sx) * (cx - sx) + (cy - sy) * (cy - sy) < 49);
@@ -354,18 +379,22 @@ function generateBadlands(
   };
 
   // Soft dirt clearings break up the green, plus a couple of small ponds.
-  for (let i = 0; i < 6; i++) stampBlob(TERRAIN_DIRT, 2, 4);
-  for (let i = 0; i < 2; i++) stampBlob(TERRAIN_WATER, 2, 3);
-  // One winding stream across the map with shallow ford crossings.
+  for (let i = 0; i < 6 * f; i++) stampBlob(TERRAIN_DIRT, 2, 4);
+  for (let i = 0; i < 2 * f; i++) stampBlob(TERRAIN_WATER, 2, 3);
+  // A winding stream across the map with crossings; big maps get two or three
+  // so the water reads as a river system instead of one lonely edge trickle.
   carveStream(terrain, width, height, rng, nearSpawn);
+  const extraStreams = f >= 9 ? 2 : f >= 4 ? 1 : 0;
+  for (let i = 0; i < extraStreams; i++) carveStream(terrain, width, height, rng, nearSpawn);
   // Long rock RIDGES: orthogonally connected stair-step walks (like classic
-  // cliff lines), occasionally thickened by a shoulder cell.
-  for (let i = 0; i < 5; i++) {
+  // cliff lines), occasionally thickened by a shoulder cell. Length scales
+  // with the map side so ridges stay landscape features, not pebbles.
+  for (let i = 0; i < 5 * f; i++) {
     let x = 4 + nextInt(rng, width - 8);
     let y = 4 + nextInt(rng, height - 8);
     const dirX = nextInt(rng, 2) === 0 ? 1 : -1;
     const dirY = nextInt(rng, 2) === 0 ? 1 : -1;
-    const len = 7 + nextInt(rng, 8);
+    const len = Math.round(((7 + nextInt(rng, 8)) * Math.min(width, height)) / 64);
     for (let s = 0; s < len; s++) {
       const widen = nextInt(rng, 3) === 0;
       if (!nearSpawn(x, y)) {
@@ -380,13 +409,15 @@ function generateBadlands(
       y = Math.max(2, Math.min(height - 3, y));
     }
   }
-  scatterTrees(terrain, width, height, rng, 20, true);
+  scatterTrees(terrain, width, height, rng, 20 * f, true);
   return terrain;
 }
 
 /** A wide meandering river splits the map; one narrow land bridge crosses it. */
 function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Array {
-  // Tiberian-Dawn look: green base with soft dirt clearings.
+  // Tiberian-Dawn look: green base with soft dirt clearings. Feature counts
+  // are 64²-tuned and multiply with the area (×1 at ≤64 by construction).
+  const f = Math.max(1, Math.round((width * height) / 4096));
   const terrain = new Uint8Array(width * height).fill(TERRAIN_GRASS);
   const dirtBlob = (): void => {
     const bx = 4 + nextInt(rng, width - 8);
@@ -403,7 +434,7 @@ function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Arr
       }
     }
   };
-  for (let i = 0; i < 6; i++) dirtBlob();
+  for (let i = 0; i < 6 * f; i++) dirtBlob();
 
   // Carve the river top→bottom around the map middle, meandering.
   const riverX: number[] = [];
@@ -417,22 +448,37 @@ function generateRiver(width: number, height: number, rng: RngCarrier): Uint8Arr
       terrain[y * width + cx] = TERRAIN_WATER;
     }
   }
-  // One narrow crossing — THE ground chokepoint; air flies anywhere. Classic
+  // Narrow crossings — THE ground chokepoints; air flies anywhere. Classic
   // C&C style: a real bridge deck spans the water (each cell gets a neutral,
   // destructible span at game start), with dirt trail mouths on both banks.
-  const bridgeY = 16 + nextInt(rng, height - 32);
-  for (let y = bridgeY; y < bridgeY + 3 && y < height; y++) {
-    for (let cx = riverX[y]! - 5; cx <= riverX[y]! + 5; cx++) {
-      if (terrain[y * width + cx] !== TERRAIN_WATER) terrain[y * width + cx] = TERRAIN_DIRT;
+  // A 64² valley has exactly one (unchanged); big maps get two or three so a
+  // dropped bridge doesn't mean a 150-cell detour.
+  const carveCrossing = (bridgeY: number): void => {
+    for (let y = bridgeY; y < bridgeY + 3 && y < height; y++) {
+      for (let cx = riverX[y]! - 5; cx <= riverX[y]! + 5; cx++) {
+        if (terrain[y * width + cx] !== TERRAIN_WATER) terrain[y * width + cx] = TERRAIN_DIRT;
+      }
+    }
+    const spanY = Math.min(bridgeY + 1, height - 1);
+    for (let cx = riverX[spanY]! - 5; cx <= riverX[spanY]! + 5; cx++) {
+      if (terrain[spanY * width + cx] === TERRAIN_WATER) {
+        terrain[spanY * width + cx] = TERRAIN_BRIDGE;
+      }
+    }
+  };
+  const crossingYs = [16 + nextInt(rng, height - 32)];
+  const extraCrossings = f >= 9 ? 2 : f >= 4 ? 1 : 0;
+  for (let i = 0; i < extraCrossings; i++) {
+    // Bounded deterministic retry: keep extra crossings away from existing ones.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const y = 16 + nextInt(rng, height - 32);
+      if (crossingYs.some((cy) => Math.abs(cy - y) < Math.floor(height / 6))) continue;
+      crossingYs.push(y);
+      break;
     }
   }
-  const spanY = Math.min(bridgeY + 1, height - 1);
-  for (let cx = riverX[spanY]! - 5; cx <= riverX[spanY]! + 5; cx++) {
-    if (terrain[spanY * width + cx] === TERRAIN_WATER) {
-      terrain[spanY * width + cx] = TERRAIN_BRIDGE;
-    }
-  }
-  scatterTrees(terrain, width, height, rng, 10, true);
+  for (const y of crossingYs) carveCrossing(y);
+  scatterTrees(terrain, width, height, rng, 10 * f, true);
   return terrain;
 }
 
@@ -444,7 +490,7 @@ function generateIslands(
   spawns: ReadonlyArray<readonly [number, number]>,
 ): Uint8Array {
   const terrain = new Uint8Array(width * height).fill(TERRAIN_WATER);
-  const r = islandRadius(spawns.length);
+  const r = islandRadius(spawns.length, Math.min(width, height));
   const midX = Math.round(width / 2);
   const midY = Math.round(height / 2);
   const centreTaken = centreTakenBy(spawns, midX, midY);

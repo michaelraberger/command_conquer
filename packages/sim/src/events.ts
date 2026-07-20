@@ -1,4 +1,5 @@
 import type { SuperweaponKind, WeaponFx } from './rules.js';
+import type { CrateKind } from './state.js';
 
 /** What kind of attacker dealt the damage (drives who bothers to respond). */
 export type AggroKind = 'infantry' | 'vehicle' | 'air' | 'naval' | 'building';
@@ -24,4 +25,6 @@ export type SimEvent =
   | { type: 'BRIDGE_UP'; cx: number; cy: number }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
   | { type: 'REPAIR'; x: number; y: number }
-  | { type: 'PARADROP'; x: number; y: number };
+  | { type: 'PARADROP'; x: number; y: number }
+  /** A unit collected the crate at fixed-point (x,y). */
+  | { type: 'CRATE_PICKUP'; x: number; y: number; kind: CrateKind };
