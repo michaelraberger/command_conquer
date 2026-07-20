@@ -108,6 +108,9 @@ export function startLoop(
       driver.onTicked(state);
       deps.effects.ingest(state.events); // events are cleared next tick
       deps.onSimEvents?.(state.events);
+      // Per tick, not per frame: the lost-unit check reads this tick's DEATH
+      // events, which are gone once the next tick runs in the same frame.
+      deps.alerts.update(state);
       accumulator -= TICK_MS;
       steps++;
     }
@@ -115,7 +118,6 @@ export function startLoop(
 
     if (steps > 0) {
       pruneDeadSelection(state, deps.controls);
-      deps.alerts.update(state);
       if (state.tick % SLOW_SYNC_TICKS < steps) {
         deps.ore.sync(state);
         deps.fog.sync(state, session.localPlayer);

@@ -25,6 +25,18 @@ const YIELD_AFTER_TICKS = 4;
 /** Ground speed multiplier on ice, in 1/256 (154/256 ≈ 60 %). Integer-only. */
 const ICE_SPEED_NUM = 154;
 
+/**
+ * Wounded units limp (classic Tiberian Dawn): under half hp they move at
+ * 75 % speed, under a quarter at 50 %. Applies to everything that moves —
+ * infantry, vehicles, ships and aircraft. Integer-only for determinism.
+ */
+function woundedSpeed(unit: Unit, speed: number): number {
+  const maxHp = unitRule(unit.type).maxHp;
+  if (unit.hp * 4 <= maxHp) return Math.max(1, speed >> 1);
+  if (unit.hp * 2 <= maxHp) return Math.max(1, (speed * 3) >> 2);
+  return speed;
+}
+
 /** Fixed probe order for sidesteps — deterministic across runs. */
 const SIDESTEP_DIRS = [
   { dx: 1, dy: 0 },
@@ -80,7 +92,7 @@ export function movementSystem(state: GameState): void {
     const dy = wy - unit.y;
     if (dx !== 0 || dy !== 0) {
       unit.facing = facingFromDelta(dx, dy);
-      let speed = unitRule(unit.type).speed;
+      let speed = woundedSpeed(unit, unitRule(unit.type).speed);
       // On ice ground units slip: 60 % speed. unit.cell is the reserved
       // waypoint cell, so entering ice already slows the unit down.
       if (state.terrain[unit.cell] === TERRAIN_ICE) {
@@ -123,7 +135,7 @@ function flyAir(state: GameState, unit: Unit): void {
   const dy = wy - unit.y;
   if (dx !== 0 || dy !== 0) {
     unit.facing = facingFromDelta(dx, dy);
-    const speed = unitRule(unit.type).speed;
+    const speed = woundedSpeed(unit, unitRule(unit.type).speed);
     const dist = isqrt(distSq(dx, dy));
     if (dist <= speed) {
       unit.x = wx;

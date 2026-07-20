@@ -12,7 +12,7 @@ import { getSupabase } from './supabase.js';
 /** Bumped whenever the sim or the net protocol changes incompatibly — a
  *  version mismatch between peers would desync within seconds, so the lobby
  *  refuses to start across versions. */
-export const NET_VERSION = 3; // v3: Tiberian-Dawn-Kartenlook (Grasbasis, Bach, Pfade)
+export const NET_VERSION = 4; // v4: Verwundeten-Malus (beschädigte Einheiten fahren langsamer)
 
 export const MAX_SEATS = 4;
 

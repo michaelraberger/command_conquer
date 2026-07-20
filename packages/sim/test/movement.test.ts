@@ -67,4 +67,30 @@ describe('movement', () => {
     tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [enemy.id], cx: 20, cy: 16 }]);
     expect(unitById(state, enemy.id).path).toBeNull();
   });
+
+  it('wounded units limp: under half hp 75 % speed, under a quarter 50 %', () => {
+    // Same order on identical maps — only the hp differs; measure the distance
+    // covered in a fixed number of ticks.
+    const travelled = (hpFraction: number): number => {
+      const state = createGame(7);
+      const id = tankIds(state)[0]!;
+      const unit = unitById(state, id);
+      const maxHp = unit.hp;
+      unit.hp = Math.max(1, Math.trunc(maxHp * hpFraction));
+      const startX = unit.x;
+      const startY = unit.y;
+      tick(state, [{ type: 'MOVE', playerId: 0, unitIds: [id], cx: 40, cy: 12 }]);
+      for (let t = 0; t < 20; t++) tick(state);
+      const u = unitById(state, id);
+      return Math.abs(u.x - startX) + Math.abs(u.y - startY);
+    };
+    const healthy = travelled(1);
+    const yellow = travelled(0.4); // < 50 %
+    const red = travelled(0.2); // < 25 %
+    expect(yellow).toBeLessThan(healthy);
+    expect(red).toBeLessThan(yellow);
+    // Roughly the intended ratios (path shape adds slack).
+    expect(yellow).toBeGreaterThan(healthy / 2);
+    expect(red).toBeGreaterThan(healthy / 4);
+  });
 });

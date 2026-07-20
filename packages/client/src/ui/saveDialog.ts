@@ -1,7 +1,7 @@
 import type { GameState } from '@cac/sim';
 import type { Hotkeys } from '../input/hotkeys.js';
 import { currentUser } from '../net/auth.js';
-import { saveGame } from '../net/savesRepo.js';
+import { listSaves, overwriteSave, saveGame, type SaveRow } from '../net/savesRepo.js';
 import { cloudEnabled } from '../net/supabase.js';
 import type { GameMeta } from '../main.js';
 
@@ -9,14 +9,57 @@ import type { GameMeta } from '../main.js';
  * In-game save dialog (F6). Pauses the sim while open (via the public
  * `hotkeys.paused` flag, without the pause overlay); serialization happens on
  * the main thread between ticks, so the snapshot is always tick-consistent.
+ * Existing saves are listed — clicking one arms overwrite mode (the confirm
+ * button replaces that save instead of creating a new row).
  */
 export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMeta): void {
   const dialog = document.getElementById('save-dialog')!;
   const nameInput = document.getElementById('save-name') as HTMLInputElement;
+  const listEl = document.getElementById('save-dialog-list')!;
   const error = document.getElementById('save-error')!;
   const confirmBtn = document.getElementById('save-confirm') as HTMLButtonElement;
 
   let wasPaused = false;
+  /** Id of the save to overwrite; null = create a new one. */
+  let overwriteId: string | null = null;
+
+  const setMode = (id: string | null): void => {
+    overwriteId = id;
+    confirmBtn.textContent = id === null ? 'Speichern' : 'Überschreiben';
+    for (const row of listEl.querySelectorAll('.save-row')) {
+      row.classList.toggle('selected', (row as HTMLElement).dataset.id === id);
+    }
+  };
+
+  const renderList = (saves: SaveRow[]): void => {
+    listEl.replaceChildren();
+    for (const save of saves) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'save-row';
+      row.dataset.id = save.id;
+      const name = document.createElement('span');
+      name.className = 'save-row-name';
+      name.textContent = save.name;
+      const info = document.createElement('small');
+      const stamp = new Date(save.created_at);
+      const when = `${stamp.toLocaleDateString('de')}, ${stamp.toLocaleTimeString('de', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`;
+      info.textContent = save.map_label ? `${save.map_label} · ${when}` : when;
+      row.append(name, info);
+      row.addEventListener('click', () => {
+        if (overwriteId === save.id) {
+          setMode(null); // click again = back to "new save"
+          return;
+        }
+        setMode(save.id);
+        nameInput.value = save.name;
+      });
+      listEl.appendChild(row);
+    }
+  };
 
   const close = (): void => {
     dialog.style.display = 'none';
@@ -30,6 +73,8 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
     dialog.style.display = 'flex';
     error.textContent = '';
     confirmBtn.disabled = false;
+    listEl.replaceChildren();
+    setMode(null);
     nameInput.value = `Spielstand ${new Date().toLocaleString('de')}`;
     if (!cloudEnabled()) {
       error.textContent = 'Cloud nicht konfiguriert (siehe supabase/README.md).';
@@ -40,7 +85,14 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
       if (!user) {
         error.textContent = 'Anmeldung erforderlich — Spielstände speichern geht nur mit Konto.';
         confirmBtn.disabled = true;
+        return;
       }
+      // Existing saves load in the background; the dialog is usable meanwhile.
+      void listSaves()
+        .then(renderList)
+        .catch((err) => {
+          error.textContent = err instanceof Error ? err.message : String(err);
+        });
     });
     nameInput.focus();
     nameInput.select();
@@ -61,7 +113,11 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
       confirmBtn.disabled = true;
       error.textContent = '';
       try {
-        await saveGame(nameInput.value, state, meta.balance, meta.mapLabel);
+        if (overwriteId !== null) {
+          await overwriteSave(overwriteId, nameInput.value, state, meta.balance, meta.mapLabel);
+        } else {
+          await saveGame(nameInput.value, state, meta.balance, meta.mapLabel);
+        }
         close();
       } catch (err) {
         error.textContent = err instanceof Error ? err.message : String(err);
