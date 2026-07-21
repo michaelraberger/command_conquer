@@ -14,7 +14,7 @@ import {
 } from './lockstepCore.js';
 import type { MatchStart } from './lobby.js';
 
-const TURN_MS = TICKS_PER_TURN * TICK_MS; // 200 ms at 15 Hz
+const TURN_MS = TICKS_PER_TURN * TICK_MS; // ~133 ms at 15 Hz
 /** Show the waiting overlay once the sim has stalled this long. */
 const STALL_OVERLAY_MS = 1000;
 /** Ask silent seats to resend while stalled, at this cadence. */
@@ -31,6 +31,8 @@ const SELF_DEAD_MS = 30_000;
 const DROP_GRACE_TURNS = 25;
 /** Catch-up budget per rendered frame (on top of MAX_TICKS_PER_FRAME). */
 const MAX_CATCHUP_TICKS = 7;
+/** Chat lines are capped — nobody pastes a novel into the game channel. */
+const CHAT_MAX_LEN = 200;
 
 interface FrameMsg {
   seat: number;
@@ -72,6 +74,9 @@ export class RemoteDriver implements TickDriver {
   /** Dev diagnostics (read via window.__mpDriver in dev builds). */
   readonly debug = { sent: 0, received: 0, sendErrors: 0, started: false, presence: 0 };
 
+  /** UI hook: an incoming chat line from another seat (see ui/chat.ts). */
+  onChat: ((seat: number, text: string) => void) | null = null;
+
   private started = false;
   private halted = false;
   private neededTick = 0;
@@ -109,6 +114,14 @@ export class RemoteDriver implements TickDriver {
     channel.on('broadcast', { event: 'control' }, ({ payload }) => {
       this.handleControl(payload as ControlMsg);
     });
+    // Chat rides the same channel as plain broadcast: pure presentation,
+    // never a sim input — latency/ordering cannot desync anything.
+    channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
+      const msg = payload as { seat?: unknown; text?: unknown };
+      if (typeof msg.seat !== 'number' || typeof msg.text !== 'string') return;
+      if (msg.seat === this.match.localSeat) return; // never trust an echo
+      this.onChat?.(msg.seat, msg.text.slice(0, CHAT_MAX_LEN));
+    });
     channel.on('presence', { event: 'sync' }, () => {
       this.presentSeats.clear();
       for (const key of Object.keys(channel.presenceState())) {
@@ -128,6 +141,19 @@ export class RemoteDriver implements TickDriver {
 
     const barrierStart = Date.now();
     this.timer = window.setInterval(() => this.onInterval(barrierStart), TURN_MS);
+  }
+
+  /** Sends a chat line to every peer and echoes it locally (broadcast is
+   *  configured self:false). Empty lines are dropped, length is capped. */
+  sendChat(text: string): void {
+    const trimmed = text.trim().slice(0, CHAT_MAX_LEN);
+    if (trimmed.length === 0) return;
+    void this.channel?.send({
+      type: 'broadcast',
+      event: 'chat',
+      payload: { seat: this.match.localSeat, text: trimmed },
+    });
+    this.onChat?.(this.match.localSeat, trimmed);
   }
 
   // ---------------------------------------------------------------- TickDriver
