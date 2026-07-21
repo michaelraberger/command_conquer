@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, tick, validateCustomMap, validateMissionDef } from '@cac/sim';
+import {
+  buildingRule,
+  createGame,
+  findPath,
+  powerBalance,
+  tick,
+  unitRule,
+  validateCustomMap,
+  validateMissionDef,
+  type GameState,
+} from '@cac/sim';
 import { CAMPAIGNS, CAMPAIGN_IDS, getMission } from '../src/campaign/index.js';
 import { mergeProgress, type ProgressData } from '../src/campaign/progress.js';
 
@@ -58,6 +68,97 @@ describe('Kampagnen-Katalog', () => {
         expect(mission.makeSimDef()).toEqual(mission.makeSimDef());
       }
     }
+  });
+});
+
+describe('Missions-Lint (Logikfehler-Wächter)', () => {
+  const eachMissionState = (fn: (label: string, state: GameState) => void): void => {
+    for (const id of CAMPAIGN_IDS) {
+      for (const mission of CAMPAIGNS[id].missions) {
+        fn(mission.id, createGame(mission.seed, { mission: mission.makeSimDef() }));
+      }
+    }
+  };
+
+  it('no player starts with dark defense towers (power deficit)', () => {
+    // A tower that needs power but has none never fires — exactly the
+    // Mission-1 tesla bug. Manned towers (Wachturm) are exempt by design.
+    const offenders: string[] = [];
+    eachMissionState((label, state) => {
+      for (const p of state.players) {
+        const darkTowers = state.buildings.filter((b) => {
+          const rule = buildingRule(b.type);
+          return b.owner === p.id && rule.weapon !== null && rule.power < 0 && rule.manned !== true;
+        });
+        if (darkTowers.length === 0) continue;
+        const { produced, used } = powerBalance(state, p.id);
+        if (used > produced) {
+          offenders.push(
+            `${label}: Spieler ${p.id} (${p.name}) hat ${darkTowers.length} stromlose Verteidigungstürme (${used}/${produced})`,
+          );
+        }
+      }
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('every tagged objective target is ground-reachable from the player start', () => {
+    const offenders: string[] = [];
+    eachMissionState((label, state) => {
+      const from = state.units.find(
+        (u) => u.owner === 0 && unitRule(u.type).air !== true && unitRule(u.type).category !== 'naval',
+      );
+      if (!from) return; // pure air/naval mission: nothing to check here
+      const fromCx = from.cell % state.mapWidth;
+      const fromCy = (from.cell - fromCx) / state.mapWidth;
+      const targets = [
+        ...state.buildings.filter((b) => b.tag !== undefined),
+        ...state.units.filter((u) => u.tag !== undefined && u.owner !== 0),
+      ];
+      for (const t of targets) {
+        const tcx = 'cx' in t && typeof t.cx === 'number' ? t.cx : (t as { cell: number }).cell % state.mapWidth;
+        const tcy = 'cy' in t && typeof t.cy === 'number' ? t.cy : Math.floor((t as { cell: number }).cell / state.mapWidth);
+        const path = findPath(state, fromCx, fromCy, tcx, tcy, {
+          avoidUnits: false,
+          selfId: from.id,
+          owner: 0,
+        });
+        const end = path?.[path.length - 1];
+        const near = end !== undefined && Math.max(Math.abs(end.cx - tcx), Math.abs(end.cy - tcy)) <= 3;
+        if (!near) {
+          offenders.push(`${label}: Ziel „${t.tag}" bei (${tcx},${tcy}) ist vom Start aus nicht erreichbar`);
+        }
+      }
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('trigger areas and spawn anchors lie inside the map', () => {
+    const offenders: string[] = [];
+    for (const id of CAMPAIGN_IDS) {
+      for (const mission of CAMPAIGNS[id].missions) {
+        const def = mission.makeSimDef();
+        const w = def.map.width;
+        const h = def.map.height;
+        for (const trig of def.triggers) {
+          if (trig.when.kind === 'AREA_ENTERED') {
+            const a = trig.when;
+            if (a.cx < 0 || a.cy < 0 || a.cx + a.w > w || a.cy + a.h > h) {
+              offenders.push(`${mission.id}: Trigger „${trig.id}" Fläche ragt aus der Karte`);
+            }
+          }
+          for (const action of trig.actions) {
+            if (action.kind !== 'SPAWN') continue;
+            for (const u of action.units) {
+              if (u.cx < 1 || u.cy < 1 || u.cx >= w - 1 || u.cy >= h - 1) {
+                offenders.push(`${mission.id}: Trigger „${trig.id}" spawnt außerhalb/am Rand (${u.cx},${u.cy})`);
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

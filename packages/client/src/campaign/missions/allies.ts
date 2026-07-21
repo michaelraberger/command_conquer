@@ -46,7 +46,11 @@ function m01Sim(): MissionDef {
       { type: 'TESLA', owner: 1, cx: 33, cy: 5 },
       { type: 'TESLA', owner: 1, cx: 33, cy: 12 },
       { type: 'TESLA', owner: 1, cx: 42, cy: 12 },
+      // Zwei Kraftwerke: 3× Tesla (à −75) + Radar (−50) = 275 Last. Mit nur
+      // einem Kraftwerk (+150) wären alle Spulen ab Tick 0 stromlos — und wer
+      // eines der beiden ausschaltet, legt die Brückendeckung gezielt lahm.
       { type: 'POWER', owner: 1, cx: 40, cy: 9 },
+      { type: 'POWER', owner: 1, cx: 31, cy: 8 },
     ],
     units: [
       { type: 'LIGHTTANK', owner: 0, cx: 7, cy: 38 },
@@ -122,7 +126,7 @@ const m01: CampaignMissionDef = {
   },
   messages: {
     intro: 'Funkspruch: Stoßtrupp gelandet. Radarstation im Nordosten ausschalten!',
-    bruecke: 'Vorsicht — die Brücke wird von Tesla-Spulen gedeckt!',
+    bruecke: 'Vorsicht — die Brücke wird von Tesla-Spulen gedeckt! Ohne Strom sind die Spulen harmlos … die Kraftwerke wären ein lohnendes Ziel.',
     welle: 'Feindliche Patrouille im Anmarsch!',
   },
   playerFaction: 'ALLIES',
@@ -251,6 +255,10 @@ function m03Sim(): MissionDef {
       { type: 'TECHCENTER', owner: 1, cx: 56, cy: 24, tag: 'tech' },
       { type: 'TESLA', owner: 1, cx: 55, cy: 27, tag: 'riegel' },
       { type: 'TESLA', owner: 1, cx: 59, cy: 27, tag: 'riegel' },
+      // Der Forschungs-Riegel (2 extra Teslas + Techzentrum) braucht eigene
+      // Kraftwerke, sonst ist die gesamte Verteidigung stromlos.
+      { type: 'POWER', owner: 1, cx: 48, cy: 24 },
+      { type: 'POWER', owner: 1, cx: 52, cy: 24 },
     ],
     units: [
       ...base.units,

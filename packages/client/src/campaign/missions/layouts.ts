@@ -11,15 +11,21 @@ export interface ForcePack {
   units: MissionUnitPlacement[];
 }
 
-/** A functioning AI base: yard, economy, production, faction defenses. */
+/** A functioning AI base: yard, economy, production, faction defenses.
+ *  Soviet bases carry a THIRD power plant: four tesla coils (à −75) plus the
+ *  economy draw 420 — with only two plants (+300) every coil would sit dark
+ *  from tick 0 (defenses go offline in a deficit). */
 export function aiBase(owner: number, sx: number, sy: number, faction: Faction): ForcePack {
   const defense = faction === 'SOVIETS' ? 'TESLA' : 'PILLBOX';
   const tank = faction === 'SOVIETS' ? 'TANK' : 'LIGHTTANK';
+  const extraPower: MissionBuildingPlacement[] =
+    faction === 'SOVIETS' ? [{ type: 'POWER', owner, cx: sx - 8, cy: sy - 1 }] : [];
   return {
     buildings: [
       { type: 'CONYARD', owner, cx: sx - 1, cy: sy - 1 },
       { type: 'POWER', owner, cx: sx - 6, cy: sy - 3 },
       { type: 'POWER', owner, cx: sx - 6, cy: sy },
+      ...extraPower,
       { type: 'REFINERY', owner, cx: sx + 2, cy: sy - 3 },
       { type: 'BARRACKS', owner, cx: sx - 5, cy: sy + 3 },
       { type: 'FACTORY', owner, cx: sx + 1, cy: sy + 3 },
@@ -53,15 +59,19 @@ export function mcvStart(owner: number, sx: number, sy: number, faction: Faction
   };
 }
 
-/** A pre-built player base for defense missions. */
+/** A pre-built player base for defense missions. Soviet variant: third power
+ *  plant for the tesla coils (same arithmetic as aiBase above). */
 export function playerBase(owner: number, sx: number, sy: number, faction: Faction): ForcePack {
   const defense = faction === 'SOVIETS' ? 'TESLA' : 'GUARDTOWER';
   const tank = faction === 'SOVIETS' ? 'TANK' : 'LIGHTTANK';
+  const extraPower: MissionBuildingPlacement[] =
+    faction === 'SOVIETS' ? [{ type: 'POWER', owner, cx: sx - 8, cy: sy - 1 }] : [];
   return {
     buildings: [
       { type: 'CONYARD', owner, cx: sx - 1, cy: sy - 1 },
       { type: 'POWER', owner, cx: sx - 6, cy: sy - 3 },
       { type: 'POWER', owner, cx: sx - 6, cy: sy },
+      ...extraPower,
       { type: 'REFINERY', owner, cx: sx + 2, cy: sy - 3 },
       { type: 'BARRACKS', owner, cx: sx - 5, cy: sy + 3 },
       { type: 'FACTORY', owner, cx: sx + 1, cy: sy + 3 },
