@@ -12,6 +12,7 @@ import {
   powerBalance,
   toCell,
   unitRule,
+  veterancyRank,
   type Building,
   type GameState,
   type Unit,
@@ -31,6 +32,10 @@ interface UnitView {
   bar: Graphics;
   /** Control-group number badge above the unit (hidden unless in a marked group). */
   groupLabel: Sprite;
+  /** Veterancy chevrons beside the unit (hidden for recruits). */
+  rank: Sprite;
+  /** Last drawn veterancy rank (0/1/2; -1 = never drawn). */
+  lastRank: number;
   lastHp: number;
   /** Last drawn ammo count (combat aircraft; -1 = never drawn). */
   lastAmmo: number;
@@ -226,6 +231,14 @@ export class EntityRenderer {
         view.groupLabel.visible = true;
       } else {
         view.groupLabel.visible = false;
+      }
+
+      // Veterancy chevrons (gold badge, C&C-style promotion).
+      const rank = veterancyRank(unit.kills);
+      if (rank !== view.lastRank) {
+        view.lastRank = rank;
+        view.rank.visible = rank > 0;
+        if (rank > 0) view.rank.texture = this.tex.chevrons[rank - 1]!;
       }
     }
     for (const [id, view] of this.views) {
@@ -632,6 +645,11 @@ export class EntityRenderer {
     groupLabel.anchor.set(0.5);
     groupLabel.position.set(0, (big ? -31 : -24) - lift);
     groupLabel.visible = false;
+    // Veterancy chevrons, tucked to the unit's lower right.
+    const rank = new Sprite();
+    rank.anchor.set(0.5);
+    rank.position.set(big ? 13 : 9, (big ? 6 : 5) - lift);
+    rank.visible = false;
     if (air) {
       // Ground shadow directly under the aircraft.
       const shadow = new Graphics().ellipse(0, 0, 11, 6).fill({ color: 0x000000, alpha: 0.28 });
@@ -644,7 +662,7 @@ export class EntityRenderer {
       shadow.scale.set(big ? 0.42 : 0.26, big ? 0.36 : 0.24);
       root.addChild(shadow);
     }
-    root.addChild(sel, body, team, bar, groupLabel);
+    root.addChild(sel, body, team, bar, groupLabel, rank);
     this.layer.addChild(root);
     const view: UnitView = {
       root,
@@ -653,6 +671,8 @@ export class EntityRenderer {
       sel,
       bar,
       groupLabel,
+      rank,
+      lastRank: -1,
       lastHp: -1,
       lastAmmo: -1,
       prevX: unit.x,

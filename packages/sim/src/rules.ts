@@ -442,8 +442,9 @@ export const UNIT_RULES = {
     speed: 44,
     radius: 110,
     armor: 'light',
-    // Fast patrol boat: MG vs shore infantry and other light ships.
-    weapon: weapon(16, 4.5, 8, 0, { none: 100, light: 70, heavy: 30 }, 'BULLET'),
+    // Fast patrol boat: MG vs shore infantry and light ships — and depth
+    // charges: the documented cheap submarine hunter for both factions.
+    weapon: weapon(16, 4.5, 8, 0, { none: 100, light: 70, heavy: 30 }, 'BULLET', 'ground', true),
     cost: 500,
     buildTime: 50,
     category: 'naval',
@@ -1424,11 +1425,32 @@ export const VEHICLE_REPAIR_REACH = 1.6;
  */
 export const BUILDING_REPAIR_HP_PER_TICK = 2;
 export const BUILDING_REPAIR_COST_DIVISOR = 2;
+/**
+ * Veterancy ("Veteranenstatus", classic RA2): units promote on confirmed
+ * kills. Rank 1 (Veteran) and rank 2 (Elite) deal bonus damage; Elite units
+ * additionally self-heal slowly in the field.
+ */
+export const VETERAN_KILLS = 3;
+export const ELITE_KILLS = 6;
+/** Damage multiplier per rank, in percent (index = rank). */
+export const VETERANCY_DAMAGE_PCT = [100, 125, 150] as const;
+/** Elite self-heal: +1 hp every N ticks. */
+export const ELITE_HEAL_INTERVAL = 4;
+export function veterancyRank(kills: number): 0 | 1 | 2 {
+  return kills >= ELITE_KILLS ? 2 : kills >= VETERAN_KILLS ? 1 : 0;
+}
+
 /** Crates ("Kisten"): spawn cadence, money payout, and map-size-scaled cap. */
 export const CRATE_INTERVAL_TICKS = 600; // one spawn attempt every 40 s
 export const CRATE_MONEY = 700;
 /** Radius (cells) a heal crate cures own units around the collector. */
 export const CRATE_HEAL_RADIUS = 3;
+/** Booby-trapped crate: flat damage to every unit within the blast radius. */
+export const CRATE_BOMB_DAMAGE = 70;
+export const CRATE_BOMB_RADIUS = 2;
+/** Unclaimed crates evaporate after this long (3 min) — a crate walled in or
+ *  stranded behind a collapsed bridge must not clog the crate cap forever. */
+export const CRATE_LIFETIME_TICKS = 2700;
 export function crateMax(area: number): number {
   return Math.min(8, Math.max(2, Math.round(area / 4096)));
 }

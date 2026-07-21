@@ -25,11 +25,16 @@ export function projectileSystem(state: GameState): void {
     const speed = weapon.projectileSpeed;
     if (d2 <= speed * speed) {
       // Rally point for defenders = launch position (old saves lack it).
-      damageTarget(state, target, weapon, {
-        x: p.sx ?? p.x,
-        y: p.sy ?? p.y,
-        kind: aggroKindOfType(p.srcType),
-      });
+      // Veterancy: the shooter (if still alive) gets bonus + kill credit.
+      const source =
+        p.srcId !== undefined ? state.units.find((u) => u.id === p.srcId) : undefined;
+      damageTarget(
+        state,
+        target,
+        weapon,
+        { x: p.sx ?? p.x, y: p.sy ?? p.y, kind: aggroKindOfType(p.srcType) },
+        source,
+      );
       continue;
     }
     const dist = isqrt(d2);

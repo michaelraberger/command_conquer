@@ -142,8 +142,40 @@ export class Effects {
           },
         );
       } else if (e.type === 'CRATE_PICKUP') {
-        // Gold sparkle burst where a crate was collected.
         const p = worldToScreen(e.x, e.y);
+        if (e.kind === 'BOMB') {
+          // Booby trap: a proper fireball instead of the gold sparkle.
+          this.add(
+            600,
+            (g) => {
+              g.circle(0, 0, 16).fill({ color: 0xff7a26, alpha: 0.9 });
+              g.circle(0, 0, 8).fill(0xffd9a0);
+              g.position.set(p.x, p.y - 4);
+            },
+            (g, t) => {
+              g.alpha = 1 - t;
+              g.scale.set(0.6 + t * 1.6);
+            },
+          );
+          continue;
+        }
+        if (e.kind === 'VETERAN') {
+          // Field promotion: a golden chevron floats up from the crate.
+          this.add(
+            700,
+            (g) => {
+              g.poly([-7, 4, 0, -3, 7, 4, 7, 7, 0, 0, -7, 7]).fill(0xffd94d);
+              g.poly([-7, -4, 0, -11, 7, -4, 7, -1, 0, -8, -7, -1]).fill({ color: 0xffd94d, alpha: 0.7 });
+              g.position.set(p.x, p.y - 10);
+            },
+            (g, t) => {
+              g.alpha = 1 - t * t;
+              g.position.y = p.y - 10 - t * 22;
+            },
+          );
+          continue;
+        }
+        // Gold sparkle burst where a crate was collected.
         this.add(
           520,
           (g) => {

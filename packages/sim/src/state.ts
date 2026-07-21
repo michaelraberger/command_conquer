@@ -92,6 +92,8 @@ export interface Unit {
   /** Combat aircraft: shots left this sortie (0 for everyone else). Empty
    *  planes fly home and rearm at their pad/airfield (see airbaseSystem). */
   ammo: number;
+  /** Confirmed kills — drives the veterancy rank (see veterancyRank). */
+  kills: number;
   /** Airfield-bound jets: id of the Flugfeld this jet belongs to. Absent for
    *  all other units and for jets from pre-Flugfeld saves (orphans: they fly
    *  and fight but never rearm and never crash with a field). */
@@ -140,8 +142,8 @@ export interface Strike {
   countdown: number;
 }
 
-/** What a crate grants on pickup. */
-export type CrateKind = 'MONEY' | 'HEAL' | 'REVEAL' | 'UNIT';
+/** What a crate grants on pickup (BOMB is the booby trap — collect at risk). */
+export type CrateKind = 'MONEY' | 'HEAL' | 'REVEAL' | 'UNIT' | 'VETERAN' | 'BOMB';
 
 /** A collectible crate on the map (classic C&C goodie box). */
 export interface Crate {
@@ -149,6 +151,8 @@ export interface Crate {
   cx: number;
   cy: number;
   kind: CrateKind;
+  /** Spawn tick — unclaimed crates expire (frees slots stuck behind walls). */
+  born: number;
 }
 
 export interface Projectile {
@@ -163,6 +167,9 @@ export interface Projectile {
    *  Optional so pre-existing saves without it still deserialize. */
   sx?: number;
   sy?: number;
+  /** Firing unit's id — veterancy bonus/kill credit on impact (optional for
+   *  pre-veterancy saves; the shooter may be dead by then, then no credit). */
+  srcId?: number;
 }
 
 export interface ProductionQueue {
@@ -229,6 +236,9 @@ export interface GameState {
   nextEntityId: number;
   /** Winning player id, -1 while the game is running. */
   winner: number;
+  /** Internet match (lockstep seats). The sim itself gates cheats on this —
+   *  UI-side hiding alone would let a modified client cheat undetected. */
+  multiplayer: boolean;
   mapWidth: number;
   mapHeight: number;
   /** Layout this game was generated with (BADLANDS/RIVER/ISLANDS). Read by the
@@ -302,6 +312,7 @@ export function spawnUnit(
     passengers: [],
     curtainTicks: 0,
     ammo: unitRule(type).ammo ?? 0,
+    kills: 0,
   };
   if (!isAir) reserveCell(state, unit, cell);
   state.units.push(unit);
@@ -340,6 +351,7 @@ export function createPassenger(
     passengers: [],
     curtainTicks: 0,
     ammo: unitRule(type).ammo ?? 0,
+    kills: 0,
   };
 }
 
@@ -630,6 +642,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     rngState: seed >>> 0,
     nextEntityId: 1,
     winner: -1,
+    multiplayer: seats !== undefined,
     mapWidth,
     mapHeight,
     mapType,
@@ -793,18 +806,27 @@ export function deserialize(json: string): GameState {
     if (!p.primaryBuildings) p.primaryBuildings = {};
   }
   // Saves from before the aircraft-ammo field: top the planes up on load.
+  // Saves from before veterancy: everyone starts as a recruit.
   for (const u of raw.units) {
     if (typeof u.ammo !== 'number') u.ammo = unitRule(u.type).ammo ?? 0;
+    if (typeof u.kills !== 'number') u.kills = 0;
     for (const p of u.passengers) {
       if (typeof p.ammo !== 'number') p.ammo = unitRule(p.type).ammo ?? 0;
+      if (typeof p.kills !== 'number') p.kills = 0;
     }
   }
   // Saves from before the building-repair mode: default the flag off.
   for (const b of raw.buildings) {
     if (typeof b.repairing !== 'boolean') b.repairing = false;
   }
-  // Saves from before crates: default to none on the map.
+  // Saves from before crates: default to none on the map; older crates
+  // without a birth tick start their expiry clock at load.
   if (!Array.isArray(raw.crates)) raw.crates = [];
+  for (const c of raw.crates) {
+    if (typeof c.born !== 'number') c.born = raw.tick;
+  }
+  // Saves from before the multiplayer flag are solo games by definition.
+  if (typeof raw.multiplayer !== 'boolean') raw.multiplayer = false;
   // NOTE: no bridge-span retrofit here — deserialize(serialize(s)) must
   // reproduce s exactly (lockstep resync depends on it). Saves from before
   // destructible bridges simply keep their spans-less, indestructible decks.

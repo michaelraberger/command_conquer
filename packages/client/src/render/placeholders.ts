@@ -71,6 +71,8 @@ export interface GameTextures {
   tree: Texture;
   /** Collectible goodie crate (iso wooden box). */
   crate: Texture;
+  /** Veterancy rank badges: [veteran (one chevron), elite (two chevrons)]. */
+  chevrons: [Texture, Texture];
   tank: UnitSprite[];
   mammoth: UnitSprite[];
   artillery: UnitSprite[];
@@ -1900,6 +1902,26 @@ export function createTextures(renderer: Renderer): GameTextures {
 
   const shell = new Graphics().circle(0, 0, 3).fill(0xffe08a).stroke({ width: 1, color: 0xffb347 });
 
+  // Veterancy chevrons (gold, dark halo): one for veteran, two for elite.
+  const bakeChevron = (count: number): Texture => {
+    const g = new Graphics();
+    for (let i = 0; i < count; i++) {
+      const y = -i * 5;
+      g.poly([-5, y + 3, 0, y - 2, 5, y + 3, 5, y + 5, 0, y, -5, y + 5])
+        .fill(0x1f1a08)
+        .stroke({ width: 2, color: 0x1f1a08 });
+    }
+    for (let i = 0; i < count; i++) {
+      const y = -i * 5;
+      g.poly([-5, y + 3, 0, y - 2, 5, y + 3, 5, y + 5, 0, y, -5, y + 5]).fill(0xffd94d);
+    }
+    return renderer.generateTexture({
+      target: g,
+      frame: new Rectangle(-8, -10, 16, 18),
+      resolution: 2,
+    });
+  };
+
   // Goodie crate: small iso wooden box with bright edge strapping, sitting on
   // a soft drop shadow so it pops against any ground.
   const crateG = new Graphics();
@@ -1972,6 +1994,7 @@ export function createTextures(renderer: Renderer): GameTextures {
       frame: new Rectangle(-13, -14, 26, 26),
       resolution: 2,
     }),
+    chevrons: [bakeChevron(1), bakeChevron(2)],
     tank,
     mammoth,
     artillery,

@@ -537,6 +537,36 @@
         top: 16px;
         background: rgba(48, 10, 10, 0.92);
       }
+      /* Incoming-superweapon warning: same alarm look, faster pulse. */
+      #sw-alert {
+        position: fixed;
+        left: calc((100% - 210px) / 2);
+        transform: translateX(-50%);
+        top: 62px;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 8px 20px;
+        border-radius: 6px;
+        background: rgba(52, 8, 8, 0.94);
+        border: 1px solid #ff3b30;
+        color: #ff9a8a;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        text-align: center;
+        pointer-events: none;
+        z-index: 6;
+        animation: lowpulse 0.5s ease-in-out infinite;
+      }
+      #sw-alert strong {
+        font-size: 15px;
+        letter-spacing: 2px;
+        color: #ff5a48;
+      }
+      #sw-alert small {
+        font-size: 11px;
+        color: #d99080;
+      }
       #groups {
         position: fixed;
         left: 10px;
@@ -2017,6 +2047,7 @@
       <small>Verteidigung offline · Produktion langsamer · Kraftwerk bauen</small>
     </div>
     <div id="attack"><strong>⚠ EINHEITEN WERDEN ANGEGRIFFEN</strong></div>
+    <div id="sw-alert"><strong>⚠ ATOMRAKETE IM ANFLUG</strong><small></small></div>
     <div id="groups"></div>
     <button id="help-btn" title="Tastenkürzel (F1)">?</button>
     <button id="techtree-btn" title="Technologiebaum (T)">🧬</button>

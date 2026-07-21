@@ -2,7 +2,7 @@ import type { SuperweaponKind, WeaponFx } from './rules.js';
 import type { CrateKind } from './state.js';
 
 /** What kind of attacker dealt the damage (drives who bothers to respond). */
-export type AggroKind = 'infantry' | 'vehicle' | 'air' | 'naval' | 'building';
+export type AggroKind = 'infantry' | 'vehicle' | 'air' | 'naval' | 'sub' | 'building';
 
 /**
  * Transient per-tick events for presentation (tracers, explosions, …).

@@ -19,6 +19,7 @@ import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
 import { Alerts } from './ui/alerts.js';
+import { SuperweaponAlert } from './ui/swAlert.js';
 import { Changelog } from './ui/changelog.js';
 import { DebugOverlay } from './ui/debug.js';
 import { Minimap } from './ui/minimap.js';
@@ -305,6 +306,7 @@ export async function startGame(
     groups,
   );
   const alerts = new Alerts();
+  const swAlert = new SuperweaponAlert();
   new HelpMenu();
   new TechTreeOverlay(state);
   if (solo) {
@@ -348,6 +350,7 @@ export async function startGame(
       debug,
       hotkeys,
       alerts,
+      swAlert,
       groups,
       groupBar,
       onGameOver: (winner) =>

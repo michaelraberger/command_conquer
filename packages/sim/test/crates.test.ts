@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CRATE_BOMB_DAMAGE,
   CRATE_MONEY,
+  ELITE_KILLS,
+  VETERAN_KILLS,
   FOG_EXPLORED,
   FOG_HIDDEN,
   FOG_VISIBLE,
@@ -33,7 +36,7 @@ function arena(seed = 7): GameState {
 }
 
 function dropCrate(state: GameState, cx: number, cy: number, kind: CrateKind): void {
-  state.crates.push({ id: state.nextEntityId++, cx, cy, kind });
+  state.crates.push({ id: state.nextEntityId++, cx, cy, kind, born: state.tick });
 }
 
 describe('crate spawning', () => {
@@ -142,6 +145,36 @@ describe('crate pickup', () => {
     tick(state);
     expect(state.units.length).toBe(unitsBefore);
     expect(state.players[0]!.credits).toBe(before + CRATE_MONEY);
+  });
+
+  it('VETERAN promotes the collector one full rank', () => {
+    const state = arena();
+    dropCrate(state, 30, 30, 'VETERAN');
+    const tank = spawnUnit(state, 'TANK', 0, 30, 30);
+    tick(state);
+    expect(tank.kills).toBe(VETERAN_KILLS); // recruit → veteran
+    dropCrate(state, 30, 30, 'VETERAN');
+    tick(state);
+    expect(tank.kills).toBe(ELITE_KILLS); // veteran → elite
+  });
+
+  it('BOMB blasts every unit near the crate — the collector included', () => {
+    const state = arena();
+    dropCrate(state, 30, 30, 'BOMB');
+    const collector = spawnUnit(state, 'RIFLEMAN', 0, 30, 30);
+    collector.hp = Math.min(collector.hp, CRATE_BOMB_DAMAGE - 10); // blast is lethal for it
+    // Own tank beside the crate: the blast hits EVERY owner, and an own unit
+    // never trades shots with the collector (isolates the bomb damage).
+    const near = spawnUnit(state, 'TANK', 0, 31, 30);
+    const far = spawnUnit(state, 'TANK', 0, 40, 40);
+    const tankBefore = near.hp;
+    tick(state);
+    // The wounded rifleman dies to the 70-damage blast this same tick.
+    expect(state.units.some((u) => u.id === collector.id)).toBe(false);
+    expect(near.hp).toBe(tankBefore - CRATE_BOMB_DAMAGE);
+    expect(far.hp).toBe(unitRule('TANK').maxHp);
+    expect(state.crates.length).toBe(0);
+    expect(state.events.some((e) => e.type === 'CRATE_PICKUP' && e.kind === 'BOMB')).toBe(true);
   });
 
   it('aircraft fly over crates without collecting them', () => {

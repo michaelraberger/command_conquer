@@ -24,6 +24,7 @@ import { resourceGrowthSystem } from './systems/resources.js';
 import { spySystem } from './systems/spy.js';
 import { superweaponSystem } from './systems/superweapon.js';
 import { transportSystem } from './systems/transport.js';
+import { veterancySystem } from './systems/veterancy.js';
 import { victorySystem } from './systems/victory.js';
 
 export const TICKS_PER_SECOND = 15;
@@ -70,6 +71,7 @@ export function tick(state: GameState, commands: Command[] = []): void {
   repairSystem(state);
   buildingRepairSystem(state);
   hospitalSystem(state);
+  veterancySystem(state);
   deathSystem(state);
   victorySystem(state);
   fogSystem(state);

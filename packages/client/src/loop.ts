@@ -15,6 +15,7 @@ import type { PrismLinkOverlay } from './render/prismLinks.js';
 import type { RallyOverlay } from './render/rally.js';
 import { session } from './session.js';
 import type { Alerts } from './ui/alerts.js';
+import type { SuperweaponAlert } from './ui/swAlert.js';
 import type { DebugOverlay } from './ui/debug.js';
 import type { GroupBar } from './ui/groupBar.js';
 import type { Minimap } from './ui/minimap.js';
@@ -65,6 +66,7 @@ export interface LoopDeps {
   debug: DebugOverlay;
   hotkeys: Hotkeys;
   alerts: Alerts;
+  swAlert: SuperweaponAlert;
   groups: ControlGroups;
   groupBar: GroupBar;
   onGameOver: (winner: number) => void;
@@ -132,6 +134,7 @@ export function startLoop(
     const attackActive = deps.alerts.active(state.tick);
     if (attackActive) attackBanner.firstElementChild!.textContent = deps.alerts.message();
     attackBanner.style.display = attackActive ? 'flex' : 'none';
+    deps.swAlert.update(state);
 
     const { width, height } = app.screen;
     deps.camera.update(app.ticker.deltaMS, width, height);

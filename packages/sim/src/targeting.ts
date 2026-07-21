@@ -1,6 +1,14 @@
 import type { AggroKind } from './events.js';
 import { SUBCELL, distSq } from './fixed.js';
-import { WALL_LEVELS, buildingRule, unitRule, type UnitType, type WeaponRule } from './rules.js';
+import {
+  VETERANCY_DAMAGE_PCT,
+  WALL_LEVELS,
+  buildingRule,
+  unitRule,
+  veterancyRank,
+  type UnitType,
+  type WeaponRule,
+} from './rules.js';
 import { areEnemies, type Building, type GameState, type Unit } from './state.js';
 
 /** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
@@ -128,28 +136,47 @@ export function targetDistSq(target: Target, fromX: number, fromY: number): numb
 export function aggroKindOfType(type: UnitType): AggroKind {
   const rule = unitRule(type);
   if (rule.air === true) return 'air';
+  // Submerged boats are their own kind: only antiSub weapons can answer them,
+  // so the base alarm must not rally ordinary defenders (see defenseReaction).
+  if (rule.submerged === true) return 'sub';
   if (rule.category === 'naval') return 'naval';
   return rule.category === 'infantry' ? 'infantry' : 'vehicle';
 }
 
 /** Warhead-vs-armor damage (integer percent math, always at least 1). When the
  *  attacker's position is passed, an AGGRO event rallies idle defenders (see
- *  defenseReactionSystem); superweapon blasts bypass this on purpose. */
+ *  defenseReactionSystem); superweapon blasts bypass this on purpose. The
+ *  firing unit (`source`) applies its veterancy damage bonus and gets kill
+ *  credit when this hit is the one that drops the victim. */
 export function damageTarget(
   state: GameState,
   target: Target,
   weapon: WeaponRule,
   attacker?: { x: number; y: number; kind: AggroKind },
+  source?: Unit,
 ): void {
   // Iron curtain: protected targets shrug off every hit while the effect lasts.
   const shielded = target.kind === 'unit' ? target.unit.curtainTicks : target.building.curtainTicks;
   if (shielded > 0) return;
   const armor =
     target.kind === 'unit' ? unitRule(target.unit.type).armor : buildingRule(target.building.type).armor;
-  const dmg = Math.trunc((weapon.damage * weapon.vs[armor]) / 100);
+  const bonusPct = source ? VETERANCY_DAMAGE_PCT[veterancyRank(source.kills)] : 100;
+  const dmg = Math.trunc((weapon.damage * weapon.vs[armor] * bonusPct) / 10000);
   const applied = dmg < 1 ? 1 : dmg;
   const victim = target.kind === 'unit' ? target.unit : target.building;
+  const wasAlive = victim.hp > 0;
   victim.hp -= applied;
+  // Kill credit: enemy units and enemy buildings count (never neutral scenery
+  // like bridges or village houses, never a same-tick already-dead victim).
+  if (
+    source &&
+    wasAlive &&
+    victim.hp <= 0 &&
+    victim.owner >= 0 &&
+    victim.owner !== source.owner
+  ) {
+    source.kills++;
+  }
   state.events.push({ type: 'HIT', x: victim.x, y: victim.y });
   if (attacker) {
     state.events.push({

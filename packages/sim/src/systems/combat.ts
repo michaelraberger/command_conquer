@@ -400,7 +400,13 @@ function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRul
   if (unitRule(unit.type).ammo !== undefined) unit.ammo--;
   state.events.push({ type: 'SHOT', x: unit.x, y: unit.y, tx: aim.x, ty: aim.y, fx: weapon.fx });
   if (weapon.projectileSpeed === 0) {
-    damageTarget(state, target, weapon, { x: unit.x, y: unit.y, kind: aggroKindOfType(unit.type) });
+    damageTarget(
+      state,
+      target,
+      weapon,
+      { x: unit.x, y: unit.y, kind: aggroKindOfType(unit.type) },
+      unit, // veterancy: damage bonus + kill credit
+    );
   } else {
     state.projectiles.push({
       id: state.nextEntityId++,
@@ -411,6 +417,7 @@ function tryFire(state: GameState, unit: Unit, target: Target, weapon: WeaponRul
       targetId: target.kind === 'unit' ? target.unit.id : target.building.id,
       sx: unit.x,
       sy: unit.y,
+      srcId: unit.id, // veterancy credit resolves on impact
     });
   }
 }
