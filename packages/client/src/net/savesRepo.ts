@@ -1,5 +1,6 @@
-import { serialize, type BalanceConfig, type GameState } from '@cac/sim';
+import type { BalanceConfig, GameState } from '@cac/sim';
 import { gzipToBase64 } from './gzip.js';
+import { encodeSavePayload } from './saveCodec.js';
 import { getSupabase } from './supabase.js';
 
 export interface SaveRow {
@@ -26,13 +27,14 @@ export async function saveGame(
   balance: BalanceConfig | undefined,
   mapLabel: string | undefined,
   campaignMission?: string | undefined,
+  groups: Record<number, number[]> = {},
 ): Promise<void> {
   const supabase = requireSupabase();
   const { data: session } = await supabase.auth.getSession();
   const owner = session.session?.user.id;
   if (!owner) throw new Error('Anmeldung erforderlich.');
 
-  const data = await gzipToBase64(serialize(state));
+  const data = await gzipToBase64(encodeSavePayload(state, groups));
   const { error } = await supabase.from('saves').insert({
     owner,
     name: name.trim() || 'Spielstand',
@@ -56,12 +58,13 @@ export async function overwriteSave(
   balance: BalanceConfig | undefined,
   mapLabel: string | undefined,
   campaignMission?: string | undefined,
+  groups: Record<number, number[]> = {},
 ): Promise<void> {
   const supabase = requireSupabase();
   const { data: session } = await supabase.auth.getSession();
   if (!session.session) throw new Error('Anmeldung erforderlich.');
 
-  const data = await gzipToBase64(serialize(state));
+  const data = await gzipToBase64(encodeSavePayload(state, groups));
   const { error } = await supabase
     .from('saves')
     .update({

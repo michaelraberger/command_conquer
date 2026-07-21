@@ -1,4 +1,5 @@
 import type { GameState } from '@cac/sim';
+import type { ControlGroups } from '../input/groups.js';
 import type { Hotkeys } from '../input/hotkeys.js';
 import { currentUser } from '../net/auth.js';
 import { listSaves, overwriteSave, saveGame, type SaveRow } from '../net/savesRepo.js';
@@ -12,7 +13,12 @@ import type { GameMeta } from '../main.js';
  * Existing saves are listed — clicking one arms overwrite mode (the confirm
  * button replaces that save instead of creating a new row).
  */
-export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMeta): void {
+export function initSaveDialog(
+  state: GameState,
+  hotkeys: Hotkeys,
+  meta: GameMeta,
+  groups: ControlGroups,
+): void {
   const dialog = document.getElementById('save-dialog')!;
   const nameInput = document.getElementById('save-name') as HTMLInputElement;
   const listEl = document.getElementById('save-dialog-list')!;
@@ -121,6 +127,7 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
             meta.balance,
             meta.mapLabel,
             meta.campaign?.missionId,
+            groups.export(),
           );
         } else {
           await saveGame(
@@ -129,6 +136,7 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
             meta.balance,
             meta.mapLabel,
             meta.campaign?.missionId,
+            groups.export(),
           );
         }
         close();

@@ -113,6 +113,8 @@ export type StartAction =
       mapLabel?: string | undefined;
       /** Set when the save belongs to a campaign mission. */
       campaign?: import('../campaign/types.js').CampaignRef | undefined;
+      /** Control groups stored in the save blob (digit → unit ids). */
+      groups?: Record<string, number[]> | undefined;
     }
   | { kind: 'editor'; map?: CustomMapData | undefined; cloudId?: string | undefined }
   /** Campaign mission from the Kampagne panel (simDef pre-built + validated). */

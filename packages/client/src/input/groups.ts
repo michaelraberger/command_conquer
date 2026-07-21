@@ -86,6 +86,27 @@ export class ControlGroups {
     this.marked.clear();
   }
 
+  /** Snapshot for savegames: digit → unit ids (chip marks are not persisted). */
+  export(): Record<number, number[]> {
+    const out: Record<number, number[]> = {};
+    for (const [digit, ids] of this.groups) {
+      if (ids.length > 0) out[digit] = [...ids];
+    }
+    return out;
+  }
+
+  /** Restores a savegame snapshot (dead ids are filtered on every access). */
+  restore(saved: Record<string, number[]>): void {
+    this.groups.clear();
+    this.marked.clear();
+    for (let digit = 1; digit <= 9; digit++) {
+      const ids = saved[digit];
+      if (Array.isArray(ids) && ids.length > 0) {
+        this.groups.set(digit, ids.filter((id) => typeof id === 'number'));
+      }
+    }
+  }
+
   /** Chips for the on-screen bar: only groups that still have living units. */
   list(): GroupChip[] {
     const chips: GroupChip[] = [];

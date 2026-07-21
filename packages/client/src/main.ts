@@ -131,6 +131,8 @@ export interface GameMeta {
   multiplayer?: boolean | undefined;
   /** Campaign mission: objectives HUD, progress marking, end-screen flow. */
   campaign?: import('./campaign/types.js').CampaignRef | undefined;
+  /** Control groups from a loaded save (digit → unit ids), restored on start. */
+  initialGroups?: Record<string, number[]> | undefined;
 }
 
 async function boot(): Promise<void> {
@@ -188,6 +190,7 @@ async function runAction(app: Application, action: StartAction): Promise<void> {
       balance: action.balance,
       mapLabel: action.mapLabel,
       campaign: action.campaign,
+      initialGroups: action.groups,
     });
     return;
   }
@@ -242,6 +245,16 @@ async function runAction(app: Application, action: StartAction): Promise<void> {
     ]);
     const driver = new RemoteDriver(match, createMpOverlay());
     if (import.meta.env.DEV) (window as unknown as { __mpDriver?: unknown }).__mpDriver = driver;
+    // In-game chat: Enter opens the line, lines arrive via the game channel.
+    const { ChatOverlay } = await import('./ui/chat.js');
+    const chat = new ChatOverlay(
+      state.players.map((p) => p.name),
+      state.players.map((p) => p.color),
+      (text) => driver.sendChat(text),
+      () => state.winner === -1,
+    );
+    driver.onChat = (seat, text) => chat.push(seat, text);
+    if (import.meta.env.DEV) (window as unknown as { __mpChat?: unknown }).__mpChat = chat;
     await driver.connect();
     await startGame(app, state, driver, {
       balance: match.balance,
@@ -352,6 +365,7 @@ export async function startGame(
   const controls = new Controls(app, world, state, sendWithPing, placement);
   controls.isPanning = () => camera.spaceHeld;
   const groups = new ControlGroups(state, controls);
+  if (meta.initialGroups) groups.restore(meta.initialGroups);
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
@@ -379,7 +393,7 @@ export async function startGame(
       tour.maybeShowOnFirstRun();
     }
     const { initSaveDialog } = await import('./ui/saveDialog.js');
-    initSaveDialog(state, hotkeys, meta);
+    initSaveDialog(state, hotkeys, meta, groups);
   }
 
   // Campaign mission: objectives HUD + toast texts from the mission catalog.

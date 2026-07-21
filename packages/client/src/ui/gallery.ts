@@ -1,6 +1,7 @@
 import { deserialize, type AiDifficulty, type Faction } from '@cac/sim';
 import { getMission } from '../campaign/index.js';
 import { gunzipFromBase64 } from '../net/gzip.js';
+import { decodeSavePayload } from '../net/saveCodec.js';
 import { deleteMap, getMap, myMaps, publicMaps, setPublic, type MapRow } from '../net/mapsRepo.js';
 import { deleteSave, listSaves, loadSaveData } from '../net/savesRepo.js';
 import { cloudEnabled } from '../net/supabase.js';
@@ -202,10 +203,12 @@ async function refreshSaves(): Promise<void> {
         try {
           loadBtn.disabled = true;
           loadBtn.textContent = 'Lade …';
-          const state = deserialize(await gunzipFromBase64(await loadSaveData(row.id)));
+          const blob = decodeSavePayload(await gunzipFromBase64(await loadSaveData(row.id)));
+          const state = deserialize(blob.stateJson);
           startScreenHooks.onAction?.({
             kind: 'resume',
             state,
+            groups: blob.groups,
             balance: row.balance ?? undefined,
             mapLabel: row.map_label ?? undefined,
             // Unknown mission id (older build): plain resume without HUD.
