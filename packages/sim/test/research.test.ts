@@ -50,11 +50,11 @@ describe('tech research', () => {
   });
 
   it('cannot research a tech of the wrong faction', () => {
-    const balance: BalanceConfig = { research: { artillery: { cost: 100, time: 10 } } };
+    const balance: BalanceConfig = { research: { spy: { cost: 100, time: 10 } } };
     const state = createGame(1, { factions: ['SOVIETS'], balance });
     constructBuilding(state, 'TECHCENTER', 0, 22, 18);
-    // 'artillery' is an Allied tech — a Soviet player can't research it.
-    tick(state, [{ type: 'RESEARCH_START', playerId: 0, tech: 'artillery' }]);
+    // 'spy' is an Allied tech — a Soviet player can't research it.
+    tick(state, [{ type: 'RESEARCH_START', playerId: 0, tech: 'spy' }]);
     expect(state.players[0]!.research).toBeNull();
   });
 

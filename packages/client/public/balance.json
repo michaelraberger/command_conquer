@@ -368,7 +368,6 @@
     "repair": { "cost": 800, "time": 5400 },
     "flak": { "cost": 800, "time": 5400 },
     "spy": { "cost": 1000, "time": 7200 },
-    "artillery": { "cost": 1200, "time": 9000 },
     "armor": { "cost": 1500, "time": 9000 },
     "air": { "cost": 1500, "time": 9000 },
     "navy": { "cost": 1500, "time": 9000 },

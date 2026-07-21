@@ -12,7 +12,7 @@ import {
  *  the "AI researches → unlocks → builds air/navy" path without minute-long sims. */
 const FAST_RESEARCH = {
   research: Object.fromEntries(
-    ['repair', 'flak', 'spy', 'artillery', 'armor', 'air', 'navy', 'tesla', 'super'].map((t) => [
+    ['repair', 'flak', 'spy', 'armor', 'air', 'navy', 'tesla', 'super'].map((t) => [
       t,
       { time: 60, cost: 200 },
     ]),

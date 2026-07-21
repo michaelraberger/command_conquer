@@ -1,8 +1,10 @@
 import { applyCommands, type Command } from '../commands.js';
 import { TERRAIN_DIRT, TERRAIN_WATER, cellsAroundRect, inBounds } from '../map.js';
 import {
+  BUILDING_RULES,
   SUPERWEAPON_CHARGE_TICKS,
   TRANSPORT_CAPACITY,
+  UNIT_RULES,
   availableToFaction,
   buildingRule,
   techFor,
@@ -215,6 +217,23 @@ function countBuildings(state: GameState, owner: number, type: BuildingType): nu
   return n;
 }
 
+/**
+ * Goal satisfaction: an in-place UPGRADED building still fills its base goal —
+ * an AGT is a satisfied GUARDTOWER, an Ausbau-Kraftwerk a satisfied POWER.
+ * Without this the AI loops forever: upgrade the tower, see the goal "empty",
+ * build the next tower, upgrade it … draining every credit into defenses
+ * (observed: 17 AGTs and a bankrupt build order that never reached its tech).
+ */
+function countGoalBuildings(state: GameState, owner: number, type: BuildingType): number {
+  const upgraded = buildingRule(type).upgradeTo;
+  let n = 0;
+  for (const b of state.buildings) {
+    if (b.owner !== owner) continue;
+    if (b.type === type || (upgraded !== undefined && b.type === upgraded)) n++;
+  }
+  return n;
+}
+
 function countUnits(state: GameState, owner: number, type: UnitType): number {
   let n = 0;
   for (const u of state.units) if (u.owner === owner && u.type === type) n++;
@@ -233,7 +252,7 @@ function manageConstruction(state: GameState, player: Player, params: AiParams):
   const wanted = new Map<BuildingType, number>();
   for (const type of goalsFor(state, player, params)) {
     wanted.set(type, (wanted.get(type) ?? 0) + 1);
-    if (countBuildings(state, player.id, type) < wanted.get(type)!) {
+    if (countGoalBuildings(state, player.id, type) < wanted.get(type)!) {
       // Tech-locked goals wait for research (manageResearch handles them) — skip
       // to the next available goal instead of stalling the whole build order.
       const tech = techFor(type);
@@ -249,7 +268,7 @@ function manageConstruction(state: GameState, player: Player, params: AiParams):
 
 /** Preferred research order; the AI unlocks its tech tree one project at a time. */
 const AI_RESEARCH_ORDER: readonly TechId[] = [
-  'repair', 'flak', 'air', 'armor', 'artillery', 'tesla', 'navy', 'super',
+  'repair', 'flak', 'air', 'armor', 'tesla', 'navy', 'super',
 ];
 
 /**
@@ -265,11 +284,28 @@ function manageResearch(state: GameState, player: Player, params: AiParams): voi
     if (player.researched.includes(tech)) continue;
     const rule = techRule(tech);
     if (!availableToFaction(rule.factions, player.faction)) continue;
+    // Skip research that unlocks nothing for THIS faction — the Allies were
+    // burning a whole slot on 'armor' (Mammoth, Soviet-only), the Soviets on
+    // Allied-only projects, before reaching their own tech.
+    if (!techUnlocksFor(tech, player.faction)) continue;
     if (tech === 'navy' && state.mapType !== 'ISLANDS') continue; // no shipyard goal on land
     if (tech === 'super' && !params.useHighTech) continue; // easy AI stays low-tech
     startResearch(state, player.id, tech);
     return;
   }
+}
+
+/** True when this tech gates at least one unit/building the faction can use. */
+function techUnlocksFor(tech: TechId, faction: Faction): boolean {
+  for (const type of Object.keys(UNIT_RULES) as UnitType[]) {
+    const rule = unitRule(type);
+    if (rule.tech === tech && availableToFaction(rule.factions, faction)) return true;
+  }
+  for (const type of Object.keys(BUILDING_RULES) as BuildingType[]) {
+    const rule = buildingRule(type);
+    if (rule.tech === tech && availableToFaction(rule.factions, faction)) return true;
+  }
+  return false;
 }
 
 /**
@@ -336,16 +372,18 @@ function manageTraining(state: GameState, player: Player, params: AiParams): voi
         params.useHighTech && tanks >= 3 && heavies < 3 && player.credits > 2200;
       startProduction(state, player.id, wantHeavy ? heavy : 'TANK');
     }
-    // Soviet siege support: a pair of V3 launchers once the tank line is full
-    // (startProduction no-ops while the queue is busy or the Radarturm/prereqs
-    // are missing, so this never stalls the build order).
+    // Siege support pair, faction-symmetric: Soviet V3 launchers or Allied
+    // artillery (startProduction no-ops while the queue is busy or the
+    // prereqs/research are missing, so this never stalls the build order).
+    const siege: UnitType = availableToFaction(unitRule('V3').factions, player.faction)
+      ? 'V3'
+      : 'ARTILLERY';
     if (
       state.mapType !== 'ISLANDS' &&
-      availableToFaction(unitRule('V3').factions, player.faction) &&
-      countUnits(state, player.id, 'V3') < 2 &&
+      countUnits(state, player.id, siege) < 2 &&
       player.credits > 1600
     ) {
-      startProduction(state, player.id, 'V3');
+      startProduction(state, player.id, siege);
     }
   }
 

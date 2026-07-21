@@ -23,7 +23,6 @@ export type AiDifficulty = 'easy' | 'normal' | 'hard';
  *  once that tech has been researched at a Techzentrum. */
 export type TechId =
   | 'armor'
-  | 'artillery'
   | 'air'
   | 'navy'
   | 'flak'
@@ -187,14 +186,19 @@ export const UNIT_RULES = {
     radius: 110,
     armor: 'light',
     // Lobbed shells: the one Allied weapon that fires over walls (arcing).
-    weapon: { ...weapon(90, 7, 45, 140, { none: 90, light: 80, heavy: 70 }, 'ARTY'), arcing: true },
+    // Balance 2026-07: range 7 → 9 — the Allied siege piece now outranges
+    // the AGT (8.5) like the Soviet V3 (9.5) always did, and 200 hp keeps
+    // it the glass cannon of the two.
+    weapon: { ...weapon(90, 9, 45, 140, { none: 90, light: 80, heavy: 70 }, 'ARTY'), arcing: true },
+    // Balance 2026-07: unlocked by the Radarturm like the Soviet V3 — the old
+    // Artillerie-Doktrin research kept the Allies siege-less all game while
+    // the V3 rolled research-free (measured 20:1 AI mirror matches).
     cost: 1200,
     buildTime: 120,
     category: 'vehicle',
-    requires: ['FACTORY'],
+    requires: ['FACTORY', 'RADAR'],
     factions: ['ALLIES'],
     sight: 7,
-    tech: 'artillery',
   },
   RIFLEMAN: {
     name: 'Schütze',
@@ -899,7 +903,9 @@ export const BUILDING_RULES = {
   PRISM: {
     name: 'Prisma-Turm',
     maxHp: 600,
-    cost: 1500,
+    // Balance 2026-07: 1500 → 1200 — price parity with the Tesla coil; the
+    // link bonus makes prism CLUSTERS the Allied specialty.
+    cost: 1200,
     buildTime: 100,
     power: -75,
     width: 1,
@@ -1284,7 +1290,6 @@ export const TECH_RULES = {
   repair: { name: 'Feldreparatur', cost: 800, time: 6 * MIN, requires: ['TECHCENTER'], factions: null },
   flak: { name: 'Flugabwehr', cost: 800, time: 6 * MIN, requires: ['TECHCENTER'], factions: null },
   spy: { name: 'Spionage', cost: 1000, time: 8 * MIN, requires: ['TECHCENTER'], factions: ['ALLIES'] },
-  artillery: { name: 'Artillerie-Doktrin', cost: 1200, time: 10 * MIN, requires: ['TECHCENTER'], factions: ['ALLIES'] },
   armor: { name: 'Schwere Panzerung', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: ['SOVIETS'] },
   air: { name: 'Luftwaffentechnik', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
   navy: { name: 'Marine-Doktrin', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
@@ -1333,7 +1338,10 @@ export interface SuperweaponStats {
 }
 export const SUPERWEAPON_STATS: Record<SuperweaponKind, SuperweaponStats> = {
   NUKE: { name: 'Atomrakete', radius: Math.round(3.5 * SUBCELL), damage: 1000 },
-  STORM: { name: 'Wettersturm', radius: Math.round(4.5 * SUBCELL), damage: 550 },
+  // Balance 2026-07: 550 → 800. Still below the nuke (1000), but with the
+  // wider radius a real answer to it — and the Allies' compensation for the
+  // Soviets' exclusive iron curtain.
+  STORM: { name: 'Wettersturm', radius: Math.round(4.5 * SUBCELL), damage: 800 },
   // Iron curtain: no damage — everything caught in the radius becomes
   // invulnerable for IRON_CURTAIN_TICKS instead (infantry and aircraft excluded).
   CURTAIN: { name: 'Eiserner Vorhang', radius: Math.round(3 * SUBCELL), damage: 0 },

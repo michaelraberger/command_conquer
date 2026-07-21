@@ -166,7 +166,7 @@ describe('ai difficulty', () => {
     // hard AI reaches it within the test budget.
     const fastResearch = {
       research: Object.fromEntries(
-        ['repair', 'flak', 'spy', 'artillery', 'armor', 'air', 'navy', 'tesla', 'super'].map((t) => [
+        ['repair', 'flak', 'spy', 'armor', 'air', 'navy', 'tesla', 'super'].map((t) => [
           t,
           { time: 60, cost: 200 },
         ]),
