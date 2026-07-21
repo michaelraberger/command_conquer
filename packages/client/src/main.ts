@@ -1,4 +1,14 @@
-import { applyBalance, createGame, tick, type BalanceConfig, type CustomMapData, type Faction, type GameState } from '@cac/sim';
+import {
+  applyBalance,
+  cellCenter,
+  createGame,
+  tick,
+  type BalanceConfig,
+  type Command,
+  type CustomMapData,
+  type Faction,
+  type GameState,
+} from '@cac/sim';
 import { Application, Container } from 'pixi.js';
 import { drainCommands, sendCommand } from './commandQueue.js';
 import { cloudEnabled } from './net/supabase.js';
@@ -119,6 +129,8 @@ export interface GameMeta {
   testPlay?: boolean | undefined;
   /** Internet match: no pause, no cheats, no saving, no tour. */
   multiplayer?: boolean | undefined;
+  /** Campaign mission: objectives HUD, progress marking, end-screen flow. */
+  campaign?: import('./campaign/types.js').CampaignRef | undefined;
 }
 
 async function boot(): Promise<void> {
@@ -141,13 +153,16 @@ async function boot(): Promise<void> {
 
   // Cloud UI (login box, map gallery, save list, multiplayer lobby) — no-ops
   // without Supabase env.
-  const [{ initAuthUi }, { initStartTabs }, { initLobbyUi }] = await Promise.all([
-    import('./ui/authUi.js'),
-    import('./ui/gallery.js'),
-    import('./ui/lobbyUi.js'),
-  ]);
+  const [{ initAuthUi }, { initStartTabs }, { initLobbyUi }, { initCampaignUi }] =
+    await Promise.all([
+      import('./ui/authUi.js'),
+      import('./ui/gallery.js'),
+      import('./ui/lobbyUi.js'),
+      import('./ui/campaignUi.js'),
+    ]);
   initAuthUi();
   initStartTabs();
+  initCampaignUi();
   if (cloudEnabled()) initLobbyUi();
 
   const action = await showStartScreen();
@@ -285,8 +300,42 @@ export async function startGame(
   const entities = new EntityRenderer(entityLayer, textures, state);
   const buildRadius = new BuildRadiusOverlay(ghostLayer);
   const rally = new RallyOverlay(ghostLayer);
+  // Order acknowledgement blips: unit commands ping their target the moment
+  // they are sent — instant feedback while the lockstep delay runs its course.
+  const pingTargetOf = (cmd: Command): { x: number; y: number; hostile: boolean } | null => {
+    switch (cmd.type) {
+      case 'MOVE':
+      case 'HARVEST':
+      case 'PATROL':
+      case 'REPAIR_BRIDGE':
+        return { x: cellCenter(cmd.cx), y: cellCenter(cmd.cy), hostile: false };
+      case 'ATTACK_MOVE':
+        return { x: cellCenter(cmd.cx), y: cellCenter(cmd.cy), hostile: true };
+      case 'ATTACK':
+      case 'INFILTRATE':
+      case 'CAPTURE':
+      case 'REPAIR':
+      case 'ESCORT':
+      case 'LOAD': {
+        const id = cmd.type === 'LOAD' ? cmd.transportId : cmd.targetId;
+        const unit = state.units.find((u) => u.id === id);
+        const building = unit ? undefined : state.buildings.find((b) => b.id === id);
+        const at = unit ?? building;
+        if (!at) return null;
+        const hostile = cmd.type === 'ATTACK' || cmd.type === 'INFILTRATE' || cmd.type === 'CAPTURE';
+        return { x: at.x, y: at.y, hostile };
+      }
+      default:
+        return null;
+    }
+  };
+  const sendWithPing = (cmd: Command): void => {
+    const ping = pingTargetOf(cmd);
+    if (ping) effects.commandPing(ping.x, ping.y, ping.hostile);
+    sendCommand(cmd);
+  };
   const placement = new PlacementMode(ghostLayer, state, sendCommand);
-  const controls = new Controls(app, world, state, sendCommand, placement);
+  const controls = new Controls(app, world, state, sendWithPing, placement);
   controls.isPanning = () => camera.spaceHeld;
   const groups = new ControlGroups(state, controls);
   controls.onManualSelect = () => groups.clearMarks();

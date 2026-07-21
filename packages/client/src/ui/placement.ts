@@ -29,6 +29,11 @@ export class PlacementMode {
   /** Repair mode (sidebar wrench): clicks toggle self-repair on own buildings. */
   repair = false;
   private readonly ghost = new Graphics();
+  /** Blueprint footprints of placements already SENT but not yet executed —
+   *  instant feedback that bridges the lockstep input delay (~330 ms online).
+   *  Purely cosmetic and short-lived; the real building replaces it. */
+  private readonly pendingG = new Graphics();
+  private pending: Array<{ cx: number; cy: number; w: number; h: number; until: number }> = [];
   private lastCell = { cx: -1, cy: -1 };
 
   constructor(
@@ -37,10 +42,39 @@ export class PlacementMode {
     private send: (cmd: Command) => void,
   ) {
     this.ghost.visible = false;
-    ghostLayer.addChild(this.ghost);
+    ghostLayer.addChild(this.pendingG, this.ghost);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.cancel();
     });
+  }
+
+  /** Remember a just-sent placement and draw its blueprint immediately. */
+  private notePending(cx: number, cy: number, w: number, h: number): void {
+    this.pending.push({ cx, cy, w, h, until: performance.now() + 1200 });
+    this.redrawPending();
+    window.setTimeout(() => this.redrawPending(), 1250);
+  }
+
+  private redrawPending(): void {
+    const now = performance.now();
+    this.pending = this.pending.filter((p) => p.until > now);
+    this.pendingG.clear();
+    for (const p of this.pending) {
+      for (let y = p.cy; y < p.cy + p.h; y++) {
+        for (let x = p.cx; x < p.cx + p.w; x++) {
+          const { x: sx, y: sy } = cellToScreen(x, y);
+          this.pendingG
+            .poly([
+              sx, sy - TILE_H / 2,
+              sx + TILE_W / 2, sy,
+              sx, sy + TILE_H / 2,
+              sx - TILE_W / 2, sy,
+            ])
+            .fill({ color: 0x9fd0ff, alpha: 0.28 })
+            .stroke({ width: 1, color: 0x9fd0ff, alpha: 0.85 });
+        }
+      }
+    }
   }
 
   /** True while any placement/targeting mode consumes canvas clicks. */
@@ -195,10 +229,13 @@ export class PlacementMode {
     if (!canPlaceBuilding(this.state, session.localPlayer, this.active, cx, cy)) return true;
     if (this.active === 'WALL') {
       this.send({ type: 'PLACE_WALL', playerId: session.localPlayer, cx, cy });
+      this.notePending(cx, cy, 1, 1);
       this.lastCell = { cx: -1, cy: -1 }; // ghost refresh; stay active for chains
       return true;
     }
+    const rule = buildingRule(this.active);
     this.send({ type: 'PLACE_BUILDING', playerId: session.localPlayer, cx, cy });
+    this.notePending(cx, cy, rule.width, rule.height);
     this.cancel();
     return true;
   }

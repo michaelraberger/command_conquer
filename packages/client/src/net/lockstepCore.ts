@@ -13,9 +13,11 @@ import type { Command } from '@cac/sim';
  * during turn N, so the network has ~400 ms to deliver them.
  */
 
-/** Sim ticks per net turn (15 Hz / 3 = 5 turns per second). */
-export const TICKS_PER_TURN = 3;
-/** Turns between issuing a command and executing it (~400 ms). */
+/** Sim ticks per net turn (15 Hz / 2 = 7.5 turns per second). Shorter turns
+ *  cut the felt input lag (boundary wait + delay ≈ 330 ms instead of 500 ms)
+ *  while the delivery budget stays 2 turns ≈ 266 ms. */
+export const TICKS_PER_TURN = 2;
+/** Turns between issuing a command and executing it (~266 ms). */
 export const INPUT_DELAY_TURNS = 2;
 /** A state hash is recorded every N turns (~10 s) for desync detection. */
 export const HASH_PERIOD_TURNS = 50;

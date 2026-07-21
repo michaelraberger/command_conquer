@@ -228,6 +228,30 @@ export class Effects {
     }
   }
 
+  /**
+   * Instant order acknowledgement at the clicked spot (classic C&C): a green
+   * shrinking ring for move-style orders, red for attacks. Fires the moment
+   * the command is SENT — in lockstep multiplayer the sim executes it ~330 ms
+   * later, and this blip is what makes the game feel responsive meanwhile.
+   */
+  commandPing(x: number, y: number, hostile: boolean): void {
+    const p = worldToScreen(x, y);
+    const color = hostile ? 0xff4d4d : 0x53c94f;
+    this.add(
+      360,
+      (g) => {
+        g.ellipse(0, 0, 18, 9).stroke({ width: 2, color, alpha: 0.95 });
+        g.moveTo(-6, 0).lineTo(6, 0).stroke({ width: 1.5, color });
+        g.moveTo(0, -3).lineTo(0, 3).stroke({ width: 1.5, color });
+        g.position.set(p.x, p.y);
+      },
+      (g, t) => {
+        g.alpha = 1 - t * t;
+        g.scale.set(1 - t * 0.55); // ring shrinks onto the target point
+      },
+    );
+  }
+
   /** Iron curtain: a red energy beam sweeps down, then an expanding ring marks
    *  the protected area — no fire, no smoke, pure crackling energy. */
   private addIronCurtain(p: { x: number; y: number }): void {

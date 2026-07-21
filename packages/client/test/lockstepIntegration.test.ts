@@ -102,7 +102,7 @@ describe('lockstep integration: two real sims over a simulated channel', () => {
       b.runAvailable();
     }
 
-    expect(a.state.tick).toBeGreaterThan(300); // the lockstep actually ran
+    expect(a.state.tick).toBeGreaterThan(100 * TICKS_PER_TURN); // the lockstep actually ran
     expect(a.state.tick).toBe(b.state.tick);
     expect(hashState(a.state)).toBe(hashState(b.state));
     // Boris' MOVE crossed the wire: both sims agree on the tank's exact fate
@@ -133,7 +133,7 @@ describe('lockstep integration: two real sims over a simulated channel', () => {
       b.runAvailable();
     }
     expect(a.state.tick).toBe(b.state.tick);
-    expect(a.state.tick).toBeGreaterThan(150);
+    expect(a.state.tick).toBeGreaterThan(50 * TICKS_PER_TURN);
     expect(hashState(a.state)).toBe(hashState(b.state));
     expect(a.state.players[1]!.credits).toBe(b.state.players[1]!.credits);
   });
