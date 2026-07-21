@@ -13,6 +13,9 @@ function canAnswer(rule: UnitRule, akind: AggroKind): boolean {
   const weapon = rule.weapon;
   if (!weapon) return false; // harvesters, MCV, spy
   if (akind === 'air') return weapon.targets !== 'ground';
+  // Submerged attacker: only antiSub weapons can even hit it — everyone else
+  // would march to the shore and stare at the water.
+  if (akind === 'sub') return weapon.antiSub === true;
   if (weapon.targets === 'air') return false;
   if (rule.antiInfantryOnly === true) return akind === 'infantry';
   if (rule.navalOnly === true) return akind === 'naval';

@@ -103,8 +103,17 @@ export function movementSystem(state: GameState): void {
         unit.x = wx;
         unit.y = wy;
       } else {
-        unit.x += Math.trunc((dx * speed) / dist);
-        unit.y += Math.trunc((dy * speed) / dist);
+        let mx = Math.trunc((dx * speed) / dist);
+        let my = Math.trunc((dy * speed) / dist);
+        // Guaranteed progress: at effective speed 1 a diagonal step truncates
+        // to 0/0 (dist > |dx|) and the unit would freeze forever — nudge one
+        // sub-cell along the dominant axis instead.
+        if (mx === 0 && my === 0) {
+          if ((dx < 0 ? -dx : dx) >= (dy < 0 ? -dy : dy)) mx = Math.sign(dx);
+          else my = Math.sign(dy);
+        }
+        unit.x += mx;
+        unit.y += my;
       }
     }
 

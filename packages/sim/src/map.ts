@@ -342,6 +342,9 @@ function carveStream(
       const cx = vertical ? cross + w : along;
       const cy = vertical ? along : cross + w;
       if (nearSpawn(cx, cy)) continue;
+      // Never wash away an earlier stream's crossing: a later stream cutting
+      // a bridge line would leave a water gap in the only ground connection.
+      if (terrain[cy * width + cx] === TERRAIN_BRIDGE) continue;
       terrain[cy * width + cx] = ford ? TERRAIN_BRIDGE : TERRAIN_WATER;
     }
   }

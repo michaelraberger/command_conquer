@@ -29,6 +29,18 @@ export function canPlaceBuilding(
       if (state.ore[idx]! > 0) return false;
     }
   }
+  // Never build over a goodie crate — it would be buried unreachable forever
+  // (crates are only removed by pickup or expiry).
+  for (const crate of state.crates) {
+    if (
+      crate.cx >= cx &&
+      crate.cx < cx + rule.width &&
+      crate.cy >= cy &&
+      crate.cy < cy + rule.height
+    ) {
+      return false;
+    }
+  }
   // Adjacency: the footprint must lie within a real building's build radius.
   // Walls never open buildable area, so they are skipped as sources — you can
   // only place a wall inside the zone your real buildings already opened.

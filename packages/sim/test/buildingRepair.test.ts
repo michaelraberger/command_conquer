@@ -28,14 +28,15 @@ function runTicks(state: GameState, n: number): void {
 }
 
 describe('Gebäude-Reparaturmodus', () => {
-  it('toggling on heals per tick and drains credits', () => {
+  it('toggling on heals at the flat rate and drains credits', () => {
     const state = arena();
     const power = constructBuilding(state, 'POWER', 0, 20, 20);
     power.hp = 100;
     const credits = state.players[0]!.credits;
     tick(state, [{ type: 'TOGGLE_REPAIR', playerId: 0, buildingId: power.id }]);
     expect(power.repairing).toBe(true);
-    expect(power.hp).toBe(100 + BUILDING_REPAIR_HP_PER_TICK);
+    // Cheap-building path heals in interval bursts — assert the RATE over a
+    // window (10 ticks × BUILDING_REPAIR_HP_PER_TICK), not tick granularity.
     runTicks(state, 9);
     expect(power.hp).toBe(100 + 10 * BUILDING_REPAIR_HP_PER_TICK);
     expect(state.players[0]!.credits).toBeLessThan(credits);

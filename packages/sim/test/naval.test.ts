@@ -103,23 +103,30 @@ describe('shipyard', () => {
 describe('submarines', () => {
   it('only antiSub weapons hit the sub; the sub sinks surface ships', () => {
     const state = coast();
-    const boat = spawnUnit(state, 'GUNBOAT', 0, 22, 20); // no antiSub
-    const sub = spawnUnit(state, 'SUB', 1, 22, 23); // in everyone's range
-    boat.path = null;
-
-    // An explicit attack on the submerged sub is refused.
-    tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [boat.id], targetId: sub.id }]);
-    expect(boat.order).toBeNull();
-
-    runTicks(state, 120);
+    // A shore tank has no antiSub weapon — its attack on the sub is refused.
+    const tank = spawnUnit(state, 'TANK', 0, 19, 23);
+    const sub = spawnUnit(state, 'SUB', 1, 22, 23);
+    tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [tank.id], targetId: sub.id }]);
+    expect(tank.order).toBeNull();
+    runTicks(state, 40);
     expect(sub.hp).toBe(unitRule('SUB').maxHp); // untouched under water
+
+    // The gunboat carries depth charges now (documented cheap sub hunter) —
+    // it fights back, so both trade damage.
+    const boat = spawnUnit(state, 'GUNBOAT', 0, 22, 20);
+    boat.path = null;
+    tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [boat.id], targetId: sub.id }]);
+    expect(boat.order).not.toBeNull();
+    runTicks(state, 120);
+    expect(sub.hp).toBeLessThan(unitRule('SUB').maxHp); // depth-charged
     expect(boat.hp).toBeLessThan(unitRule('GUNBOAT').maxHp); // torpedoed
 
-    // The destroyer's depth charges do reach it.
+    // The destroyer's depth charges reach it too.
     const destroyer = spawnUnit(state, 'DESTROYER', 0, 22, 21);
+    const subHp = sub.hp;
     tick(state, [{ type: 'ATTACK', playerId: 0, unitIds: [destroyer.id], targetId: sub.id }]);
     runTicks(state, 60);
-    expect(sub.hp).toBeLessThan(unitRule('SUB').maxHp);
+    expect(sub.hp).toBeLessThan(subHp);
   });
 
   it('torpedoes never engage land targets or buildings', () => {

@@ -43,6 +43,9 @@ export function captureSystem(state: GameState): void {
 
     if (targetDistSq(target, unit.x, unit.y) <= REACH_SQ) {
       building.owner = unit.owner;
+      // The old owner's self-repair order must not silently bill the captor;
+      // he arms the wrench himself if he wants the fixer-upper repaired.
+      building.repairing = false;
       // Gates cache their owner in the pathing grid — re-stamp the footprint,
       // otherwise the captured gate keeps opening for the old owner.
       if (building.type === 'GATE') {
@@ -60,7 +63,10 @@ export function captureSystem(state: GameState): void {
       if (bonus > 0 && player) player.credits += bonus;
 
       state.events.push({ type: 'HIT', x: building.x, y: building.y });
-      state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
+      // Deliberately NO DEATH event: the engineer walks in, he doesn't blow
+      // up — and the client's lost-unit alarm keys on DEATH events, so one
+      // here would announce "EINHEIT VERLOREN" on your own successful capture.
+      state.events.push({ type: 'REPAIR', x: unit.x, y: unit.y });
       releaseCell(state, unit);
       consumed.add(unit.id);
       continue;

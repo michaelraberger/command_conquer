@@ -176,6 +176,8 @@ export function applyCommands(state: GameState, commands: Command[]): void {
               const idx = cellIndex(state, x, y);
               const occ = state.occupancy[idx];
               if (state.structures[idx] !== 0 || (occ !== 0 && occ !== unit.id)) { clear = false; break; }
+              // Crates must not be buried under the new yard (see placement.ts).
+              if (state.crates.some((c) => c.cx === x && c.cy === y)) { clear = false; break; }
             }
           }
           if (!clear) continue;
@@ -250,6 +252,11 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         );
         if (!player || !building) break;
         player.credits += sellRefund(building.type, building.level);
+        // A running in-place upgrade was prepaid — refund half of that too
+        // ("selling refunds half of everything invested").
+        if (building.upgrade) {
+          player.credits += Math.floor((buildingRule(building.type).upgradeCost ?? 0) / 2);
+        }
         // Selling a Flugfeld loses its bound jet (fixed binding, like being
         // destroyed) — deathSystem sweeps the crashed jet this same tick.
         if (building.type === 'FLUGFELD') crashBoundJets(state, building);
@@ -426,8 +433,11 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         break;
       }
       case 'CHEAT': {
-        // Cheats are ordinary commands so replays reproduce them faithfully;
-        // the client only offers the hotkeys in solo games.
+        // Cheats are ordinary commands so saves reproduce them faithfully —
+        // but in internet matches the SIM refuses them: hiding the console is
+        // UI courtesy, this line is the actual guard (a modified client would
+        // otherwise cheat deterministically and undetectably).
+        if (state.multiplayer) break;
         const player = state.players.find((p) => p.id === cmd.playerId);
         if (!player) break;
         if (cmd.cheat === 'MONEY') player.credits += CHEAT_MONEY;

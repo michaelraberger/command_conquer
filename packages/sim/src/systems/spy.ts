@@ -65,8 +65,9 @@ export function spySystem(state: GameState): void {
         const room = Math.max(0, storageCapacity(state, unit.owner) - owner.credits);
         owner.credits += Math.min(stolen, room);
       }
+      // No DEATH event for the consumed spy — he slips inside, and the
+      // client's lost-unit alarm would misreport the successful infiltration.
       state.events.push({ type: 'HIT', x: building.x, y: building.y });
-      state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
       releaseCell(state, unit);
       consumed.add(unit.id);
       continue;
@@ -81,7 +82,10 @@ export function spySystem(state: GameState): void {
 }
 
 export function chaseBuilding(state: GameState, unit: Unit, target: { kind: 'building'; building: Building }): void {
-  if (unit.path && (state.tick + unit.id) % REPATH_INTERVAL !== 0) return;
+  // Throttle ALL repaths, not only those with a live path: an unreachable
+  // target (walled-in hospital) otherwise triggers a full A* flood — findPath
+  // returns null, unit.path stays null, and the next tick tries again.
+  if ((state.tick + unit.id) % REPATH_INTERVAL !== 0) return;
   const cx = unit.cell % state.mapWidth;
   const cy = (unit.cell - cx) / state.mapWidth;
   const goal = aimPoint(target, unit.x, unit.y);

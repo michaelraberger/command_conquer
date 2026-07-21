@@ -29,16 +29,25 @@ export function buildingRepairSystem(state: GameState): void {
       building.repairing = false; // neutral/ownerless: nobody can pay
       continue;
     }
-    const costPerTick = Math.max(
-      1,
-      Math.round(
-        (buildingRule(building.type).cost * BUILDING_REPAIR_HP_PER_TICK) /
-          (maxHp * BUILDING_REPAIR_COST_DIVISOR),
-      ),
-    );
-    if (player.credits < costPerTick) continue; // broke: pause, keep the flag
-    player.credits -= costPerTick;
-    building.hp = Math.min(maxHp, building.hp + BUILDING_REPAIR_HP_PER_TICK);
+    // Intended economics: a full 0→max repair costs cost/DIVISOR. num/den is
+    // the exact credit price of one tick's healing; cheap sturdy buildings
+    // (walls!) land far below 1 credit/tick, where a per-tick floor of 1
+    // would overcharge many-fold — those pay 1 credit per INTERVAL ticks and
+    // heal the whole interval's worth in one burst instead.
+    const num = buildingRule(building.type).cost * BUILDING_REPAIR_HP_PER_TICK;
+    const den = maxHp * BUILDING_REPAIR_COST_DIVISOR;
+    if (num >= den) {
+      const costPerTick = Math.round(num / den);
+      if (player.credits < costPerTick) continue; // broke: pause, keep the flag
+      player.credits -= costPerTick;
+      building.hp = Math.min(maxHp, building.hp + BUILDING_REPAIR_HP_PER_TICK);
+    } else {
+      const interval = Math.floor(den / num);
+      if (state.tick % interval !== 0) continue;
+      if (player.credits < 1) continue; // broke: pause, keep the flag
+      player.credits -= 1;
+      building.hp = Math.min(maxHp, building.hp + BUILDING_REPAIR_HP_PER_TICK * interval);
+    }
     if (building.hp >= maxHp) building.repairing = false;
     if (state.tick % SPARKLE_INTERVAL === 0) {
       state.events.push({ type: 'REPAIR', x: building.x, y: building.y });
