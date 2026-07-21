@@ -162,7 +162,9 @@ export function aiSystem(state: GameState): void {
   if (state.winner !== -1) return;
   for (const player of state.players) {
     if (!player.isAi) continue;
-    const params = DIFFICULTY_PARAMS[player.difficulty];
+    const base = DIFFICULTY_PARAMS[player.difficulty];
+    // Campaign missions may override single knobs per player (mission.ts).
+    const params = player.aiTuning ? { ...base, ...player.aiTuning } : base;
     if (state.tick % params.interval !== 0) continue;
     player.credits += params.incomeBonus;
     manageConstruction(state, player, params);

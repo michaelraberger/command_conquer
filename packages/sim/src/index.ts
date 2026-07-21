@@ -143,6 +143,31 @@ export {
 } from './customMap.js';
 export type { SimEvent } from './events.js';
 export {
+  OBJ_HIDDEN,
+  OBJ_ACTIVE,
+  OBJ_COMPLETE,
+  OBJ_FAILED,
+  validateMissionDef,
+  buildMissionState,
+  missionAlive,
+  missionEnemyRep,
+  type AiTuning,
+  type PlacementOrder,
+  type MissionUnitPlacement,
+  type MissionBuildingPlacement,
+  type MissionPlayerDef,
+  type ObjectiveSpec,
+  type MissionObjectiveDef,
+  type TriggerCondition,
+  type TriggerAction,
+  type MissionTriggerDef,
+  type MissionDef,
+  type ObjectiveState,
+  type TriggerState,
+  type MissionState,
+  type MissionValidation,
+} from './mission.js';
+export {
   createGame,
   spawnUnit,
   createPassenger,

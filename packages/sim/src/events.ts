@@ -27,4 +27,8 @@ export type SimEvent =
   | { type: 'REPAIR'; x: number; y: number }
   | { type: 'PARADROP'; x: number; y: number }
   /** A unit collected the crate at fixed-point (x,y). */
-  | { type: 'CRATE_PICKUP'; x: number; y: number; kind: CrateKind };
+  | { type: 'CRATE_PICKUP'; x: number; y: number; kind: CrateKind }
+  /** Campaign: objective `id` changed to `status` (OBJ_* in mission.ts). */
+  | { type: 'OBJECTIVE'; id: string; status: number }
+  /** Campaign: show the briefing text mapped to msgId (client-side lookup). */
+  | { type: 'MISSION_MESSAGE'; msgId: string };

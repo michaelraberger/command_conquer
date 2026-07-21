@@ -1,5 +1,13 @@
 import { validateCustomMap, type CustomMapData } from './customMap.js';
 import type { SimEvent } from './events.js';
+import {
+  applyPlacementOrder,
+  buildMissionState,
+  validateMissionDef,
+  type AiTuning,
+  type MissionDef,
+  type MissionState,
+} from './mission.js';
 import { cellCenter, SUBCELL } from './fixed.js';
 import {
   INFANTRY_STACK,
@@ -98,6 +106,9 @@ export interface Unit {
    *  all other units and for jets from pre-Flugfeld saves (orphans: they fly
    *  and fight but never rearm and never crash with a field). */
   homeId?: number;
+  /** Campaign: objective/trigger reference (see mission.ts). Absent outside
+   *  missions and for untagged units — never assigned undefined. */
+  tag?: string;
 }
 
 export interface Building {
@@ -128,6 +139,9 @@ export interface Building {
    *  the building keeps working as its current type until `progress` reaches the
    *  target's buildTime, then becomes `to`. null/absent = not upgrading. */
   upgrade?: { to: BuildingType; progress: number } | null;
+  /** Campaign: objective/trigger reference (see mission.ts). Survives capture —
+   *  the entity keeps its record, only the owner changes. */
+  tag?: string;
 }
 
 /** A superweapon on its way to impact. */
@@ -208,6 +222,9 @@ export interface Player {
   primaryBuildings?: Partial<Record<ProductionCategory, number>>;
   /** AI scratch memory — plain data so it hashes/replays. */
   aiLastAttackTick: number;
+  /** Campaign: per-mission AI parameter overrides, merged over the difficulty
+   *  preset (see ai/controller.ts). Absent outside missions. */
+  aiTuning?: AiTuning;
   /** Paradrop: ticks until ready; counts down only while a Flugfeld stands. */
   paradropCooldown: number;
   /** Cheat: the whole map stays visible for this player. */
@@ -269,6 +286,10 @@ export interface GameState {
   crates: Crate[];
   /** Presentation events of the current tick (see events.ts). */
   events: SimEvent[];
+  /** Campaign mission runtime (objectives/triggers) — absent in skirmish and
+   *  multiplayer games; every campaign system no-ops without it. Pure JSON
+   *  data, so serialize/deserialize carry it untouched. */
+  mission?: MissionState;
 }
 
 function emptyQueue(): ProductionQueue {
@@ -528,6 +549,12 @@ export interface GameOptions {
    * or the sims diverge immediately.
    */
   multiplayer?: { seats: readonly MultiplayerSeat[] } | undefined;
+  /**
+   * Campaign mission: map, players and starting forces come exclusively from
+   * the def (the default base loop is skipped). Mutually exclusive with
+   * `multiplayer`; overrides customMap/factions/opponents/ai/aiDifficulty.
+   */
+  mission?: MissionDef | undefined;
 }
 
 /** Owner id of neutral map structures (Erz-Bohrturm): no Player record exists
@@ -573,7 +600,17 @@ export function storedInBuilding(state: GameState, building: Building): number {
 
 export function createGame(seed: number, options: GameOptions = {}): GameState {
   applyBalance(options.balance); // resets to defaults when no config is given
-  const customMap = options.customMap;
+  const mission = options.mission;
+  if (mission) {
+    if (options.multiplayer) {
+      throw new Error('Kampagnenmissionen sind im Mehrspieler nicht möglich.');
+    }
+    const missionCheck = validateMissionDef(mission);
+    if (!missionCheck.ok) {
+      throw new Error(`Ungültige Mission: ${missionCheck.errors.join(' ')}`);
+    }
+  }
+  const customMap = mission?.map ?? options.customMap;
   if (customMap) {
     const check = validateCustomMap(customMap);
     if (!check.ok) throw new Error(`Ungültige Karte: ${check.errors.join(' ')}`);
@@ -585,10 +622,9 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
 
   const seats = options.multiplayer?.seats;
   const maxPlayers = customMap ? customMap.spawns.length : 6;
-  const playerCount = Math.max(
-    2,
-    Math.min(maxPlayers, seats ? seats.length : 1 + (options.opponents ?? 1)),
-  );
+  const playerCount = mission
+    ? mission.players.length
+    : Math.max(2, Math.min(maxPlayers, seats ? seats.length : 1 + (options.opponents ?? 1)));
   const spawns = customMap
     ? customMap.spawns.slice(0, playerCount).map(([x, y]) => [x, y] as const)
     : spawnCenters(playerCount, mapWidth, mapHeight);
@@ -597,28 +633,32 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
   const factionFor = (id: number): Faction =>
     options.factions?.[id] ?? (id === 0 ? humanFaction : id % 2 === 1 ? otherFaction(humanFaction) : humanFaction);
 
+  const missionFor = (id: number) => mission?.players[id];
   const makePlayer = (id: number): Player => ({
     id,
     // Multiplayer seats: every player is human, on their own team (FFA), with
     // a fixed per-seat tint — identical on every client by construction.
-    name: seats
-      ? seats[id]!.name
-      : id === 0
-        ? 'Spieler'
-        : playerCount > 2
-          ? `Gegner ${id}`
-          : 'Gegner',
-    faction: seats ? seats[id]!.faction : factionFor(id),
-    isAi: !seats && id !== 0 && options.ai === true,
-    difficulty: options.aiDifficulty ?? 'normal',
-    team: seats ? id : id === 0 ? 0 : 1,
-    color: seats
-      ? MP_COLORS[id % MP_COLORS.length]!
-      : id === 0
-        ? FACTION_COLORS[humanFaction]
-        : AI_COLORS[(id - 1) % AI_COLORS.length]!,
+    // Campaign missions define every seat explicitly (MissionPlayerDef).
+    name: missionFor(id)?.name ??
+      (seats
+        ? seats[id]!.name
+        : id === 0
+          ? 'Spieler'
+          : playerCount > 2
+            ? `Gegner ${id}`
+            : 'Gegner'),
+    faction: missionFor(id)?.faction ?? (seats ? seats[id]!.faction : factionFor(id)),
+    isAi: mission ? missionFor(id)!.isAi : !seats && id !== 0 && options.ai === true,
+    difficulty: missionFor(id)?.aiDifficulty ?? options.aiDifficulty ?? 'normal',
+    team: mission ? missionFor(id)!.team : seats ? id : id === 0 ? 0 : 1,
+    color: missionFor(id)?.color ??
+      (seats
+        ? MP_COLORS[id % MP_COLORS.length]!
+        : id === 0
+          ? FACTION_COLORS[missionFor(id)?.faction ?? humanFaction]
+          : AI_COLORS[(id - 1) % AI_COLORS.length]!),
     surrendered: false,
-    credits: STARTING_CREDITS,
+    credits: mission ? missionFor(id)!.credits : STARTING_CREDITS,
     queues: {
       building: emptyQueue(),
       infantry: emptyQueue(),
@@ -754,21 +794,44 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     placeNeutralTechBuildings(state, spawns);
   }
 
-  // Construction yard, harvester and a small guard force at each base.
-  for (let id = 0; id < playerCount; id++) {
-    const [cx, cy] = spawns[id]!;
-    constructBuilding(state, 'CONYARD', id, cx - 1, cy - 1);
-    spawnUnit(state, 'TANK', id, cx + 3, cy - 1);
-    spawnUnit(state, 'TANK', id, cx + 3, cy);
-    spawnUnit(state, 'RIFLEMAN', id, cx - 1, cy + 3);
-    spawnUnit(state, 'RIFLEMAN', id, cx, cy + 3);
-    spawnUnit(state, 'HARVESTER', id, cx + 3, cy + 2);
+  // Construction yard, harvester and a small guard force at each base —
+  // campaign missions skip this: their starting forces come from the def.
+  if (!mission) {
+    for (let id = 0; id < playerCount; id++) {
+      const [cx, cy] = spawns[id]!;
+      constructBuilding(state, 'CONYARD', id, cx - 1, cy - 1);
+      spawnUnit(state, 'TANK', id, cx + 3, cy - 1);
+      spawnUnit(state, 'TANK', id, cx + 3, cy);
+      spawnUnit(state, 'RIFLEMAN', id, cx - 1, cy + 3);
+      spawnUnit(state, 'RIFLEMAN', id, cx, cy + 3);
+      spawnUnit(state, 'HARVESTER', id, cx + 3, cy + 2);
+    }
   }
 
   // Neutral structures authored into the map (Erz-Bohrturm): owner -1, no
   // player record — capturable by engineers, ignored by auto-targeting.
   for (const nb of customMap?.neutralBuildings ?? []) {
     constructBuilding(state, nb.type as BuildingType, NEUTRAL_OWNER, nb.cx, nb.cy);
+  }
+
+  if (mission) {
+    // Per-mission AI tuning (assigned only when present — no undefined keys).
+    for (const p of state.players) {
+      const tuning = mission.players[p.id]?.aiTuning;
+      if (tuning) p.aiTuning = { ...tuning };
+    }
+    // Starting forces: buildings first (they stamp the structures grid, so
+    // unit validation catches collisions), then units, in def order.
+    for (const b of mission.buildings) {
+      const building = constructBuilding(state, b.type, b.owner, b.cx, b.cy);
+      if (b.tag !== undefined) building.tag = b.tag;
+    }
+    for (const u of mission.units) {
+      const unit = spawnUnit(state, u.type, u.owner, u.cx, u.cy);
+      if (u.tag !== undefined) unit.tag = u.tag;
+      if (u.order) applyPlacementOrder(state, unit, u.order);
+    }
+    state.mission = buildMissionState(mission);
   }
 
   // Destructible neutral span on every authored bridge cell.
@@ -827,6 +890,9 @@ export function deserialize(json: string): GameState {
   }
   // Saves from before the multiplayer flag are solo games by definition.
   if (typeof raw.multiplayer !== 'boolean') raw.multiplayer = false;
+  // Campaign fields (state.mission, Unit/Building.tag, Player.aiTuning) are
+  // optional and pass through JSON untouched: absent in pre-campaign saves,
+  // always fully initialized in mission games — nothing to back-fill.
   // NOTE: no bridge-span retrofit here — deserialize(serialize(s)) must
   // reproduce s exactly (lockstep resync depends on it). Saves from before
   // destructible bridges simply keep their spans-less, indestructible decks.

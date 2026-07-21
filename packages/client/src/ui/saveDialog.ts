@@ -114,9 +114,22 @@ export function initSaveDialog(state: GameState, hotkeys: Hotkeys, meta: GameMet
       error.textContent = '';
       try {
         if (overwriteId !== null) {
-          await overwriteSave(overwriteId, nameInput.value, state, meta.balance, meta.mapLabel);
+          await overwriteSave(
+            overwriteId,
+            nameInput.value,
+            state,
+            meta.balance,
+            meta.mapLabel,
+            meta.campaign?.missionId,
+          );
         } else {
-          await saveGame(nameInput.value, state, meta.balance, meta.mapLabel);
+          await saveGame(
+            nameInput.value,
+            state,
+            meta.balance,
+            meta.mapLabel,
+            meta.campaign?.missionId,
+          );
         }
         close();
       } catch (err) {

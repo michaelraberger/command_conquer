@@ -1,4 +1,5 @@
 import { deserialize, type AiDifficulty, type Faction } from '@cac/sim';
+import { getMission } from '../campaign/index.js';
 import { gunzipFromBase64 } from '../net/gzip.js';
 import { deleteMap, getMap, myMaps, publicMaps, setPublic, type MapRow } from '../net/mapsRepo.js';
 import { deleteSave, listSaves, loadSaveData } from '../net/savesRepo.js';
@@ -189,8 +190,9 @@ async function refreshSaves(): Promise<void> {
       </div>
       <div class="actions"></div>`;
     el.querySelector('.title')!.textContent = row.name;
+    const campaignMission = row.campaign_mission ? getMission(row.campaign_mission) : undefined;
     el.querySelector('.meta')!.textContent =
-      `${row.map_label ?? 'Unbekannte Karte'} · ${minutes} min Spielzeit · ${new Date(row.created_at).toLocaleString('de')}`;
+      `${campaignMission ? 'Kampagne · ' : ''}${row.map_label ?? 'Unbekannte Karte'} · ${minutes} min Spielzeit · ${new Date(row.created_at).toLocaleString('de')}`;
 
     const actions = el.querySelector('.actions')!;
     const loadBtn = document.createElement('button');
@@ -206,6 +208,10 @@ async function refreshSaves(): Promise<void> {
             state,
             balance: row.balance ?? undefined,
             mapLabel: row.map_label ?? undefined,
+            // Unknown mission id (older build): plain resume without HUD.
+            campaign: campaignMission
+              ? { campaignId: campaignMission.campaign, missionId: campaignMission.id }
+              : undefined,
           });
         } catch (err) {
           loadBtn.disabled = false;

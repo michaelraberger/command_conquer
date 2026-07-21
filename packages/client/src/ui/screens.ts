@@ -111,8 +111,16 @@ export type StartAction =
       state: GameState;
       balance?: BalanceConfig | undefined;
       mapLabel?: string | undefined;
+      /** Set when the save belongs to a campaign mission. */
+      campaign?: import('../campaign/types.js').CampaignRef | undefined;
     }
   | { kind: 'editor'; map?: CustomMapData | undefined; cloudId?: string | undefined }
+  /** Campaign mission from the Kampagne panel (simDef pre-built + validated). */
+  | {
+      kind: 'campaign';
+      mission: import('../campaign/types.js').CampaignMissionDef;
+      simDef: import('@cac/sim').MissionDef;
+    }
   /** Internet match: the lobby agreed on a MatchStart (see net/lobby.ts). */
   | { kind: 'multiplayer'; match: import('../net/lobby.js').MatchStart };
 
@@ -174,6 +182,7 @@ export function showStartScreen(): Promise<StartAction> {
   const subTitle = document.getElementById('sub-title')!;
   const panels: Record<string, { el: HTMLElement; title: string }> = {
     gefecht: { el: document.getElementById('tab-gefecht')!, title: 'Gefecht' },
+    kampagne: { el: document.getElementById('tab-kampagne')!, title: 'Kampagne' },
     mehrspieler: { el: document.getElementById('tab-mehrspieler')!, title: 'Mehrspieler & Online' },
     karten: { el: document.getElementById('tab-karten')!, title: 'Karten-Galerie' },
     laden: { el: document.getElementById('tab-laden')!, title: 'Spiel laden' },
@@ -197,13 +206,18 @@ export function showStartScreen(): Promise<StartAction> {
   };
   for (const btn of mainMenu.querySelectorAll<HTMLButtonElement>('[data-menu]')) {
     btn.addEventListener('click', () => openPanel(btn.dataset['menu']!));
-    // Online features need the cloud; without it only Gefecht/Editor remain.
-    if (btn.dataset['menu'] !== 'gefecht' && !cloudEnabled()) btn.style.display = 'none';
+    // Online features need the cloud; Gefecht, Kampagne and Editor work offline.
+    const offline = btn.dataset['menu'] === 'gefecht' || btn.dataset['menu'] === 'kampagne';
+    if (!offline && !cloudEnabled()) btn.style.display = 'none';
   }
   document.getElementById('menu-back')!.addEventListener('click', backToMenu);
   document.getElementById('menu-news')!.addEventListener('click', () => {
     document.getElementById('changelog-link')?.click();
   });
+  // Late-added panels (Kampagne) may navigate the menu programmatically —
+  // e.g. jumping straight to the next mission's briefing after a reload.
+  startMenuHooks.openPanel = openPanel;
+  startMenuHooks.onShown?.();
 
   return new Promise((resolve) => {
     const finish = (action: StartAction): void => {
@@ -257,13 +271,26 @@ export const startScreenHooks: { onAction: ((action: StartAction) => void) | nul
   onAction: null,
 };
 
-/** Per-panel open callbacks (gallery/save list register their refreshers). */
-export const startMenuHooks: { onOpen: Record<string, () => void> } = {
+/** Per-panel open callbacks (gallery/save list register their refreshers),
+ *  plus programmatic navigation hooks for the Kampagne panel. */
+export const startMenuHooks: {
+  onOpen: Record<string, () => void>;
+  /** Assigned by showStartScreen — opens a main-menu panel programmatically. */
+  openPanel?: (key: string) => void;
+  /** Fires once per showStartScreen, after the menu is wired. */
+  onShown?: () => void;
+} = {
   onOpen: {},
 };
 
 /** Victory/defeat overlay. */
-export function showEndScreen(won: boolean, opts: { backToEditor?: boolean } = {}): void {
+export function showEndScreen(
+  won: boolean,
+  opts: {
+    backToEditor?: boolean;
+    campaign?: { nextMissionId?: string | undefined; missionId: string } | undefined;
+  } = {},
+): void {
   const root = document.getElementById('end')!;
   root.style.display = 'flex';
   root.querySelector('h1')!.textContent = won ? 'SIEG!' : 'NIEDERLAGE';
@@ -279,5 +306,24 @@ export function showEndScreen(won: boolean, opts: { backToEditor?: boolean } = {
       localStorage.setItem('cac-reopen', 'editor');
       location.reload();
     });
+  }
+
+  // Campaign: victory offers the next mission, defeat a retry — both via the
+  // one-shot reload flag that campaignUi picks up on the next boot.
+  const nextBtn = document.getElementById('end-next') as HTMLButtonElement | null;
+  const retryBtn = document.getElementById('end-retry') as HTMLButtonElement | null;
+  const jumpTo = (missionId: string): void => {
+    localStorage.setItem('cac-campaign-next', missionId);
+    location.reload();
+  };
+  if (nextBtn) {
+    const nextId = won ? opts.campaign?.nextMissionId : undefined;
+    nextBtn.style.display = nextId !== undefined ? '' : 'none';
+    if (nextId !== undefined) nextBtn.addEventListener('click', () => jumpTo(nextId));
+  }
+  if (retryBtn) {
+    const show = !won && opts.campaign !== undefined;
+    retryBtn.style.display = show ? '' : 'none';
+    if (show) retryBtn.addEventListener('click', () => jumpTo(opts.campaign!.missionId));
   }
 }

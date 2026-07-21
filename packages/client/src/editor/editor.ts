@@ -439,6 +439,26 @@ export async function openEditor(
     location.reload(); // one-shot app: back to the start screen via fresh boot
   });
 
+  // Dev-only: export the map as JSON — the authoring path for campaign maps
+  // (drop the file into src/campaign/missions/ or fine-tune generated ones).
+  if (import.meta.env.DEV) {
+    const exportBtn = document.createElement('button');
+    exportBtn.textContent = 'Als JSON exportieren';
+    exportBtn.className = 'subtle';
+    exportBtn.addEventListener('click', () => {
+      const { map, ok } = validate();
+      if (!ok) return;
+      const blob = new Blob([JSON.stringify(map)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${map.name.replace(/[^a-z0-9äöüß_-]+/gi, '_').toLowerCase() || 'karte'}.map.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      say('Karte als JSON exportiert.', 'ok');
+    });
+    saveBtn.parentElement?.appendChild(exportBtn);
+  }
+
   // Cloud save needs a login; guests can still build and test-play.
   if (!cloudEnabled()) {
     saveBtn.disabled = true;

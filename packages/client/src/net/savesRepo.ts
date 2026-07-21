@@ -8,6 +8,8 @@ export interface SaveRow {
   tick: number;
   map_label: string | null;
   balance: BalanceConfig | null;
+  /** Campaign mission id (e.g. 'allies-03'), null for skirmish saves. */
+  campaign_mission: string | null;
   created_at: string;
 }
 
@@ -23,6 +25,7 @@ export async function saveGame(
   state: GameState,
   balance: BalanceConfig | undefined,
   mapLabel: string | undefined,
+  campaignMission?: string | undefined,
 ): Promise<void> {
   const supabase = requireSupabase();
   const { data: session } = await supabase.auth.getSession();
@@ -36,6 +39,7 @@ export async function saveGame(
     tick: state.tick,
     map_label: mapLabel ?? null,
     balance: balance ?? null,
+    campaign_mission: campaignMission ?? null,
     data,
   });
   if (error) {
@@ -51,6 +55,7 @@ export async function overwriteSave(
   state: GameState,
   balance: BalanceConfig | undefined,
   mapLabel: string | undefined,
+  campaignMission?: string | undefined,
 ): Promise<void> {
   const supabase = requireSupabase();
   const { data: session } = await supabase.auth.getSession();
@@ -64,6 +69,7 @@ export async function overwriteSave(
       tick: state.tick,
       map_label: mapLabel ?? null,
       balance: balance ?? null,
+      campaign_mission: campaignMission ?? null,
       data,
       // Refresh the timestamp so the list keeps sorting by "last saved".
       created_at: new Date().toISOString(),
@@ -81,7 +87,7 @@ export async function listSaves(): Promise<SaveRow[]> {
   if (!session.session) return [];
   const { data, error } = await supabase
     .from('saves')
-    .select('id,name,tick,map_label,balance,created_at')
+    .select('id,name,tick,map_label,balance,campaign_mission,created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Spielstände laden fehlgeschlagen: ${error.message}`);
   return data as SaveRow[];

@@ -24,6 +24,8 @@ import { resourceGrowthSystem } from './systems/resources.js';
 import { spySystem } from './systems/spy.js';
 import { superweaponSystem } from './systems/superweapon.js';
 import { transportSystem } from './systems/transport.js';
+import { triggersSystem } from './systems/triggers.js';
+import { objectivesSystem } from './systems/objectives.js';
 import { veterancySystem } from './systems/veterancy.js';
 import { victorySystem } from './systems/victory.js';
 
@@ -41,6 +43,9 @@ export function tick(state: GameState, commands: Command[] = []): void {
     return; // game over — freeze the world
   }
   applyCommands(state, commands);
+  // Campaign triggers before the AI pass: spawned reinforcements exist and
+  // act the same tick (no-op outside missions).
+  triggersSystem(state);
   aiSystem(state);
   productionSystem(state);
   buildingUpgradeSystem(state);
@@ -73,6 +78,9 @@ export function tick(state: GameState, commands: Command[] = []): void {
   hospitalSystem(state);
   veterancySystem(state);
   deathSystem(state);
+  // Campaign objectives right after deaths so this tick's kills count;
+  // victorySystem early-returns for mission games.
+  objectivesSystem(state);
   victorySystem(state);
   fogSystem(state);
   state.tick++;

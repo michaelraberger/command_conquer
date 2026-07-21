@@ -187,6 +187,20 @@ async function runAction(app: Application, action: StartAction): Promise<void> {
     await startGame(app, action.state, new LocalDriver(), {
       balance: action.balance,
       mapLabel: action.mapLabel,
+      campaign: action.campaign,
+    });
+    return;
+  }
+  if (action.kind === 'campaign') {
+    // Campaign mission: fixed seed (replayable), objectives/triggers run in
+    // the sim (GameOptions.mission); the meta ref drives HUD + progress.
+    session.localPlayer = 0;
+    const balance = await loadBalance();
+    const state = createGame(action.mission.seed, { mission: action.simDef, balance });
+    await startGame(app, state, new LocalDriver(), {
+      balance,
+      mapLabel: action.mission.title,
+      campaign: { campaignId: action.mission.campaign, missionId: action.mission.id },
     });
     return;
   }
@@ -359,10 +373,29 @@ export async function startGame(
   new HelpMenu();
   new TechTreeOverlay(state);
   if (solo) {
-    const tour = new OnboardingTour();
-    tour.maybeShowOnFirstRun();
+    // No skirmish tutorial inside campaign missions — the briefing covers them.
+    if (!meta.campaign) {
+      const tour = new OnboardingTour();
+      tour.maybeShowOnFirstRun();
+    }
     const { initSaveDialog } = await import('./ui/saveDialog.js');
     initSaveDialog(state, hotkeys, meta);
+  }
+
+  // Campaign mission: objectives HUD + toast texts from the mission catalog.
+  let objectivesHud: import('./ui/objectives.js').ObjectivesHud | null = null;
+  const campaignCatalog = meta.campaign ? await import('./campaign/index.js') : undefined;
+  const campaignMission =
+    meta.campaign && campaignCatalog
+      ? campaignCatalog.getMission(meta.campaign.missionId)
+      : undefined;
+  if (meta.campaign && state.mission) {
+    const { ObjectivesHud } = await import('./ui/objectives.js');
+    objectivesHud = new ObjectivesHud(
+      state,
+      campaignMission?.objectiveTexts ?? {},
+      campaignMission?.messages ?? {},
+    );
   }
 
   ore.sync(state);
@@ -402,9 +435,27 @@ export async function startGame(
       swAlert,
       groups,
       groupBar,
-      onGameOver: (winner) =>
-        showEndScreen(winner === session.localPlayer, { backToEditor: meta.testPlay === true }),
+      onGameOver: (winner) => {
+        const won = winner === session.localPlayer;
+        if (meta.campaign && won) {
+          void import('./campaign/progress.js').then(({ markCompleted }) =>
+            markCompleted(meta.campaign!.campaignId, meta.campaign!.missionId, {
+              timeTicks: state.tick,
+            }),
+          );
+        }
+        showEndScreen(won, {
+          backToEditor: meta.testPlay === true,
+          campaign: meta.campaign
+            ? {
+                missionId: meta.campaign.missionId,
+                nextMissionId: campaignCatalog?.nextMission(meta.campaign.missionId)?.id,
+              }
+            : undefined,
+        });
+      },
       onSimEvents: (events) => {
+        objectivesHud?.handleEvents(events);
         for (const e of events) {
           if (e.type === 'BRIDGE_DOWN') {
             terrainView.collapseBridge(e.cx, e.cy);

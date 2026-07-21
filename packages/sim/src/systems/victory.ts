@@ -9,6 +9,9 @@ import type { GameState } from '../state.js';
  */
 export function victorySystem(state: GameState): void {
   if (state.winner !== -1) return;
+  // Campaign missions are decided exclusively by objectivesSystem — last-team-
+  // alive would fire premature wins on capture/survive missions.
+  if (state.mission !== undefined) return;
   const alive = (id: number): boolean =>
     // Surrendered players (SURRENDER command, e.g. dropped from an internet
     // match) are out — their abandoned base does not keep the game running.

@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-07-21-kampagne",
+    "date": "2026-07-21",
+    "title": "Kampagnenmodus: Alliierte und Sowjets mit eigenen Feldzügen",
+    "text": "CAC bekommt Kampagnen wie im großen Vorbild! Der neue Menüpunkt „Kampagne“ führt in zwei getrennte Feldzüge — einen für die Alliierten, einen für die Sowjets — mit je 12 geplanten Missionen und steigendem Schwierigkeitsgrad; die ersten vier pro Fraktion sind jetzt spielbar. Jede Mission startet mit einer Einsatzbesprechung samt Kartenvorschau und echten Missionszielen: Radarstationen sprengen, Gebäude unversehrt erobern, Stellungen halten, Spezialisten lebend evakuieren. Im Spiel zeigt ein neues Zielpanel den Fortschritt, Funksprüche und Verstärkungswellen halten die Lage in Bewegung. Nach dem Sieg geht es mit einem Klick zur nächsten Mission — der Fortschritt wird lokal gespeichert und wandert mit deinem Konto in die Cloud. Zwischenspeichern mit F6 funktioniert auch mitten in der Mission.",
+    "image": "changelog/kampagne.png"
+  },
+  {
     "id": "2026-07-19-mehrspieler",
     "date": "2026-07-19",
     "title": "Mehrspieler übers Internet: 2–4 Spieler, jeder gegen jeden",
