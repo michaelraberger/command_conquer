@@ -26,7 +26,14 @@ import {
   type BuildingType,
   type ProductionCategory,
 } from './rules.js';
-import { areEnemies, constructBuilding, type GameState, type PathCell, type Unit } from './state.js';
+import {
+  areEnemies,
+  bumpStat,
+  constructBuilding,
+  type GameState,
+  type PathCell,
+  type Unit,
+} from './state.js';
 import { crashBoundJets } from './systems/airbase.js';
 import { launchParadrop } from './systems/paradrop.js';
 import { buildingMaxHp, findTarget, isAir, isNaval, targetOwner } from './targeting.js';
@@ -207,6 +214,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         if (!canPlaceBuilding(state, cmd.playerId, 'WALL', cmd.cx, cmd.cy)) break;
         player.credits -= cost;
         constructBuilding(state, 'WALL', cmd.playerId, cmd.cx, cmd.cy);
+        bumpStat(player.stats.buildingsBuilt, 'WALL');
         break;
       }
       case 'UPGRADE_BUILDING': {
@@ -260,7 +268,9 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         // Selling a Flugfeld loses its bound jet (fixed binding, like being
         // destroyed) — deathSystem sweeps the crashed jet this same tick.
         if (building.type === 'FLUGFELD') crashBoundJets(state, building);
-        // Deconstruct without an explosion: free the footprint, drop the record.
+        // Deconstruct without an explosion: free the footprint, drop the
+        // record. Deliberately NOT counted as a loss in the match stats —
+        // selling removes the building outside deathSystem.
         const rule = buildingRule(building.type);
         for (let y = building.cy; y < building.cy + rule.height; y++) {
           for (let x = building.cx; x < building.cx + rule.width; x++) {

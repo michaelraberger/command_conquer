@@ -14,7 +14,14 @@ import {
   type ProductionCategory,
   type UnitCategory,
 } from '../rules.js';
-import { constructBuilding, spawnUnit, type Building, type GameState, type Player } from '../state.js';
+import {
+  bumpStat,
+  constructBuilding,
+  spawnUnit,
+  type Building,
+  type GameState,
+  type Player,
+} from '../state.js';
 import { findFreeAirfield } from './airbase.js';
 import { canPlaceBuilding } from './placement.js';
 
@@ -158,6 +165,8 @@ export function placeQueuedBuilding(state: GameState, playerId: number, cx: numb
   if (!queue.ready || queue.item === null || !isBuildingType(queue.item)) return;
   if (!canPlaceBuilding(state, playerId, queue.item, cx, cy)) return;
   constructBuilding(state, queue.item, playerId, cx, cy);
+  // Match stats: only queue-built structures count (in-place upgrades don't).
+  bumpStat(player.stats.buildingsBuilt, queue.item);
   queue.item = null;
   queue.progress = 0;
   queue.ready = false;
@@ -281,6 +290,9 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
         if (state.occupancy[cellIndex(state, cell.cx, cell.cy)] !== 0) continue;
       }
       const unit = spawnUnit(state, item, player.id, cell.cx, cell.cy);
+      // Match stats: only genuine production counts (starting forces, crate
+      // freebies and mission trigger spawns call spawnUnit directly).
+      bumpStat(player.stats.unitsProduced, item);
       if (bound) unit.homeId = producer.id; // this Flugfeld is the jet's home
       if (producer.rallyCx >= 0) {
         unit.path = air

@@ -513,6 +513,114 @@
         font-size: 12px;
         color: #8fa1b3;
       }
+      /* In-game statistics overlay (Tab). Sits above the pause veil, below
+         fatal MP overlays; sidebar stays visible like #pause/#cheat. */
+      #stats-overlay {
+        position: fixed;
+        inset: 0 210px 0 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: rgba(10, 14, 18, 0.72);
+        color: #d7e0ea;
+        z-index: 6;
+      }
+      #stats-overlay .stats-box {
+        background: rgba(16, 20, 26, 0.97);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        padding: 16px 20px;
+        max-width: min(720px, 92%);
+        max-height: 84vh;
+        overflow-y: auto;
+      }
+      #stats-overlay h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        letter-spacing: 3px;
+        color: #e8b339;
+      }
+      #stats-overlay small {
+        font-size: 11px;
+        color: #8fa1b3;
+      }
+      /* Shared match-stats table (end screen + overlay). */
+      .stats-table table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12px;
+      }
+      .stats-table .stats-clock {
+        font-size: 11px;
+        color: #8fa1b3;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .stats-table th {
+        font-size: 10px;
+        color: #8fa1b3;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-bottom: 1px solid #2c3a4a;
+      }
+      .stats-table td {
+        padding: 5px 8px;
+      }
+      .stats-table th.num,
+      .stats-table td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .stats-table td.name,
+      .stats-table th.name {
+        text-align: left;
+        white-space: nowrap;
+      }
+      .stats-table tr.me td {
+        color: #ffe9b0;
+      }
+      .stats-table .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        margin-right: 7px;
+        vertical-align: -1px;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+      }
+      .stats-table tr.detail td {
+        padding: 0 8px 6px;
+        border-bottom: 1px solid #1d2733;
+      }
+      .stats-table details {
+        font-size: 11px;
+        color: #8fa1b3;
+      }
+      .stats-table details summary {
+        cursor: pointer;
+        font-size: 10px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #5f7186;
+      }
+      .stats-table details div {
+        margin: 3px 0 0 12px;
+      }
+      .stats-table details strong {
+        color: #a9b8c7;
+        font-weight: 600;
+      }
+      #end-career {
+        display: none;
+        font-size: 11px;
+        color: #8fa1b3;
+        letter-spacing: 1px;
+        margin-top: 8px;
+      }
       #lowpower,
       #attack {
         position: fixed;
@@ -2266,6 +2374,14 @@
     <div id="debug" class="overlay"></div>
     <div id="pause"><span>PAUSE</span><small>P zum Fortsetzen</small></div>
 
+    <div id="stats-overlay">
+      <div class="stats-box">
+        <h2>STATISTIK</h2>
+        <div id="stats-overlay-table"></div>
+        <small>Tab oder Esc schließt</small>
+      </div>
+    </div>
+
     <div id="mp-wait" class="mp-overlay" style="display: none">
       <span>Warte auf Spieler …</span>
       <small id="mp-wait-names"></small>
@@ -2359,6 +2475,7 @@
           <h3>Spiel</h3>
           <dl>
             <dt>P</dt><dd>Pause</dd>
+            <dt>Tab</dt><dd>Statistik-Übersicht ein-/ausblenden</dd>
             <dt>F6</dt><dd>Spiel speichern (Cloud, Konto nötig; Laden im Hauptmenü)</dd>
             <dt>T</dt><dd>Technologiebaum öffnen / schließen</dd>
             <dt>F1</dt><dd>Dieses Menü öffnen / schließen</dd>
@@ -2549,9 +2666,11 @@
     </div>
 
     <div id="end" class="fullscreen">
-      <div class="panel">
+      <div class="panel" style="width: min(640px, 94vw)">
         <h1>SIEG!</h1>
         <div class="sub">Die Partie ist beendet.</div>
+        <div id="end-stats"></div>
+        <div id="end-career"></div>
         <button id="end-next" style="display: none">Nächste Mission</button>
         <button id="end-retry" style="display: none">Erneut versuchen</button>
         <button id="end-restart">Neue Partie</button>

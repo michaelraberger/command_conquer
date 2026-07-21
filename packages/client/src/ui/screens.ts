@@ -7,9 +7,11 @@ import {
   type GameState,
   type MapType,
 } from '@cac/sim';
+import { fetchCareer } from '../net/careerRepo.js';
 import { cloudEnabled } from '../net/supabase.js';
 import { colorCss, paintMapData } from '../render/palette.js';
 import { createMapPicker, type MapSelection } from './mapPicker.js';
+import { buildStatsTable, formatTicks } from './statsTable.js';
 
 /** Fixed seed for the start-screen thumbnails — a representative sample; the
  * actual match rolls its own seed, so details (blobs, islets) will vary. */
@@ -291,6 +293,11 @@ export function showEndScreen(
   opts: {
     backToEditor?: boolean;
     campaign?: { nextMissionId?: string | undefined; missionId: string } | undefined;
+    /** Match statistics: rendered as the score table below the headline. */
+    stats?: { state: GameState; localPlayer: number } | undefined;
+    /** Resolves once the career upsert finished — the career line waits for it
+     *  so it shows the totals INCLUDING this match. */
+    careerReady?: Promise<unknown> | undefined;
   } = {},
 ): void {
   const root = document.getElementById('end')!;
@@ -298,6 +305,26 @@ export function showEndScreen(
   root.querySelector('h1')!.textContent = won ? 'SIEG!' : 'NIEDERLAGE';
   root.querySelector('h1')!.style.color = won ? '#53c94f' : '#e04a3a';
   document.getElementById('end-restart')!.addEventListener('click', () => location.reload());
+
+  const statsHost = document.getElementById('end-stats');
+  if (statsHost && opts.stats) {
+    statsHost.replaceChildren(buildStatsTable(opts.stats.state, opts.stats.localPlayer));
+  }
+  // Career line, fire-and-forget: logged-out/offline/missing table → the
+  // block simply never appears (fetchCareer throws only on real DB errors).
+  const careerHost = document.getElementById('end-career');
+  if (careerHost && opts.stats) {
+    Promise.resolve(opts.careerReady)
+      .then(() => fetchCareer())
+      .then((career) => {
+        if (!career) return;
+        careerHost.textContent =
+          `Karriere: ${career.games} Partien · ${career.wins} Siege · ` +
+          `Spielzeit ${formatTicks(career.playtimeTicks)}`;
+        careerHost.style.display = 'block';
+      })
+      .catch(() => undefined);
+  }
 
   // After an editor test match: reload with the reopen flag, boot() then jumps
   // straight back into the editor (the draft lives in localStorage).

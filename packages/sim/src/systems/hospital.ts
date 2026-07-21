@@ -20,6 +20,11 @@ export function hospitalSystem(state: GameState): void {
     if (!owners.has(unit.owner)) continue;
     if (!isInfantryType(unit.type)) continue;
     const maxHp = unitRule(unit.type).maxHp;
-    if (unit.hp < maxHp) unit.hp = Math.min(maxHp, unit.hp + HOSPITAL_HP_PER_TICK);
+    if (unit.hp < maxHp) {
+      const healed = Math.min(maxHp, unit.hp + HOSPITAL_HP_PER_TICK);
+      const p = state.players[unit.owner];
+      if (p) p.stats.healingDone += healed - unit.hp;
+      unit.hp = healed;
+    }
   }
 }

@@ -107,6 +107,7 @@ function collectCrates(state: GameState): void {
     if (!crate) continue;
     const player = state.players.find((p) => p.id === unit.owner);
     if (!player) continue;
+    player.stats.cratesCollected++;
     applyCrate(state, crate, unit.owner);
     state.events.push({
       type: 'CRATE_PICKUP',
@@ -162,7 +163,9 @@ function applyCrate(state: GameState, crate: Crate, ownerId: number): void {
         const dx = ux - crate.cx;
         const dy = uy - crate.cy;
         if (dx * dx + dy * dy > CRATE_HEAL_RADIUS * CRATE_HEAL_RADIUS) continue;
-        u.hp = unitRule(u.type).maxHp;
+        const maxHp = unitRule(u.type).maxHp;
+        player.stats.healingDone += maxHp - u.hp; // full heal → delta counts
+        u.hp = maxHp;
       }
       return;
     }

@@ -32,7 +32,9 @@ export function repairSystem(state: GameState): void {
       if (player.credits < REPAIR_COST_PER_TICK) break;
       player.credits -= REPAIR_COST_PER_TICK;
       const healed = unit.hp + REPAIR_HP_PER_TICK;
-      unit.hp = healed > uRule.maxHp ? uRule.maxHp : healed;
+      const newHp = healed > uRule.maxHp ? uRule.maxHp : healed;
+      player.stats.healingDone += newHp - unit.hp;
+      unit.hp = newHp;
     }
   }
 }

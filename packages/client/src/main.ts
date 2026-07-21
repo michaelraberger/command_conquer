@@ -29,6 +29,7 @@ import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
 import { Alerts } from './ui/alerts.js';
+import { StatsOverlay } from './ui/statsOverlay.js';
 import { SuperweaponAlert } from './ui/swAlert.js';
 import { Changelog } from './ui/changelog.js';
 import { DebugOverlay } from './ui/debug.js';
@@ -384,6 +385,7 @@ export async function startGame(
   );
   const alerts = new Alerts();
   const swAlert = new SuperweaponAlert();
+  const statsOverlay = new StatsOverlay(state, session.localPlayer);
   new HelpMenu();
   new TechTreeOverlay(state);
   if (solo) {
@@ -458,6 +460,14 @@ export async function startGame(
             }),
           );
         }
+        statsOverlay.close(); // the end screen owns the stats now
+        // Career totals: real matches only, fire-and-forget (errors stay silent).
+        const careerReady =
+          meta.testPlay !== true
+            ? import('./net/careerRepo.js').then(({ recordGame }) =>
+                recordGame(state, session.localPlayer, won),
+              )
+            : undefined;
         showEndScreen(won, {
           backToEditor: meta.testPlay === true,
           campaign: meta.campaign
@@ -466,6 +476,8 @@ export async function startGame(
                 nextMissionId: campaignCatalog?.nextMission(meta.campaign.missionId)?.id,
               }
             : undefined,
+          stats: { state, localPlayer: session.localPlayer },
+          careerReady,
         });
       },
       onSimEvents: (events) => {

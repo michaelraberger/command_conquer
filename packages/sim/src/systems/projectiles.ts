@@ -34,6 +34,7 @@ export function projectileSystem(state: GameState): void {
         weapon,
         { x: p.sx ?? p.x, y: p.sy ?? p.y, kind: aggroKindOfType(p.srcType) },
         source,
+        p.owner, // stats credit survives the shooter's death mid-flight
       );
       continue;
     }

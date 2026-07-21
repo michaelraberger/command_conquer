@@ -9,7 +9,7 @@ import {
   type UnitType,
   type WeaponRule,
 } from './rules.js';
-import { areEnemies, type Building, type GameState, type Unit } from './state.js';
+import { areEnemies, bumpStat, type Building, type GameState, type Unit } from './state.js';
 
 /** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
 export function isAir(unit: Unit): boolean {
@@ -154,6 +154,10 @@ export function damageTarget(
   weapon: WeaponRule,
   attacker?: { x: number; y: number; kind: AggroKind },
   source?: Unit,
+  /** Player id credited in the match stats for a kill; defaults to
+   *  source?.owner. Towers (defense.ts) pass their building's owner, homing
+   *  projectiles their launch owner (the shooter may be dead on impact). */
+  sourceOwner?: number,
 ): void {
   // Iron curtain: protected targets shrug off every hit while the effect lasts.
   const shielded = target.kind === 'unit' ? target.unit.curtainTicks : target.building.curtainTicks;
@@ -176,6 +180,15 @@ export function damageTarget(
     victim.owner !== source.owner
   ) {
     source.kills++;
+  }
+  // Player-level kill stats (same enemy/neutral guards as the unit credit).
+  const killer = sourceOwner ?? source?.owner;
+  if (wasAlive && victim.hp <= 0 && victim.owner >= 0 && killer !== undefined && killer !== victim.owner) {
+    const p = state.players[killer];
+    if (p) {
+      if (target.kind === 'unit') bumpStat(p.stats.unitsKilled, target.unit.type);
+      else bumpStat(p.stats.buildingsKilled, target.building.type);
+    }
   }
   state.events.push({ type: 'HIT', x: victim.x, y: victim.y });
   if (attacker) {

@@ -17,6 +17,9 @@ export function incomeSystem(state: GameState): void {
     const income = buildingRule(building.type).income ?? 0;
     if (income <= 0 || building.owner < 0) continue;
     const player = state.players[building.owner];
-    if (player) player.credits += income;
+    if (player) {
+      player.credits += income;
+      player.stats.creditsHarvested += income;
+    }
   }
 }

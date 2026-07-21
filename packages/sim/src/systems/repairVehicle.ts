@@ -65,6 +65,7 @@ export function repairVehicleSystem(state: GameState): void {
       if (player && player.credits >= VEHICLE_REPAIR_COST_PER_TICK) {
         player.credits -= VEHICLE_REPAIR_COST_PER_TICK;
         const healed = Math.min(maxHp, resolved.hp + VEHICLE_REPAIR_HP_PER_TICK);
+        player.stats.healingDone += healed - resolved.hp;
         if (target.kind === 'building') target.building.hp = healed;
         else target.unit.hp = healed;
         if (state.tick % SPARKLE_INTERVAL === 0) {

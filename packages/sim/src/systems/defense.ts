@@ -93,10 +93,13 @@ export function defenseSystem(state: GameState): void {
         : weapon;
     // All current defenses are hitscan; projectile support comes free via
     // the unit path if ever needed.
-    damageTarget(state, { kind: 'unit', unit: target }, shot, {
-      x: building.x,
-      y: building.y,
-      kind: 'building',
-    });
+    damageTarget(
+      state,
+      { kind: 'unit', unit: target },
+      shot,
+      { x: building.x, y: building.y, kind: 'building' },
+      undefined,
+      building.owner, // tower kills credit the owner's match stats
+    );
   }
 }

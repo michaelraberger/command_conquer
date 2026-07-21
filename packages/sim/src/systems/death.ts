@@ -1,6 +1,6 @@
 import { TERRAIN_BRIDGE_WRECK, cellIndex, releaseCell } from '../map.js';
 import { buildingRule, unitRule } from '../rules.js';
-import { storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
+import { bumpStat, storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
 import { crashBoundJets } from './airbase.js';
 
 /**
@@ -41,6 +41,17 @@ export function deathSystem(state: GameState): void {
       }
       releaseCell(state, unit);
       state.events.push({ type: 'DEATH', x: unit.x, y: unit.y, big: false });
+      // Match stats: losses count on the victim's side, passengers sink with
+      // their transport. (Consumed engineers/spies never pass through here —
+      // capture/spy remove them directly, so they are deliberately NOT losses.)
+      const owner = state.players[unit.owner];
+      if (owner) {
+        bumpStat(owner.stats.unitsLost, unit.type);
+        for (const pas of unit.passengers) {
+          const pOwner = state.players[pas.owner];
+          if (pOwner) bumpStat(pOwner.stats.unitsLost, pas.type);
+        }
+      }
     }
     state.units = survivors;
   }
@@ -75,6 +86,11 @@ export function deathSystem(state: GameState): void {
         y: building.y,
         big: building.type !== 'WALL',
       });
+      // Match stats: neutral scenery (bridges, tech buildings) has no player.
+      if (building.owner >= 0) {
+        const owner = state.players[building.owner];
+        if (owner) bumpStat(owner.stats.buildingsLost, building.type);
+      }
     }
     state.buildings = standing;
   }

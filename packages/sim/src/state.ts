@@ -195,6 +195,49 @@ export interface ProductionQueue {
   ready: boolean;
 }
 
+/**
+ * Running match statistics per player. Maintained EXCLUSIVELY in
+ * deterministic sim paths, so every lockstep peer computes identical values
+ * and the state hash stays consistent by construction.
+ *
+ * DETERMINISM NOTE: the insertion order of the per-type record keys flows
+ * into serialize()/hashState() via JSON.stringify. That is safe because
+ * identical sim execution produces identical insertion order, and JSON.parse
+ * preserves it (round-trip stable).
+ */
+export interface PlayerStats {
+  /** Total hp healed/repaired by this player's healers (all six sources). */
+  healingDone: number;
+  /** Delivered harvest + Bohrturm income — no cheat money, no crate money. */
+  creditsHarvested: number;
+  cratesCollected: number;
+  unitsProduced: Partial<Record<UnitType, number>>;
+  unitsLost: Partial<Record<UnitType, number>>;
+  unitsKilled: Partial<Record<UnitType, number>>;
+  buildingsBuilt: Partial<Record<BuildingType, number>>;
+  buildingsLost: Partial<Record<BuildingType, number>>;
+  buildingsKilled: Partial<Record<BuildingType, number>>;
+}
+
+export function emptyStats(): PlayerStats {
+  return {
+    healingDone: 0,
+    creditsHarvested: 0,
+    cratesCollected: 0,
+    unitsProduced: {},
+    unitsLost: {},
+    unitsKilled: {},
+    buildingsBuilt: {},
+    buildingsLost: {},
+    buildingsKilled: {},
+  };
+}
+
+/** +n on a per-type stat counter (missing keys start at 0). */
+export function bumpStat<K extends string>(rec: Partial<Record<K, number>>, key: K, n = 1): void {
+  rec[key] = (rec[key] ?? 0) + n;
+}
+
 export interface Player {
   id: number;
   name: string;
@@ -239,6 +282,8 @@ export interface Player {
   researched: TechId[];
   /** Tech being researched right now (drains credits over time), or null. */
   research: { tech: TechId; progress: number } | null;
+  /** Match statistics (kills, losses, production, healing …). */
+  stats: PlayerStats;
 }
 
 /** Fog states per cell: 0 = hidden, 1 = explored, 2 = visible. */
@@ -674,6 +719,7 @@ export function createGame(seed: number, options: GameOptions = {}): GameState {
     motherload: false,
     researched: [],
     research: null,
+    stats: emptyStats(),
   });
 
   const state: GameState = {
@@ -867,6 +913,8 @@ export function deserialize(json: string): GameState {
   // Saves from before the primary-building field: default it in.
   for (const p of raw.players) {
     if (!p.primaryBuildings) p.primaryBuildings = {};
+    // Saves from before match statistics start counting at zero.
+    if (!p.stats) p.stats = emptyStats();
   }
   // Saves from before the aircraft-ammo field: top the planes up on load.
   // Saves from before veterancy: everyone starts as a recruit.

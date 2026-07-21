@@ -97,7 +97,9 @@ function handleReturn(state: GameState, unit: Unit, backCx: number, backCy: numb
     const player = state.players.find((p) => p.id === unit.owner);
     if (player) {
       const room = Math.max(0, storageCapacity(state, unit.owner) - player.credits);
-      player.credits += Math.min(unit.cargo, room);
+      const credited = Math.min(unit.cargo, room);
+      player.credits += credited;
+      player.stats.creditsHarvested += credited;
     }
     unit.cargo = 0;
     const back =

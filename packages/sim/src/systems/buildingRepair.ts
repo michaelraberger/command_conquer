@@ -36,6 +36,7 @@ export function buildingRepairSystem(state: GameState): void {
     // heal the whole interval's worth in one burst instead.
     const num = buildingRule(building.type).cost * BUILDING_REPAIR_HP_PER_TICK;
     const den = maxHp * BUILDING_REPAIR_COST_DIVISOR;
+    const hpBefore = building.hp;
     if (num >= den) {
       const costPerTick = Math.round(num / den);
       if (player.credits < costPerTick) continue; // broke: pause, keep the flag
@@ -48,6 +49,7 @@ export function buildingRepairSystem(state: GameState): void {
       player.credits -= 1;
       building.hp = Math.min(maxHp, building.hp + BUILDING_REPAIR_HP_PER_TICK * interval);
     }
+    player.stats.healingDone += building.hp - hpBefore;
     if (building.hp >= maxHp) building.repairing = false;
     if (state.tick % SPARKLE_INTERVAL === 0) {
       state.events.push({ type: 'REPAIR', x: building.x, y: building.y });

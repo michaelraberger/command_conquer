@@ -19,6 +19,7 @@ import {
   TECH_RULES,
   sellRefund,
   unitRule,
+  veterancyRank,
   type Building,
   type BuildingType,
   type Command,
@@ -588,7 +589,7 @@ export class Sidebar {
     const counts = new Map<UnitType, number>();
     for (const u of units) counts.set(u.type, (counts.get(u.type) ?? 0) + 1);
     const key = `u:${[...counts].map(([t, n]) => `${t}${n}`).join(',')}:${
-      units.length === 1 ? units[0]!.hp : ''
+      units.length === 1 ? `${units[0]!.hp}:${units[0]!.kills}` : ''
     }`;
     if (key === this.lastBinfoKey) return;
     this.lastBinfoKey = key;
@@ -618,6 +619,14 @@ export class Sidebar {
         ammo.className = 'bhp';
         ammo.textContent = `Munition ${units[0]!.ammo} / ${maxAmmo}`;
         this.binfoEl.append(ammo);
+      }
+      // Kill count + veterancy rank (matching the chevrons over the sprite).
+      if (unitRule(units[0]!.type).weapon !== null) {
+        const rank = veterancyRank(units[0]!.kills);
+        const kills = document.createElement('div');
+        kills.className = 'bhp';
+        kills.textContent = `Kills ${units[0]!.kills} · ${rank === 2 ? 'Elite' : rank === 1 ? 'Veteran' : 'Rekrut'}`;
+        this.binfoEl.append(kills);
       }
     } else {
       const list = document.createElement('div');

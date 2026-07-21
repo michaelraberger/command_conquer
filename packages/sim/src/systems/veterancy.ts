@@ -12,6 +12,10 @@ export function veterancySystem(state: GameState): void {
     if (veterancyRank(unit.kills) < 2) continue;
     if ((state.tick + unit.id) % ELITE_HEAL_INTERVAL !== 0) continue;
     const maxHp = unitRule(unit.type).maxHp;
-    if (unit.hp > 0 && unit.hp < maxHp) unit.hp++;
+    if (unit.hp > 0 && unit.hp < maxHp) {
+      unit.hp++;
+      const p = state.players[unit.owner];
+      if (p) p.stats.healingDone++;
+    }
   }
 }

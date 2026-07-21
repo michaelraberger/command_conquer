@@ -177,6 +177,8 @@ export {
   serialize,
   deserialize,
   areEnemies,
+  emptyStats,
+  bumpStat,
   NEUTRAL_OWNER,
   storageCapacity,
   storedInBuilding,
@@ -195,6 +197,7 @@ export {
   type Crate,
   type CrateKind,
   type Player,
+  type PlayerStats,
   type ProductionQueue,
   type PathCell,
 } from './state.js';
