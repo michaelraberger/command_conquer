@@ -29,7 +29,8 @@ export type TechId =
   | 'repair'
   | 'tesla'
   | 'super'
-  | 'spy';
+  | 'spy'
+  | 'atom';
 
 export const FACTIONS: readonly Faction[] = ['ALLIES', 'SOVIETS'];
 export const FACTION_NAMES: Record<Faction, string> = {
@@ -669,6 +670,9 @@ export interface BuildingRule {
   civilian?: boolean;
   /** Hospital: the owner's infantry regenerates this many hp per tick. */
   heal?: number;
+  /** Kernschmelze: on destruction, flat blast damage to EVERYTHING within
+   *  `radius` cells (friend and foe, unattributed — like the crate bomb). */
+  meltdown?: { radius: number; damage: number };
 }
 
 /** Lazarett: infantry hp regenerated per tick for the hospital's owner. */
@@ -730,6 +734,30 @@ export const BUILDING_RULES = {
     buildable: false,
     factions: null,
     sight: 4,
+    upgradeTo: 'ATOM',
+    upgradeCost: 600,
+  },
+  ATOM: {
+    name: 'Atomkraftwerk',
+    maxHp: 1100,
+    cost: 1100,
+    buildTime: 135,
+    // Third power tier: one 2×2 footprint carries ~3.7 base plants' output.
+    // Reached only via ADVPOWER upgrade and gated behind the Atomprogramm
+    // research; the meltdown makes it a juicy raid target in return.
+    power: 550,
+    width: 2,
+    height: 2,
+    armor: 'light',
+    produces: null,
+    weapon: null,
+    superweapon: null,
+    requires: ['CONYARD'],
+    buildable: false,
+    factions: null,
+    sight: 4,
+    tech: 'atom',
+    meltdown: { radius: 3, damage: 250 },
   },
   REFINERY: {
     name: 'Raffinerie',
@@ -1256,6 +1284,21 @@ const UPGRADE_BASE: Partial<Record<BuildingType, BuildingType>> = (() => {
   return map;
 })();
 
+/** Full upgrade chain starting at `type` (POWER → [POWER, ADVPOWER, ATOM]).
+ *  Single source of truth for "an upgraded building still fills its base
+ *  goal" — used by the AI's goal counting so no tier ever reads as missing. */
+export function upgradeChainOf(type: BuildingType): readonly BuildingType[] {
+  const chain: BuildingType[] = [type];
+  let t: BuildingType = type;
+  while (true) {
+    const to = buildingRule(t).upgradeTo;
+    if (to === undefined || !isBuildingType(to)) break;
+    chain.push(to);
+    t = to;
+  }
+  return chain;
+}
+
 /** True when a standing building of `type` satisfies the prerequisite `req`.
  *  Upgraded buildings keep counting as their base type — a Fortschr. Kraftwerk
  *  is still a Kraftwerk as far as requirements are concerned, so upgrading
@@ -1294,6 +1337,7 @@ export const TECH_RULES = {
   air: { name: 'Luftwaffentechnik', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
   navy: { name: 'Marine-Doktrin', cost: 1500, time: 10 * MIN, requires: ['TECHCENTER'], factions: null },
   tesla: { name: 'Tesla-Technologie', cost: 1800, time: 12 * MIN, requires: ['TECHCENTER'], factions: ['SOVIETS'] },
+  atom: { name: 'Atomprogramm', cost: 2000, time: 12 * MIN, requires: ['TECHCENTER'], factions: null },
   super: { name: 'Superwaffen-Programm', cost: 2500, time: 15 * MIN, requires: ['TECHCENTER'], factions: null },
 } as const satisfies Record<TechId, TechRule>;
 

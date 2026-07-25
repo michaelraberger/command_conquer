@@ -17,6 +17,7 @@ import {
 import {
   bumpStat,
   constructBuilding,
+  footprintOf,
   spawnUnit,
   type Building,
   type GameState,
@@ -158,13 +159,19 @@ export function cancelProduction(state: GameState, playerId: number, category: P
   queue.ready = false;
 }
 
-export function placeQueuedBuilding(state: GameState, playerId: number, cx: number, cy: number): void {
+export function placeQueuedBuilding(
+  state: GameState,
+  playerId: number,
+  cx: number,
+  cy: number,
+  rotated = false,
+): void {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return;
   const queue = player.queues.building;
   if (!queue.ready || queue.item === null || !isBuildingType(queue.item)) return;
-  if (!canPlaceBuilding(state, playerId, queue.item, cx, cy)) return;
-  constructBuilding(state, queue.item, playerId, cx, cy);
+  if (!canPlaceBuilding(state, playerId, queue.item, cx, cy, rotated)) return;
+  constructBuilding(state, queue.item, playerId, cx, cy, rotated);
   // Match stats: only queue-built structures count (in-place upgrades don't).
   bumpStat(player.stats.buildingsBuilt, queue.item);
   queue.item = null;
@@ -274,11 +281,11 @@ function trySpawnProduced(state: GameState, player: Player, item: string): boole
           buildingRule(b.type).produces === category,
       ));
   if (!producer) return false;
-  const rule = buildingRule(producer.type);
+  const { w: pw, h: ph } = footprintOf(producer);
   const air = unitRule(item).air === true;
   const naval = unitRule(item).category === 'naval';
   for (let r = 1; r <= 6; r++) {
-    for (const cell of cellsAroundRect(producer.cx, producer.cy, rule.width, rule.height, r)) {
+    for (const cell of cellsAroundRect(producer.cx, producer.cy, pw, ph, r)) {
       if (!inBounds(state, cell.cx, cell.cy)) continue;
       // Aircraft appear over any cell; ships need open water, ground units
       // clear passable ground.

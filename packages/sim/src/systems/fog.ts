@@ -1,6 +1,6 @@
 import { cellIndex, inBounds } from '../map.js';
 import { buildingRule, unitRule } from '../rules.js';
-import { FOG_EXPLORED, FOG_VISIBLE, type GameState } from '../state.js';
+import { FOG_EXPLORED, FOG_VISIBLE, footprintOf, type GameState } from '../state.js';
 
 /** Fog refresh cadence in ticks (cheap enough, still feels instant). */
 const FOG_INTERVAL = 3;
@@ -74,8 +74,8 @@ export function fogSystem(state: GameState): void {
     }
     for (const building of state.buildings) {
       if (building.owner !== player.id) continue;
-      const rule = buildingRule(building.type);
-      stampRect(building.cx, building.cy, rule.width, rule.height, rule.sight);
+      const { w, h } = footprintOf(building);
+      stampRect(building.cx, building.cy, w, h, buildingRule(building.type).sight);
     }
   }
 }

@@ -401,16 +401,25 @@ export class Sidebar {
     return row;
   }
 
-  /** Appends an "Ausbauen" button that stays affordability-gated in place. */
-  private appendUpgradeButton(buildingId: number, label: string, cost: number): void {
+  /** Appends an "Ausbauen" button that stays affordability-gated in place.
+   *  `lockedHint` (re-evaluated live) returns the reason the upgrade is tech-
+   *  locked, or null — so the button unlocks the moment research completes. */
+  private appendUpgradeButton(
+    buildingId: number,
+    label: string,
+    cost: number,
+    lockedHint?: () => string | null,
+  ): void {
     const btn = document.createElement('button');
     btn.className = 'bupgrade';
-    btn.textContent = label;
-    const affordable = (): void => {
-      btn.disabled = this.player().credits < cost;
+    const refresh = (): void => {
+      const locked = lockedHint?.() ?? null;
+      btn.disabled = locked !== null || this.player().credits < cost;
+      btn.classList.toggle('techlocked', locked !== null);
+      btn.textContent = locked !== null ? `${label} — ${locked}` : label;
     };
-    affordable();
-    this.binfoUpdaters.push(affordable);
+    refresh();
+    this.binfoUpdaters.push(refresh);
     btn.addEventListener('click', () => {
       this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId });
     });
@@ -488,7 +497,19 @@ export class Sidebar {
       );
     } else if (rule.upgradeTo !== undefined && rule.upgradeCost !== undefined) {
       const targetName = buildingRule(rule.upgradeTo as BuildingType).name;
-      this.appendUpgradeButton(building.id, `Ausbauen → ${targetName} ($${rule.upgradeCost})`, rule.upgradeCost);
+      const upTech = techFor(rule.upgradeTo);
+      this.appendUpgradeButton(
+        building.id,
+        `Ausbauen → ${targetName} ($${rule.upgradeCost})`,
+        rule.upgradeCost,
+        upTech === undefined
+          ? undefined
+          : () => {
+              const pl = this.player();
+              const locked = !pl.motherload && !pl.researched.includes(upTech);
+              return locked ? `Benötigt: ${techRule(upTech).name}` : null;
+            },
+      );
     }
     if (rule.produces !== null) {
       const hint = document.createElement('div');

@@ -65,8 +65,9 @@ export class StatsOverlay {
     if (this.state.tick === this.renderedTick) return; // paused: nothing new
     this.renderedTick = this.state.tick;
     // Keep expanded per-type breakdowns expanded across the periodic refresh.
+    // Mid-match only the OWN row shows — enemy stats would be free intel.
     const open = [...this.host.querySelectorAll('details')].map((d) => d.open);
-    this.host.replaceChildren(buildStatsTable(this.state, this.localPlayer));
+    this.host.replaceChildren(buildStatsTable(this.state, this.localPlayer, { onlyLocal: true }));
     this.host.querySelectorAll('details').forEach((d, i) => (d.open = open[i] ?? false));
   }
 }

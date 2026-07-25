@@ -1,6 +1,6 @@
 import { cellIndex, inBounds, isBuildableTerrain, isOpenWater } from '../map.js';
 import { buildAdjacency, buildingRule, type BuildingType } from '../rules.js';
-import type { GameState } from '../state.js';
+import { footprintOf, type GameState } from '../state.js';
 
 /**
  * Placement validation: every footprint cell must be buildable ground (grass,
@@ -14,10 +14,13 @@ export function canPlaceBuilding(
   type: BuildingType,
   cx: number,
   cy: number,
+  rotated = false,
 ): boolean {
   const rule = buildingRule(type);
-  for (let y = cy; y < cy + rule.height; y++) {
-    for (let x = cx; x < cx + rule.width; x++) {
+  const w = rotated ? rule.height : rule.width;
+  const h = rotated ? rule.width : rule.height;
+  for (let y = cy; y < cy + h; y++) {
+    for (let x = cx; x < cx + w; x++) {
       if (!inBounds(state, x, y)) return false;
       // Shipyards need genuinely open water — the passage under a bridge is
       // navigable for ships but not a construction site.
@@ -32,12 +35,7 @@ export function canPlaceBuilding(
   // Never build over a goodie crate — it would be buried unreachable forever
   // (crates are only removed by pickup or expiry).
   for (const crate of state.crates) {
-    if (
-      crate.cx >= cx &&
-      crate.cx < cx + rule.width &&
-      crate.cy >= cy &&
-      crate.cy < cy + rule.height
-    ) {
+    if (crate.cx >= cx && crate.cx < cx + w && crate.cy >= cy && crate.cy < cy + h) {
       return false;
     }
   }
@@ -46,9 +44,9 @@ export function canPlaceBuilding(
   // only place a wall inside the zone your real buildings already opened.
   for (const b of state.buildings) {
     if (b.owner !== playerId || b.type === 'WALL') continue;
-    const br = buildingRule(b.type);
-    const dx = rectGap(cx, rule.width, b.cx, br.width);
-    const dy = rectGap(cy, rule.height, b.cy, br.height);
+    const bf = footprintOf(b);
+    const dx = rectGap(cx, w, b.cx, bf.w);
+    const dy = rectGap(cy, h, b.cy, bf.h);
     if ((dx > dy ? dx : dy) <= buildAdjacency(b.type)) return true;
   }
   return false;

@@ -1,6 +1,6 @@
 import { releaseCell } from '../map.js';
 import { buildingRule } from '../rules.js';
-import { areEnemies, type Building, type GameState, type Unit } from '../state.js';
+import { areEnemies, footprintOf, type Building, type GameState, type Unit } from '../state.js';
 import { targetDistSq } from '../targeting.js';
 import { REACH_SQ, chaseBuilding } from './spy.js';
 
@@ -49,9 +49,9 @@ export function captureSystem(state: GameState): void {
       // Gates cache their owner in the pathing grid — re-stamp the footprint,
       // otherwise the captured gate keeps opening for the old owner.
       if (building.type === 'GATE') {
-        const rule = buildingRule(building.type);
-        for (let y = building.cy; y < building.cy + rule.height; y++) {
-          for (let x = building.cx; x < building.cx + rule.width; x++) {
+        const { w, h } = footprintOf(building);
+        for (let y = building.cy; y < building.cy + h; y++) {
+          for (let x = building.cx; x < building.cx + w; x++) {
             state.gateOwner[y * state.mapWidth + x] = unit.owner + 1;
           }
         }

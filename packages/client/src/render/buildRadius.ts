@@ -1,4 +1,4 @@
-import { SUBCELL, buildingRule, type Building, type GameState } from '@cac/sim';
+import { SUBCELL, buildingRule, footprintOf, type Building, type GameState } from '@cac/sim';
 import { Graphics, type Container } from 'pixi.js';
 import { session } from '../session.js';
 import { worldToScreen, TILE_H, TILE_W } from './iso.js';
@@ -76,8 +76,8 @@ export class BuildRadiusOverlay {
     strokeAlpha: number,
     strokeWidth: number,
   ): void {
-    const rule = buildingRule(b.type);
-    const radiusCells = 3 + Math.min(rule.width, rule.height) / 2;
+    const { w, h } = footprintOf(b);
+    const radiusCells = 3 + Math.min(w, h) / 2;
     const c = worldToScreen(b.x, b.y);
     this.g
       .ellipse(c.x, c.y, radiusCells * 32 * K, radiusCells * 16 * K)
@@ -87,9 +87,9 @@ export class BuildRadiusOverlay {
 
   /** Highlights just the building's own tiles — no projected radius. */
   private drawFootprint(b: Building, color: number): void {
-    const rule = buildingRule(b.type);
-    for (let dy = 0; dy < rule.height; dy++) {
-      for (let dx = 0; dx < rule.width; dx++) {
+    const { w, h } = footprintOf(b);
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
         const c = worldToScreen((b.cx + dx) * 256 + 128, (b.cy + dy) * 256 + 128);
         this.g
           .poly([

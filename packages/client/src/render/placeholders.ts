@@ -666,11 +666,6 @@ function flagPole(g: Graphics, px: number, py: number, h: number): void {
 }
 
 /** Waving flag at the pole top, white → tinted to the owner's colour. */
-function teamFlag(g: Graphics, px: number, py: number, h: number): void {
-  const t = py - h;
-  g.poly([px + 1, t, px + 13, t + 2, px + 13, t + 9.5, px + 1, t + 7.5]).fill(0xffffff);
-}
-
 const BUILDING_ART: Record<BuildingType, BuildingArt> = {
   CONYARD: {
     frameTop: 52,
@@ -713,6 +708,27 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       const core = iso(1.0, 1.0);
       g.circle(core.x, core.y - 30, 6).fill(fx).stroke({ width: 1, color: 0xfff3b0 });
       g.circle(core.x, core.y - 30, 10).stroke({ width: 1, color: fx, alpha: 0.5 });
+    },
+    team: (g) => teamMark(g, 1, 1.75, 12),
+  },
+  ATOM: {
+    frameTop: 60,
+    fx: 0x9fff6e,
+    body: (g, w, h, fx) => {
+      concretePlate(g, w, h);
+      prismAt(g, 0.15, 0.15, 1.7, 1.7, 16, 0xa8a08d);
+      // Wide cooling tower with a waisted silhouette hint (lighter rim ring).
+      const tower = iso(0.6, 1.1);
+      cylinder(g, tower.x, tower.y - 8, 13, 38, 0xcfc9bb);
+      g.ellipse(tower.x, tower.y - 46, 10, 4.5).fill(0x8d8778); // open throat
+      // Containment dome on a low drum, steel grey with a highlight arc.
+      const dome = iso(1.5, 0.8);
+      cylinder(g, dome.x, dome.y - 6, 11, 10, 0xb8b2a4);
+      g.ellipse(dome.x, dome.y - 16, 11, 8).fill(0xc9c4b8).stroke({ width: 1, color: 0x37322a, alpha: 0.8 });
+      g.arc(dome.x - 3, dome.y - 19, 6, Math.PI, Math.PI * 1.6).stroke({ width: 2, color: 0xe8e4da, alpha: 0.8 });
+      // Reactor glow at the dome's base — the ADVPOWER core idiom in green.
+      g.circle(dome.x, dome.y - 8, 5).fill(fx).stroke({ width: 1, color: 0xd6ffc0 });
+      g.circle(dome.x, dome.y - 8, 9).stroke({ width: 1, color: fx, alpha: 0.5 });
     },
     team: (g) => teamMark(g, 1, 1.75, 12),
   },
@@ -768,8 +784,11 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       flagPole(g, p.x, p.y, 36);
     },
     team: (g) => {
+      // The cloth itself waves in the ambient overlay (drawn there in the
+      // owner's colour every frame); the baked layer keeps only a slim
+      // halyard strip on the pole so the tint survives even without motion.
       const p = iso(1.5, 1.0);
-      teamFlag(g, p.x, p.y, 36);
+      g.rect(p.x + 0.5, p.y - 36, 2, 9).fill(0xffffff);
     },
   },
   FACTORY: {
@@ -778,9 +797,14 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
     body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.2, 0.2, 2.6, 2.0, 28, 0xb5ac99);
-      // Big vehicle door on the SE face.
+      // Big vehicle door on the SE face — rolled OPEN: bright frame, pitch-dark
+      // hall behind it (the forge glow inside comes from the ambient overlay).
       const d0 = iso(2.8, 1.35);
-      g.poly([d0.x, d0.y - 22, d0.x - 26, d0.y - 9, d0.x - 26, d0.y + 7, d0.x, d0.y - 6]).fill(0x4a443a);
+      g.poly([d0.x, d0.y - 22, d0.x - 26, d0.y - 9, d0.x - 26, d0.y + 7, d0.x, d0.y - 6])
+        .fill(0x2a2620)
+        .stroke({ width: 1.5, color: 0x8f8775 });
+      // Rolled-up door slats as a lintel above the opening.
+      g.poly([d0.x, d0.y - 22, d0.x - 26, d0.y - 9, d0.x - 26, d0.y - 6, d0.x, d0.y - 19]).fill(0x6f675a);
       prismAt(g, 0.4, 2.25, 2.0, 0.55, 8, 0xa39a87); // apron
       const v1 = iso(0.9, 0.8);
       cylinder(g, v1.x, v1.y - 26, 4, 10, 0x8f8775);
@@ -964,8 +988,9 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
       g.ellipse(c.x, c.y - 35, 12, 6).fill(0xa8a08c);
       g.rect(c.x - 4, c.y - 46, 8, 10).fill(0x7d7568).stroke({ width: 1, color: 0x4a443a }); // cabin
       g.rect(c.x - 3, c.y - 44, 6, 2.5).fill(0x3a352c); // viewing slit
-      g.rect(c.x + 3, c.y - 42, 12, 2).fill(0x4a4a4a); // MG barrel
-      g.circle(c.x + 15, c.y - 41, 1.4).fill(fx); // muzzle
+      // The MG barrel itself sweeps in the ambient overlay (watch rotation);
+      // only its pivot mount stays baked here.
+      g.circle(c.x, c.y - 41, 2).fill(0x4a4a4a).stroke({ width: 1, color: fx, alpha: 0.4 });
       g.rect(c.x - 5, c.y - 52, 1.5, 7).fill(0x6f675a); // flag pole
       g.poly([c.x - 3.5, c.y - 52, c.x + 3, c.y - 50.5, c.x - 3.5, c.y - 49]).fill(0xc23b2e);
     },

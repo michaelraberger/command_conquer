@@ -87,8 +87,15 @@ function breakdownLine(rec: Partial<Record<string, number>>, nameOf: (t: string)
 /**
  * The match table: one row per (non-neutral) player with the core columns,
  * plus a collapsible <details> per-type breakdown underneath each row.
+ * `onlyLocal` restricts it to the local player's row — the LIVE overlay must
+ * not leak enemy intel (what they produced/lost) mid-match; the end screen
+ * shows everyone.
  */
-export function buildStatsTable(state: GameState, localPlayer: number): HTMLElement {
+export function buildStatsTable(
+  state: GameState,
+  localPlayer: number,
+  opts: { onlyLocal?: boolean } = {},
+): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'stats-table';
 
@@ -117,6 +124,7 @@ export function buildStatsTable(state: GameState, localPlayer: number): HTMLElem
   table.appendChild(head);
 
   for (const p of state.players) {
+    if (opts.onlyLocal === true && p.id !== localPlayer) continue;
     const s = p.stats;
     const row = document.createElement('tr');
     if (p.id === localPlayer) row.className = 'me';

@@ -1,6 +1,13 @@
 import { TERRAIN_BRIDGE_WRECK, cellIndex, releaseCell } from '../map.js';
 import { buildingRule, unitRule } from '../rules.js';
-import { bumpStat, storedInBuilding, type Building, type GameState, type Unit } from '../state.js';
+import {
+  bumpStat,
+  footprintOf,
+  storedInBuilding,
+  type Building,
+  type GameState,
+  type Unit,
+} from '../state.js';
 import { crashBoundJets } from './airbase.js';
 
 /**
@@ -30,6 +37,52 @@ export function deathSystem(state: GameState): void {
       }
     }
     state.events.push({ type: 'BRIDGE_DOWN', cx: b.cx, cy: b.cy });
+  }
+
+  // Kernschmelze: a dying meltdown building (Atomkraftwerk) blasts EVERYTHING
+  // around it — friend and foe, unattributed like the crate bomb. Worklist
+  // loop so a chain reaction (meltdown kills the neighbor ATOM) fires within
+  // the same tick regardless of array order; iron curtain shields as usual.
+  // Runs before the sweeps so all victims are removed this very tick.
+  const melted = new Set<number>();
+  for (let again = true; again; ) {
+    again = false;
+    for (const b of state.buildings) {
+      if (b.hp > 0 || melted.has(b.id)) continue;
+      const meltdown = buildingRule(b.type).meltdown;
+      if (!meltdown) continue;
+      melted.add(b.id);
+      again = true;
+      const bf = footprintOf(b);
+      const ccx = b.cx + (bf.w >> 1);
+      const ccy = b.cy + (bf.h >> 1);
+      const r2 = meltdown.radius * meltdown.radius;
+      for (const u of state.units) {
+        if (u.curtainTicks > 0 || unitRule(u.type).air === true) continue;
+        const ux = u.cell % state.mapWidth;
+        const uy = (u.cell - ux) / state.mapWidth;
+        if ((ux - ccx) * (ux - ccx) + (uy - ccy) * (uy - ccy) > r2) continue;
+        u.hp -= meltdown.damage;
+        state.events.push({ type: 'HIT', x: u.x, y: u.y });
+      }
+      for (const other of state.buildings) {
+        if (other.id === b.id || other.hp <= 0 || other.curtainTicks > 0) continue;
+        const ofp = footprintOf(other);
+        let inRange = false;
+        for (let y = other.cy; y < other.cy + ofp.h && !inRange; y++) {
+          for (let x = other.cx; x < other.cx + ofp.w; x++) {
+            if ((x - ccx) * (x - ccx) + (y - ccy) * (y - ccy) <= r2) {
+              inRange = true;
+              break;
+            }
+          }
+        }
+        if (!inRange) continue;
+        other.hp -= meltdown.damage;
+        state.events.push({ type: 'HIT', x: other.x, y: other.y });
+      }
+      state.events.push({ type: 'MELTDOWN', x: b.x, y: b.y });
+    }
   }
 
   if (state.units.some((u) => u.hp <= 0)) {
@@ -70,9 +123,9 @@ export function deathSystem(state: GameState): void {
         const player = state.players[building.owner];
         if (player) player.credits = Math.max(0, player.credits - stored);
       }
-      const rule = buildingRule(building.type);
-      for (let y = building.cy; y < building.cy + rule.height; y++) {
-        for (let x = building.cx; x < building.cx + rule.width; x++) {
+      const { w, h } = footprintOf(building);
+      for (let y = building.cy; y < building.cy + h; y++) {
+        for (let x = building.cx; x < building.cx + w; x++) {
           const idx = y * state.mapWidth + x;
           if (state.structures[idx] === building.id) {
             state.structures[idx] = 0;

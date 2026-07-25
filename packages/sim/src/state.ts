@@ -135,6 +135,10 @@ export interface Building {
   curtainTicks: number;
   /** Credit-fed self-repair mode (sidebar wrench). Auto-clears at full hp. */
   repairing: boolean;
+  /** Placed rotated (diagonal iso mirror): the client mirrors the sprite and
+   *  the EFFECTIVE footprint swaps width/height (see footprintOf). Always
+   *  initialized for stable hashing. */
+  rotated: boolean;
   /** In-place upgrade in progress (Wachturm → AGT, Kraftwerk → Fortschr.):
    *  the building keeps working as its current type until `progress` reaches the
    *  target's buildTime, then becomes `to`. null/absent = not upgrading. */
@@ -428,8 +432,11 @@ export function constructBuilding(
   owner: number,
   cx: number,
   cy: number,
+  rotated = false,
 ): Building {
   const rule = buildingRule(type);
+  const w = rotated ? rule.height : rule.width;
+  const h = rotated ? rule.width : rule.height;
   const building: Building = {
     id: state.nextEntityId++,
     type,
@@ -437,8 +444,8 @@ export function constructBuilding(
     cx,
     cy,
     hp: rule.maxHp,
-    x: cx * SUBCELL + (rule.width * SUBCELL) / 2,
-    y: cy * SUBCELL + (rule.height * SUBCELL) / 2,
+    x: cx * SUBCELL + (w * SUBCELL) / 2,
+    y: cy * SUBCELL + (h * SUBCELL) / 2,
     rallyCx: -1,
     rallyCy: -1,
     level: 1,
@@ -446,12 +453,13 @@ export function constructBuilding(
     charge: 0,
     curtainTicks: 0,
     repairing: false,
+    rotated,
   };
   // Bridge spans never enter the structures grid: ground units drive over
   // them and ships sail beneath — the span is only a damage target.
   if (type !== 'BRIDGE') {
-    for (let y = cy; y < cy + rule.height; y++) {
-      for (let x = cx; x < cx + rule.width; x++) {
+    for (let y = cy; y < cy + h; y++) {
+      for (let x = cx; x < cx + w; x++) {
         const idx = cellIndex(state, x, y);
         state.structures[idx] = building.id;
         if (type === 'GATE') state.gateOwner[idx] = owner + 1;
@@ -460,6 +468,16 @@ export function constructBuilding(
   }
   state.buildings.push(building);
   return building;
+}
+
+/** Effective footprint of a standing building: rotated placement (diagonal
+ *  iso mirror) swaps the rule's width/height. Single source of truth for
+ *  every per-building footprint walk. */
+export function footprintOf(building: Building): { w: number; h: number } {
+  const rule = buildingRule(building.type);
+  return building.rotated
+    ? { w: rule.height, h: rule.width }
+    : { w: rule.width, h: rule.height };
 }
 
 /**
@@ -545,8 +563,8 @@ export function spawnBridgeSpans(state: GameState): void {
 
 /** The cell in front of a refinery where harvesters dock to unload. */
 export function dockCell(building: Building): PathCell {
-  const rule = buildingRule(building.type);
-  return { cx: building.cx + 1, cy: building.cy + rule.height };
+  const { h } = footprintOf(building);
+  return { cx: building.cx + 1, cy: building.cy + h };
 }
 
 /** Classic two-player spawn centres; the actual game uses state.spawns. */
@@ -927,8 +945,10 @@ export function deserialize(json: string): GameState {
     }
   }
   // Saves from before the building-repair mode: default the flag off.
+  // Same for pre-rotation saves: everything was placed unrotated.
   for (const b of raw.buildings) {
     if (typeof b.repairing !== 'boolean') b.repairing = false;
+    if (typeof b.rotated !== 'boolean') b.rotated = false;
   }
   // Saves from before crates: default to none on the map; older crates
   // without a birth tick start their expiry clock at load.

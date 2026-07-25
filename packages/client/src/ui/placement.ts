@@ -4,6 +4,7 @@ import {
   SUPERWEAPON_STATS,
   buildingRule,
   canPlaceBuilding,
+  footprintOf,
   type Building,
   type BuildingType,
   type Command,
@@ -24,6 +25,8 @@ import { session } from '../session.js';
  */
 export class PlacementMode {
   active: BuildingType | null = null;
+  /** Rotated placement (R toggles): diagonal iso mirror, swaps the footprint. */
+  rotated = false;
   /** Superweapon/paradrop targeting mode ("Ziel wählen"). */
   strike: StrikeKind | null = null;
   /** Repair mode (sidebar wrench): clicks toggle self-repair on own buildings. */
@@ -45,6 +48,17 @@ export class PlacementMode {
     ghostLayer.addChild(this.pendingG, this.ghost);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.cancel();
+      // R rotates the pending building. Registered BEFORE the Hotkeys handler
+      // (main.ts constructs PlacementMode first), so consuming the key here
+      // keeps it away from the radius toggle while placement is active.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if ((e.key === 'r' || e.key === 'R') && this.active !== null && this.active !== 'WALL') {
+        e.stopImmediatePropagation();
+        this.rotated = !this.rotated;
+        const { cx, cy } = this.lastCell;
+        this.lastCell = { cx: -1, cy: -1 };
+        if (cx >= 0) this.hover(cx, cy); // refresh the ghost in place
+      }
     });
   }
 
@@ -86,6 +100,7 @@ export class PlacementMode {
     this.strike = null;
     this.repair = false;
     this.active = type;
+    this.rotated = false;
     this.lastCell = { cx: -1, cy: -1 };
     this.ghost.visible = true;
     this.ghost.clear();
@@ -144,11 +159,11 @@ export class PlacementMode {
     this.ghost.clear();
     const building = this.buildingAt(cx, cy);
     const own = building !== null && building.owner === session.localPlayer;
-    const rule = own ? buildingRule(building.type) : null;
+    const fp = own ? footprintOf(building) : null;
     const x0 = own ? building.cx : cx;
     const y0 = own ? building.cy : cy;
-    const w = rule?.width ?? 1;
-    const h = rule?.height ?? 1;
+    const w = fp?.w ?? 1;
+    const h = fp?.h ?? 1;
     const color = own ? 0xffd94d : 0x8a94a0;
     for (let y = y0; y < y0 + h; y++) {
       for (let x = x0; x < x0 + w; x++) {
@@ -185,11 +200,13 @@ export class PlacementMode {
 
   private redraw(cx: number, cy: number): void {
     const rule = buildingRule(this.active!);
-    const ok = canPlaceBuilding(this.state, session.localPlayer, this.active!, cx, cy);
+    const w = this.rotated ? rule.height : rule.width;
+    const h = this.rotated ? rule.width : rule.height;
+    const ok = canPlaceBuilding(this.state, session.localPlayer, this.active!, cx, cy, this.rotated);
     const color = ok ? 0x53c94f : 0xe04a3a;
     this.ghost.clear();
-    for (let y = cy; y < cy + rule.height; y++) {
-      for (let x = cx; x < cx + rule.width; x++) {
+    for (let y = cy; y < cy + h; y++) {
+      for (let x = cx; x < cx + w; x++) {
         const { x: sx, y: sy } = cellToScreen(x, y);
         this.ghost
           .poly([
@@ -226,7 +243,9 @@ export class PlacementMode {
       return true;
     }
     if (!this.active) return false;
-    if (!canPlaceBuilding(this.state, session.localPlayer, this.active, cx, cy)) return true;
+    if (!canPlaceBuilding(this.state, session.localPlayer, this.active, cx, cy, this.rotated)) {
+      return true;
+    }
     if (this.active === 'WALL') {
       this.send({ type: 'PLACE_WALL', playerId: session.localPlayer, cx, cy });
       this.notePending(cx, cy, 1, 1);
@@ -234,8 +253,19 @@ export class PlacementMode {
       return true;
     }
     const rule = buildingRule(this.active);
-    this.send({ type: 'PLACE_BUILDING', playerId: session.localPlayer, cx, cy });
-    this.notePending(cx, cy, rule.width, rule.height);
+    this.send({
+      type: 'PLACE_BUILDING',
+      playerId: session.localPlayer,
+      cx,
+      cy,
+      rotated: this.rotated,
+    });
+    this.notePending(
+      cx,
+      cy,
+      this.rotated ? rule.height : rule.width,
+      this.rotated ? rule.width : rule.height,
+    );
     this.cancel();
     return true;
   }

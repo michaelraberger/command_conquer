@@ -9,7 +9,7 @@ import {
   type UnitType,
   type WeaponRule,
 } from './rules.js';
-import { areEnemies, bumpStat, type Building, type GameState, type Unit } from './state.js';
+import { areEnemies, bumpStat, footprintOf, type Building, type GameState, type Unit } from './state.js';
 
 /** Is this unit an aircraft (flies, only hit by anti-air weapons)? */
 export function isAir(unit: Unit): boolean {
@@ -116,11 +116,11 @@ export function targetOwner(target: Target): number {
 export function aimPoint(target: Target, fromX: number, fromY: number): { x: number; y: number } {
   if (target.kind === 'unit') return { x: target.unit.x, y: target.unit.y };
   const b = target.building;
-  const rule = buildingRule(b.type);
+  const { w, h } = footprintOf(b);
   const minX = b.cx * SUBCELL;
   const minY = b.cy * SUBCELL;
-  const maxX = (b.cx + rule.width) * SUBCELL;
-  const maxY = (b.cy + rule.height) * SUBCELL;
+  const maxX = (b.cx + w) * SUBCELL;
+  const maxY = (b.cy + h) * SUBCELL;
   return {
     x: fromX < minX ? minX : fromX > maxX ? maxX : fromX,
     y: fromY < minY ? minY : fromY > maxY ? maxY : fromY,

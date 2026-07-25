@@ -76,6 +76,30 @@ describe('cheats', () => {
     expect(state.players[1]!.motherload).toBe(false);
   });
 
+  it('the SIM refuses every cheat in internet matches (modified clients included)', () => {
+    const state = createGame(1, {
+      multiplayer: {
+        seats: [
+          { faction: 'ALLIES', name: 'Anna' },
+          { faction: 'SOVIETS', name: 'Boris' },
+        ],
+      },
+    });
+    expect(state.multiplayer).toBe(true);
+    const before = state.players[0]!.credits;
+    tick(state, [
+      { type: 'CHEAT', playerId: 0, cheat: 'MONEY' },
+      { type: 'CHEAT', playerId: 0, cheat: 'POWER' },
+      { type: 'CHEAT', playerId: 0, cheat: 'REVEAL' },
+      { type: 'CHEAT', playerId: 0, cheat: 'MOTHERLOAD' },
+    ]);
+    const p = state.players[0]!;
+    expect(p.credits).toBe(before);
+    expect(p.powerBonus).toBe(0);
+    expect(p.mapRevealed).toBe(false);
+    expect(p.motherload).toBe(false);
+  });
+
   it('cheats replay deterministically through the command log', () => {
     const run = (): string => {
       const state = createGame(42);

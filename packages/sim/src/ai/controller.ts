@@ -10,6 +10,7 @@ import {
   techFor,
   techRule,
   unitRule,
+  upgradeChainOf,
   type AiDifficulty,
   type BuildingType,
   type Faction,
@@ -208,6 +209,11 @@ function manageUpgrades(state: GameState, player: Player, params: AiParams): voi
   if (player.credits < 1500) return; // keep a buffer for production
   const { produced, used } = powerBalance(state, player.id);
   if (used > produced && upgradeOne(state, player, 'POWER')) return;
+  // Third tier only after the Atomprogramm — upgradeOne bypasses the command
+  // gate, so the research check must live here.
+  if (used > produced && player.researched.includes('atom') && upgradeOne(state, player, 'ADVPOWER')) {
+    return;
+  }
   upgradeOne(state, player, 'GUARDTOWER');
 }
 
@@ -225,11 +231,11 @@ function countBuildings(state: GameState, owner: number, type: BuildingType): nu
  * (observed: 17 AGTs and a bankrupt build order that never reached its tech).
  */
 function countGoalBuildings(state: GameState, owner: number, type: BuildingType): number {
-  const upgraded = buildingRule(type).upgradeTo;
+  const chain = upgradeChainOf(type); // POWER counts ADVPOWER and ATOM too
   let n = 0;
   for (const b of state.buildings) {
     if (b.owner !== owner) continue;
-    if (b.type === type || (upgraded !== undefined && b.type === upgraded)) n++;
+    if (chain.includes(b.type)) n++;
   }
   return n;
 }
@@ -268,7 +274,7 @@ function manageConstruction(state: GameState, player: Player, params: AiParams):
 
 /** Preferred research order; the AI unlocks its tech tree one project at a time. */
 const AI_RESEARCH_ORDER: readonly TechId[] = [
-  'repair', 'flak', 'air', 'armor', 'tesla', 'navy', 'super',
+  'repair', 'flak', 'air', 'armor', 'tesla', 'navy', 'atom', 'super',
 ];
 
 /**
@@ -289,7 +295,7 @@ function manageResearch(state: GameState, player: Player, params: AiParams): voi
     // Allied-only projects, before reaching their own tech.
     if (!techUnlocksFor(tech, player.faction)) continue;
     if (tech === 'navy' && state.mapType !== 'ISLANDS') continue; // no shipyard goal on land
-    if (tech === 'super' && !params.useHighTech) continue; // easy AI stays low-tech
+    if ((tech === 'super' || tech === 'atom') && !params.useHighTech) continue; // easy AI stays low-tech
     startResearch(state, player.id, tech);
     return;
   }

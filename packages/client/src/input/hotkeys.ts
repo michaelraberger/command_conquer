@@ -1,4 +1,4 @@
-import { WALL_LEVELS, buildingRule, unitRule, type Command, type GameState } from '@cac/sim';
+import { WALL_LEVELS, buildingRule, techFor, unitRule, type Command, type GameState } from '@cac/sim';
 import { worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { Camera } from './camera.js';
@@ -190,12 +190,25 @@ export class Hotkeys {
     if (id === null) return;
     const building = this.state.buildings.find((b) => b.id === id);
     if (!building || building.owner !== session.localPlayer) return;
+    const upgradeTo = buildingRule(building.type).upgradeTo;
     const upgradable =
-      (building.type === 'WALL' && building.level < WALL_LEVELS.length) ||
-      buildingRule(building.type).upgradeTo !== undefined;
-    if (upgradable) {
-      this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId: id });
+      (building.type === 'WALL' && building.level < WALL_LEVELS.length) || upgradeTo !== undefined;
+    if (!upgradable) return;
+    // Mirror the sim's tech gate (Atomkraftwerk braucht Atomprogramm) so the
+    // hotkey never fires a command the sim would silently reject.
+    if (upgradeTo !== undefined) {
+      const tech = techFor(upgradeTo);
+      const player = this.state.players[session.localPlayer];
+      if (
+        tech !== undefined &&
+        player &&
+        !player.motherload &&
+        !player.researched.includes(tech)
+      ) {
+        return;
+      }
     }
+    this.send({ type: 'UPGRADE_BUILDING', playerId: session.localPlayer, buildingId: id });
   }
 
   /** Recenter the camera on the player's construction yard (or any building). */

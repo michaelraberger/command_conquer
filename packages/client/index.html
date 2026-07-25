@@ -989,6 +989,12 @@
         opacity: 0.4;
         cursor: not-allowed;
       }
+      /* Tech-gesperrter Ausbau (Atomkraftwerk ohne Atomprogramm). */
+      #binfo .bupgrade.techlocked {
+        border-color: #4a5a6a;
+        color: #8fa1b3;
+        background: #1a222c;
+      }
       #binfo .bprog-label {
         margin-top: 6px;
         font-size: 11px;
@@ -2462,6 +2468,7 @@
           <h3>Einheiten &amp; Bauen</h3>
           <dl>
             <dt>U</dt><dd>Ausgewähltes Gebäude ausbauen</dd>
+            <dt>R (beim Platzieren)</dt><dd>Gebäude drehen</dd>
             <dt>R</dt><dd>Baubereich &amp; Patrouillen-Routen ein-/ausblenden</dd>
             <dt>E</dt><dd>Transportschiff entladen</dd>
             <dt>G</dt><dd>Position halten (feuert, weicht nie – auch bei Basis-Alarm)</dd>
@@ -2475,6 +2482,7 @@
           <h3>Spiel</h3>
           <dl>
             <dt>P</dt><dd>Pause</dd>
+            <dt>Enter</dt><dd>Chat im Mehrspieler-Spiel (Enter sendet, Esc bricht ab)</dd>
             <dt>Tab</dt><dd>Statistik-Übersicht ein-/ausblenden</dd>
             <dt>F6</dt><dd>Spiel speichern (Cloud, Konto nötig; Laden im Hauptmenü)</dd>
             <dt>T</dt><dd>Technologiebaum öffnen / schließen</dd>

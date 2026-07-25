@@ -8,6 +8,7 @@ import {
   buildingMaxHp,
   buildingRule,
   cellCenter,
+  footprintOf,
   isInfantryType,
   powerBalance,
   toCell,
@@ -100,10 +101,10 @@ const PACK_OFFSETS = [
  *  brown on grass/dirt, packed tan on sand — null (no apron) on anything
  *  else, e.g. water-based structures. */
 function wornTintFor(state: GameState, building: Building): number | null {
-  const rule = buildingRule(building.type);
+  const { w, h } = footprintOf(building);
   const counts = new Map<number, number>();
-  for (let y = building.cy; y < building.cy + rule.height; y++) {
-    for (let x = building.cx; x < building.cx + rule.width; x++) {
+  for (let y = building.cy; y < building.cy + h; y++) {
+    for (let x = building.cx; x < building.cx + w; x++) {
       const t = state.terrain[y * state.mapWidth + x]!;
       counts.set(t, (counts.get(t) ?? 0) + 1);
     }
@@ -395,9 +396,11 @@ export class EntityRenderer {
       if (building.type !== view.lastType && building.type !== 'WALL') {
         const def = this.tex.buildings[building.type];
         view.body.texture = def.texture;
-        view.body.anchor.set(def.anchorX, def.anchorY);
         view.team.texture = def.team;
-        view.team.anchor.set(def.anchorX, def.anchorY);
+        // Keep the rotated mirror across the swap (upgrades share footprints).
+        const ax = building.rotated ? 1 - def.anchorX : def.anchorX;
+        view.body.anchor.set(ax, def.anchorY);
+        view.team.anchor.set(ax, def.anchorY);
         view.lastType = building.type;
       }
       // Gates open when a friendly unit is within ~2.5 cells (cosmetic only).
@@ -467,11 +470,11 @@ export class EntityRenderer {
     // Trampled apron + soft drop shadow under the footprint (shadow thrown to
     // the left — light from the east, like the tree/cliff shading). Walls,
     // gates and bridge spans stay bare.
+    const fp = footprintOf(building);
     if (building.type !== 'WALL' && building.type !== 'GATE' && building.type !== 'BRIDGE') {
-      const rule0 = buildingRule(building.type);
       const centre = worldToScreen(
-        (building.cx + rule0.width / 2) * SUBCELL,
-        (building.cy + rule0.height / 2) * SUBCELL,
+        (building.cx + fp.w / 2) * SUBCELL,
+        (building.cy + fp.h / 2) * SUBCELL,
       );
       const corner0 = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
       // Worn ground around the structure, classic C&C "bib": an irregular
@@ -481,30 +484,38 @@ export class EntityRenderer {
       if (worn !== null) {
         const patch = new Sprite(this.tex.wornPatch[building.id % this.tex.wornPatch.length]!);
         patch.anchor.set(0.5);
-        patch.position.set(centre.x - corner0.x, centre.y - corner0.y + 5 + rule0.height * 3);
-        patch.scale.set(rule0.width * 0.68 + 0.6, rule0.height * 0.66 + 0.55);
+        patch.position.set(centre.x - corner0.x, centre.y - corner0.y + 5 + fp.h * 3);
+        patch.scale.set(fp.w * 0.68 + 0.6, fp.h * 0.66 + 0.55);
         patch.tint = worn;
         root.addChild(patch);
       }
       const shadow = new Sprite(this.tex.softShadow);
       shadow.anchor.set(0.5);
-      shadow.position.set(centre.x - corner0.x - rule0.width * 5, centre.y - corner0.y + 3);
-      shadow.scale.set(rule0.width * 0.62, rule0.height * 0.55);
+      shadow.position.set(centre.x - corner0.x - fp.w * 5, centre.y - corner0.y + 3);
+      shadow.scale.set(fp.w * 0.62, fp.h * 0.55);
       shadow.alpha = 0.8;
       root.addChild(shadow);
     }
     // Neutral structure stays untinted; the team accent carries the faction.
+    // Rotated buildings mirror the baked sprite about the footprint corner —
+    // the diagonal iso mirror that maps the w×h diamond onto h×w in place.
     const body = new Sprite(def.texture);
-    body.anchor.set(def.anchorX, def.anchorY);
-    const teamColor = this.playerColors.get(building.owner) ?? 0xffffff;
     const team = new Sprite(def.team);
-    team.anchor.set(def.anchorX, def.anchorY);
+    if (building.rotated) {
+      body.anchor.set(1 - def.anchorX, def.anchorY);
+      team.anchor.set(1 - def.anchorX, def.anchorY);
+      body.scale.x = -1;
+      team.scale.x = -1;
+    } else {
+      body.anchor.set(def.anchorX, def.anchorY);
+      team.anchor.set(def.anchorX, def.anchorY);
+    }
+    const teamColor = this.playerColors.get(building.owner) ?? 0xffffff;
     team.tint = teamColor;
-    const rule = buildingRule(building.type);
     const bar = new Graphics();
     const roof = worldToScreen(
-      (building.cx + rule.width / 2) * SUBCELL,
-      (building.cy + rule.height / 2) * SUBCELL,
+      (building.cx + fp.w / 2) * SUBCELL,
+      (building.cy + fp.h / 2) * SUBCELL,
     );
     const corner = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     bar.position.set(roof.x - corner.x, -18);
@@ -520,7 +531,7 @@ export class EntityRenderer {
     root.addChild(body, team, bar, wrench);
     const { x, y } = worldToScreen(building.cx * SUBCELL, building.cy * SUBCELL);
     root.position.set(x, y);
-    root.zIndex = depthOf((building.cx + rule.width) * SUBCELL, (building.cy + rule.height) * SUBCELL);
+    root.zIndex = depthOf((building.cx + fp.w) * SUBCELL, (building.cy + fp.h) * SUBCELL);
     this.layer.addChild(root);
     return {
       root,

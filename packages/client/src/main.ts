@@ -24,6 +24,7 @@ import { EntityRenderer } from './render/entities.js';
 import { FogRenderer } from './render/fog.js';
 import { OreRenderer } from './render/ore.js';
 import { PatrolRouteOverlay } from './render/patrolRoutes.js';
+import { AmbientOverlay } from './render/ambient.js';
 import { PrismLinkOverlay } from './render/prismLinks.js';
 import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
@@ -295,6 +296,7 @@ export async function startGame(
   entityLayer.sortableChildren = true;
   placeDoodads(state, textures, entityLayer);
   const effects = new Effects();
+  const ambient = new AmbientOverlay();
   const prismLinks = new PrismLinkOverlay();
   const patrolRoutes = new PatrolRouteOverlay();
   const fog = new FogRenderer(state);
@@ -304,6 +306,7 @@ export async function startGame(
     ghostLayer,
     patrolRoutes.layer,
     entityLayer,
+    ambient.layer,
     prismLinks.layer,
     effects.layer,
     fog.layer,
@@ -437,6 +440,7 @@ export async function startGame(
       controls,
       entities,
       effects,
+      ambient,
       prismLinks,
       patrolRoutes,
       ore,
@@ -514,6 +518,7 @@ export async function startGame(
       alerts,
       groups,
       meta,
+      ambient,
     };
   }
 }

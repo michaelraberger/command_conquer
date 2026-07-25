@@ -24,6 +24,9 @@ export type SimEvent =
   /** An engineer rebuilt the span at (cx,cy): wreck → deck again. */
   | { type: 'BRIDGE_UP'; cx: number; cy: number }
   | { type: 'SUPERWEAPON'; x: number; y: number; kind: SuperweaponKind }
+  /** Kernschmelze: a meltdown-rule building (Atomkraftwerk) blew up at
+   *  fixed-point (x,y) — the client draws the big dirty explosion. */
+  | { type: 'MELTDOWN'; x: number; y: number }
   | { type: 'REPAIR'; x: number; y: number }
   | { type: 'PARADROP'; x: number; y: number }
   /** A unit collected the crate at fixed-point (x,y). */

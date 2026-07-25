@@ -107,6 +107,8 @@ export class Effects {
       } else if (e.type === 'SUPERWEAPON') {
         if (e.kind === 'CURTAIN') this.addIronCurtain(worldToScreen(e.x, e.y));
         else this.addSuperweapon(worldToScreen(e.x, e.y), e.kind === 'NUKE');
+      } else if (e.type === 'MELTDOWN') {
+        this.addMeltdown(worldToScreen(e.x, e.y));
       } else if (e.type === 'PARADROP') {
         // A paratrooper drifts down under a canopy onto the landing point.
         const p = worldToScreen(e.x, e.y);
@@ -276,6 +278,60 @@ export class Effects {
       (g, t) => {
         g.alpha = 0.9 * (1 - t);
         g.scale.set(0.5 + t * 2.6); // ring expands over the protected area
+      },
+    );
+  }
+
+  /** Kernschmelze (Atomkraftwerk): green-tinged flash, shockwave ring,
+   *  fireball and a dirty rising smoke column — the nuke idiom, scaled down. */
+  private addMeltdown(p: { x: number; y: number }): void {
+    this.add(
+      240,
+      (g) => {
+        g.circle(0, 0, 55).fill({ color: 0xd8ffc4, alpha: 0.9 });
+        g.position.set(p.x, p.y);
+      },
+      (g, t) => {
+        g.alpha = 0.9 * (1 - t);
+        g.scale.set(1 + t * 0.4);
+      },
+    );
+    this.add(
+      950,
+      (g) => {
+        g.ellipse(0, 0, 26, 13).stroke({ width: 3, color: 0x9fff6e, alpha: 0.9 });
+        g.position.set(p.x, p.y);
+      },
+      (g, t) => {
+        g.alpha = 0.9 * (1 - t);
+        g.scale.set(0.4 + t * 2.8);
+      },
+    );
+    this.add(
+      1100,
+      (g) => {
+        g.circle(0, 0, 26).fill({ color: 0xff7a26, alpha: 0.9 });
+        g.circle(0, -5, 15).fill(0xffd9a0);
+        g.position.set(p.x, p.y - 6);
+      },
+      (g, t) => {
+        g.alpha = 1 - t;
+        g.scale.set(0.5 + t * 1.2);
+        g.position.y = p.y - 6 - t * 20;
+      },
+    );
+    this.add(
+      2200,
+      (g) => {
+        g.circle(-8, 0, 13).fill({ color: 0x3a4436, alpha: 0.55 });
+        g.circle(10, -5, 11).fill({ color: 0x4a5544, alpha: 0.5 });
+        g.circle(0, -15, 15).fill({ color: 0x55604e, alpha: 0.5 });
+        g.position.set(p.x, p.y - 14);
+      },
+      (g, t) => {
+        g.alpha = 0.65 * (1 - t);
+        g.position.y = p.y - 14 - t * 45;
+        g.scale.set(0.7 + t * 1.4);
       },
     );
   }

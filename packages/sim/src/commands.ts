@@ -22,6 +22,7 @@ import {
   WALL_LEVELS,
   buildingRule,
   sellRefund,
+  techFor,
   unitRule,
   type BuildingType,
   type ProductionCategory,
@@ -30,6 +31,7 @@ import {
   areEnemies,
   bumpStat,
   constructBuilding,
+  footprintOf,
   type GameState,
   type PathCell,
   type Unit,
@@ -59,7 +61,8 @@ export type Command =
   | { type: 'REPAIR'; playerId: number; unitIds: number[]; targetId: number }
   | { type: 'BUILD_START'; playerId: number; item: string }
   | { type: 'BUILD_CANCEL'; playerId: number; category: ProductionCategory }
-  | { type: 'PLACE_BUILDING'; playerId: number; cx: number; cy: number }
+  /** `rotated`: place as diagonal iso mirror — swaps the footprint's w/h. */
+  | { type: 'PLACE_BUILDING'; playerId: number; cx: number; cy: number; rotated?: boolean }
   | { type: 'PLACE_WALL'; playerId: number; cx: number; cy: number }
   | { type: 'UPGRADE_BUILDING'; playerId: number; buildingId: number }
   | { type: 'SELL_BUILDING'; playerId: number; buildingId: number }
@@ -205,7 +208,7 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         cancelProduction(state, cmd.playerId, cmd.category);
         break;
       case 'PLACE_BUILDING':
-        placeQueuedBuilding(state, cmd.playerId, cmd.cx, cmd.cy);
+        placeQueuedBuilding(state, cmd.playerId, cmd.cx, cmd.cy, cmd.rotated === true);
         break;
       case 'PLACE_WALL': {
         const player = state.players.find((p) => p.id === cmd.playerId);
@@ -238,6 +241,12 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         if (building.upgrade) break;
         const rule = buildingRule(building.type);
         if (rule.upgradeTo === undefined || rule.upgradeCost === undefined) break;
+        // Tech gate on the TARGET tier (Atomkraftwerk braucht Atomprogramm);
+        // motherload skips it, matching startProduction.
+        const upTech = techFor(rule.upgradeTo);
+        if (upTech !== undefined && !player.motherload && !player.researched.includes(upTech)) {
+          break;
+        }
         if (player.credits < rule.upgradeCost) break;
         player.credits -= rule.upgradeCost;
         building.upgrade = { to: rule.upgradeTo as BuildingType, progress: 0 };
@@ -271,9 +280,9 @@ export function applyCommands(state: GameState, commands: Command[]): void {
         // Deconstruct without an explosion: free the footprint, drop the
         // record. Deliberately NOT counted as a loss in the match stats —
         // selling removes the building outside deathSystem.
-        const rule = buildingRule(building.type);
-        for (let y = building.cy; y < building.cy + rule.height; y++) {
-          for (let x = building.cx; x < building.cx + rule.width; x++) {
+        const { w, h } = footprintOf(building);
+        for (let y = building.cy; y < building.cy + h; y++) {
+          for (let x = building.cx; x < building.cx + w; x++) {
             const idx = y * state.mapWidth + x;
             if (state.structures[idx] === building.id) {
               state.structures[idx] = 0;
