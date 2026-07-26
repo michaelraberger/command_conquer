@@ -1,4 +1,4 @@
-import type { Command } from '@cac/sim';
+import { TICK_MS, type Command } from '@cac/sim';
 
 /**
  * Pure lockstep bookkeeping — no DOM, no Supabase, no timers. The RemoteDriver
@@ -25,6 +25,12 @@ export const HASH_PERIOD_TURNS = 50;
 export const HISTORY_TURNS = 3;
 /** Sender stops running ahead of the executed turn by more than this. */
 export const MAX_AHEAD_TURNS = 300;
+/** Wall-clock length of one net turn. */
+export const TURN_MS = TICKS_PER_TURN * TICK_MS;
+/** Upper bound of turns closed per send — sanity cap after long timer gaps
+ *  (laptop sleep, minute-level background throttling). At 7.5 due turns per
+ *  second even a 1 Hz throttled timer catches up with room to spare. */
+export const MAX_TURNS_PER_SEND = 45;
 
 export function turnOfTick(tick: number): number {
   return Math.trunc(tick / TICKS_PER_TURN);
@@ -195,6 +201,7 @@ export class LockstepScheduler {
 export class FrameSender {
   private readonly log = new Map<number, Command[]>();
   private nextSendTurn = INPUT_DELAY_TURNS;
+  private turnZeroAt: number | null = null;
 
   constructor(readonly localSeat: number) {}
 
@@ -203,19 +210,49 @@ export class FrameSender {
     return this.nextSendTurn;
   }
 
+  /** Anchor the turn clock: the first send turn is due at `nowMs`. */
+  markStarted(nowMs: number): void {
+    this.turnZeroAt = nowMs;
+  }
+
   /**
-   * Close the current send turn with the drained local commands and return the
-   * message payload: this turn plus the trailing history window.
+   * Newest turn that should be closed by `nowMs`. Clock-based instead of
+   * counting timer fires: setInterval callbacks arrive systematically LATE
+   * (and hidden tabs throttle them to seconds), so a fire-counting sender
+   * drifts behind the 7.5-turns-per-second the sim consumes — every deficit
+   * turn stalls all peers for a turn and triggers a catch-up burst.
+   */
+  dueTurn(nowMs: number): number {
+    if (this.turnZeroAt === null) return this.nextSendTurn;
+    return INPUT_DELAY_TURNS + Math.trunc((nowMs - this.turnZeroAt) / TURN_MS);
+  }
+
+  /**
+   * Close every due turn up to `targetTurn` (capped at MAX_TURNS_PER_SEND):
+   * the drained commands land in the first newly closed turn — peers cannot
+   * have executed it yet, they are still waiting for exactly this frame — and
+   * later turns close empty. Returns the newly closed frames, oldest first;
+   * empty array when no turn is due.
+   */
+  buildFramesUpTo(targetTurn: number, drained: Command[]): TurnFrame[] {
+    const closed: TurnFrame[] = [];
+    const last = Math.min(targetTurn, this.nextSendTurn + MAX_TURNS_PER_SEND - 1);
+    while (this.nextSendTurn <= last) {
+      const cmds = closed.length === 0 ? drained : [];
+      this.log.set(this.nextSendTurn, cmds);
+      closed.push({ turn: this.nextSendTurn, cmds });
+      this.nextSendTurn++;
+    }
+    return closed;
+  }
+
+  /**
+   * Close exactly the next turn and return the message payload: this turn
+   * plus the trailing history window (convenience path, also used by tests).
    */
   buildFrames(drained: Command[]): TurnFrame[] {
-    this.log.set(this.nextSendTurn, drained);
-    const from = Math.max(INPUT_DELAY_TURNS, this.nextSendTurn - HISTORY_TURNS + 1);
-    const frames: TurnFrame[] = [];
-    for (let t = from; t <= this.nextSendTurn; t++) {
-      frames.push({ turn: t, cmds: this.log.get(t) ?? [] });
-    }
-    this.nextSendTurn++;
-    return frames;
+    this.buildFramesUpTo(this.nextSendTurn, drained);
+    return this.framesForRange(this.nextSendTurn - HISTORY_TURNS, this.nextSendTurn - 1);
   }
 
   /** Frames for a peer's resend request (empty for unknown turns). */

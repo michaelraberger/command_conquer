@@ -6,7 +6,9 @@ import {
   INPUT_DELAY_TURNS,
   LockstepScheduler,
   MAX_AHEAD_TURNS,
+  MAX_TURNS_PER_SEND,
   TICKS_PER_TURN,
+  TURN_MS,
   firstTickOfTurn,
   turnOfTick,
 } from '../src/net/lockstepCore.js';
@@ -164,5 +166,46 @@ describe('FrameSender', () => {
     for (let i = 0; i <= MAX_AHEAD_TURNS; i++) f.buildFrames([]);
     expect(f.tooFarAhead(INPUT_DELAY_TURNS - 1)).toBe(true);
     expect(f.tooFarAhead(INPUT_DELAY_TURNS + 5)).toBe(false);
+  });
+
+  it('derives due turns from the wall clock, immune to timer drift', () => {
+    const f = new FrameSender(0);
+    f.markStarted(1000);
+    // At start exactly the first send turn is due.
+    expect(f.dueTurn(1000)).toBe(INPUT_DELAY_TURNS);
+    // 10 turns of wall clock later, 10 more turns are due — no matter how
+    // often (or rarely) a timer fired in between.
+    expect(f.dueTurn(1000 + 10 * TURN_MS)).toBe(INPUT_DELAY_TURNS + 10);
+  });
+
+  it('closes all missed turns in one batch after a late timer', () => {
+    const f = new FrameSender(0);
+    f.markStarted(0);
+    // Timer slept through ~4 turns (busy frame / throttled background tab).
+    const due = f.dueTurn(4 * TURN_MS + 5);
+    const closed = f.buildFramesUpTo(due, [move(0)]);
+    expect(closed.map((x) => x.turn)).toEqual([
+      INPUT_DELAY_TURNS,
+      INPUT_DELAY_TURNS + 1,
+      INPUT_DELAY_TURNS + 2,
+      INPUT_DELAY_TURNS + 3,
+      INPUT_DELAY_TURNS + 4,
+    ]);
+    // Drained commands land in the FIRST closed turn (executes soonest —
+    // peers are still waiting for exactly that frame), the rest are empty.
+    expect(closed[0]!.cmds.length).toBe(1);
+    expect(closed.slice(1).every((x) => x.cmds.length === 0)).toBe(true);
+    // Nothing new due right afterwards.
+    expect(f.buildFramesUpTo(f.dueTurn(4 * TURN_MS + 6), [])).toEqual([]);
+  });
+
+  it('caps a single catch-up batch at MAX_TURNS_PER_SEND', () => {
+    const f = new FrameSender(0);
+    f.markStarted(0);
+    const closed = f.buildFramesUpTo(f.dueTurn(1000 * TURN_MS), []);
+    expect(closed.length).toBe(MAX_TURNS_PER_SEND);
+    // The next call continues where the cap stopped.
+    const next = f.buildFramesUpTo(f.dueTurn(1000 * TURN_MS), []);
+    expect(next[0]!.turn).toBe(INPUT_DELAY_TURNS + MAX_TURNS_PER_SEND);
   });
 });

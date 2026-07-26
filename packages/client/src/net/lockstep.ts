@@ -1,11 +1,12 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { TICK_MS, hashState, type Command, type GameState } from '@cac/sim';
+import { hashState, type Command, type GameState } from '@cac/sim';
 import { drainCommands } from '../commandQueue.js';
 import type { TickDriver } from '../loop.js';
 import { getSupabase } from './supabase.js';
 import {
   FrameSender,
   HASH_PERIOD_TURNS,
+  HISTORY_TURNS,
   INPUT_DELAY_TURNS,
   LockstepScheduler,
   TICKS_PER_TURN,
@@ -14,7 +15,11 @@ import {
 } from './lockstepCore.js';
 import type { MatchStart } from './lobby.js';
 
-const TURN_MS = TICKS_PER_TURN * TICK_MS; // ~133 ms at 15 Hz
+/** Timer cadence. Deliberately shorter than TURN_MS: the interval only POLLS —
+ *  which turns are due comes from the wall clock (FrameSender.dueTurn), so a
+ *  late or throttled timer never loses turns, it just batches them. Polling at
+ *  ~50 ms keeps sends close to their turn boundary. */
+const SEND_POLL_MS = 50;
 /** Show the waiting overlay once the sim has stalled this long. */
 const STALL_OVERLAY_MS = 1000;
 /** Ask silent seats to resend while stalled, at this cadence. */
@@ -140,7 +145,7 @@ export class RemoteDriver implements TickDriver {
     await channel.track({ seat: this.match.localSeat });
 
     const barrierStart = Date.now();
-    this.timer = window.setInterval(() => this.onInterval(barrierStart), TURN_MS);
+    this.timer = window.setInterval(() => this.onInterval(barrierStart), SEND_POLL_MS);
   }
 
   /** Sends a chat line to every peer and echoes it locally (broadcast is
@@ -206,6 +211,7 @@ export class RemoteDriver implements TickDriver {
         // The silence clock starts NOW — a slow barrier must not count toward
         // the drop timeout, or a seat could be dropped before its first frame.
         this.lastSeenAt.fill(now);
+        this.sender.markStarted(now); // Turn-Uhr läuft ab jetzt
       } else if (now - barrierStart > START_BARRIER_MS) {
         this.halted = true;
         this.shutdown();
@@ -222,25 +228,36 @@ export class RemoteDriver implements TickDriver {
       return;
     }
 
-    // Send this turn's frame (even when empty) unless we ran too far ahead of
-    // our own sim (hidden for many minutes — peers will wait/drop us anyway).
+    // Close and send every turn the wall clock says is due (even when empty),
+    // unless we ran too far ahead of our own sim (hidden for many minutes —
+    // peers will wait/drop us anyway). After a late timer (busy frame, hidden
+    // tab) ALL missed turns go out batched in one message, so peers never
+    // starve on a drifting sender.
     if (!this.sender.tooFarAhead(this.core.executedTurn())) {
-      const drained = drainCommands().filter((c) => c.playerId === this.match.localSeat);
-      const frames = this.sender.buildFrames(drained);
-      const last = frames[frames.length - 1]!;
-      this.core.addFrame(this.match.localSeat, last); // own buffer, no echo needed
-      const msg: FrameMsg = { seat: this.match.localSeat, frames };
-      if (this.pendingHash) {
-        msg.hashTurn = this.pendingHash.turn;
-        msg.hash = this.pendingHash.hash;
-        this.pendingHash = null;
+      const due = this.sender.dueTurn(now);
+      if (due >= this.sender.currentSendTurn()) {
+        const drained = drainCommands().filter((c) => c.playerId === this.match.localSeat);
+        const closed = this.sender.buildFramesUpTo(due, drained);
+        if (closed.length > 0) {
+          for (const f of closed) this.core.addFrame(this.match.localSeat, f); // own buffer, no echo needed
+          const oldest = closed[0]!.turn;
+          const newest = closed[closed.length - 1]!.turn;
+          // Message = newly closed turns plus the healing window before them.
+          const frames = this.sender.framesForRange(oldest - (HISTORY_TURNS - 1), newest);
+          const msg: FrameMsg = { seat: this.match.localSeat, frames };
+          if (this.pendingHash) {
+            msg.hashTurn = this.pendingHash.turn;
+            msg.hash = this.pendingHash.hash;
+            this.pendingHash = null;
+          }
+          this.debug.sent++;
+          void this.channel
+            ?.send({ type: 'broadcast', event: 'frame', payload: msg })
+            .then((r) => {
+              if (r !== 'ok') this.debug.sendErrors++;
+            });
+        }
       }
-      this.debug.sent++;
-      void this.channel
-        ?.send({ type: 'broadcast', event: 'frame', payload: msg })
-        .then((r) => {
-          if (r !== 'ok') this.debug.sendErrors++;
-        });
     }
 
     this.superviseStall(now);
