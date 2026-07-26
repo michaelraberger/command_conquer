@@ -86,6 +86,15 @@ export class ControlGroups {
     this.marked.clear();
   }
 
+  /**
+   * Dissolves a group entirely (chip ✕): the units survive, only the grouping
+   * goes away. A marked group leaves the selection via the usual rebuild.
+   */
+  dissolve(digit: number): void {
+    this.groups.delete(digit);
+    if (this.marked.delete(digit)) this.rebuildSelection();
+  }
+
   /** Snapshot for savegames: digit → unit ids (chip marks are not persisted). */
   export(): Record<number, number[]> {
     const out: Record<number, number[]> = {};

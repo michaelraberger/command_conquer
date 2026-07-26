@@ -397,6 +397,10 @@ export async function startGame(
   if (meta.initialGroups) groups.restore(meta.initialGroups);
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);
+  if (import.meta.env.DEV) {
+    // Dev-Konsole/E2E-Checks: Zugriff auf Auswahl & Gruppen (nur im Dev-Build).
+    (window as unknown as Record<string, unknown>).__cacDebug = { state, controls, groups };
+  }
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
   const buildBand = new BuildBand(state, controls, sidebar, world);
   const minimap = new Minimap(state, camera, fog.canvas);

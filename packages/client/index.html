@@ -844,6 +844,7 @@
         font: inherit;
       }
       .group-chip {
+        position: relative; /* Anker für das Auflösen-✕ */
         display: flex;
         align-items: center;
         gap: 6px;
@@ -856,6 +857,31 @@
         font: inherit;
         cursor: pointer;
         user-select: none;
+      }
+      .group-chip .g-close {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        background: #2c3a4a;
+        border: 1px solid #4a5a6a;
+        border-radius: 50%;
+        color: #d7e0ea;
+        font-size: 9px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .group-chip:hover .g-close {
+        display: flex;
+      }
+      .group-chip .g-close:hover {
+        background: #a33;
+        border-color: #d66;
+        color: #fff;
       }
       .group-chip:hover {
         border-color: #4da6ff;

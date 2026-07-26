@@ -30,6 +30,18 @@ export class GroupBar {
         this.groups.toggle(chip.digit);
         this.sync(); // reflect the new marked state immediately
       });
+      // Dissolve ✕, top-right corner, only visible while hovering the chip.
+      // A span, not a nested button — buttons must not contain buttons.
+      const close = document.createElement('span');
+      close.className = 'g-close';
+      close.textContent = '✕';
+      close.title = `Gruppe ${chip.digit} auflösen`;
+      close.addEventListener('click', (ev) => {
+        ev.stopPropagation(); // the chip underneath must not toggle
+        this.groups.dissolve(chip.digit);
+        this.sync();
+      });
+      el.appendChild(close);
       this.root.appendChild(el);
     }
   }
