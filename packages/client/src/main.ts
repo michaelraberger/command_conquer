@@ -30,6 +30,9 @@ import { createTextures } from './render/placeholders.js';
 import { buildTerrainLayer, placeDoodads } from './render/terrain.js';
 import { session } from './session.js';
 import { Alerts } from './ui/alerts.js';
+import { BuildBand } from './ui/buildBand.js';
+import { EscMenu } from './ui/escMenu.js';
+import { ResearchAlert } from './ui/researchAlert.js';
 import { StatsOverlay } from './ui/statsOverlay.js';
 import { SuperweaponAlert } from './ui/swAlert.js';
 import { Changelog } from './ui/changelog.js';
@@ -135,6 +138,8 @@ export interface GameMeta {
   campaign?: import('./campaign/types.js').CampaignRef | undefined;
   /** Control groups from a loaded save (digit → unit ids), restored on start. */
   initialGroups?: Record<string, number[]> | undefined;
+  /** Skirmish setup — lets the Esc menu restart the same match (fresh seed). */
+  skirmishChoice?: StartChoice | undefined;
 }
 
 async function boot(): Promise<void> {
@@ -153,6 +158,22 @@ async function boot(): Promise<void> {
     localStorage.removeItem('cac-reopen');
     await runAction(app, { kind: 'editor' });
     return;
+  }
+
+  // Esc menu "Neu starten": same skirmish setup, fresh seed (one-shot flag).
+  const restartRaw = localStorage.getItem('cac-restart');
+  if (restartRaw !== null) {
+    localStorage.removeItem('cac-restart');
+    try {
+      const choice = JSON.parse(restartRaw) as StartChoice;
+      // The start screen ships visible (inline style); only showStartScreen
+      // normally hides it — this path bypasses that.
+      document.getElementById('start')!.style.display = 'none';
+      await runAction(app, { kind: 'skirmish', choice });
+      return;
+    } catch {
+      // corrupt flag: fall through to the normal start screen
+    }
   }
 
   // Cloud UI (login box, map gallery, save list, multiplayer lobby) — no-ops
@@ -269,6 +290,7 @@ async function runAction(app: Application, action: StartAction): Promise<void> {
   await startGame(app, state, driver, {
     balance: await loadBalance(),
     mapLabel: action.choice.mapLabel,
+    skirmishChoice: action.choice,
   });
 }
 
@@ -365,6 +387,9 @@ export async function startGame(
     if (ping) effects.commandPing(ping.x, ping.y, ping.hostile);
     sendCommand(cmd);
   };
+  // Esc menu BEFORE PlacementMode: its keydown listener must run first so an
+  // open menu consumes Escape before the placement-cancel handler sees it.
+  const escMenu = new EscMenu();
   const placement = new PlacementMode(ghostLayer, state, sendCommand);
   const controls = new Controls(app, world, state, sendWithPing, placement);
   controls.isPanning = () => camera.spaceHeld;
@@ -373,6 +398,7 @@ export async function startGame(
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
+  const buildBand = new BuildBand(state, controls, sidebar, world);
   const minimap = new Minimap(state, camera, fog.canvas);
   const debug = new DebugOverlay();
   const solo = meta.multiplayer !== true;
@@ -388,7 +414,30 @@ export async function startGame(
   );
   const alerts = new Alerts();
   const swAlert = new SuperweaponAlert();
+  const researchAlert = new ResearchAlert(session.localPlayer);
   const statsOverlay = new StatsOverlay(state, session.localPlayer);
+  escMenu.wire({
+    placementBusy: () => placement.busy,
+    setPaused: (p) => {
+      hotkeys.paused = p;
+    },
+    isPaused: () => hotkeys.paused,
+    canPause: solo,
+    restart: meta.campaign
+      ? () => {
+          localStorage.setItem('cac-campaign-next', meta.campaign!.missionId);
+          location.reload();
+        }
+      : meta.skirmishChoice
+        ? () => {
+            localStorage.setItem('cac-restart', JSON.stringify(meta.skirmishChoice));
+            location.reload();
+          }
+        : null,
+    surrender: solo
+      ? null
+      : () => sendCommand({ type: 'SURRENDER', playerId: session.localPlayer }),
+  });
   new HelpMenu();
   new TechTreeOverlay(state);
   if (solo) {
@@ -453,6 +502,8 @@ export async function startGame(
       hotkeys,
       alerts,
       swAlert,
+      researchAlert,
+      buildBand,
       groups,
       groupBar,
       onGameOver: (winner) => {

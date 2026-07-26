@@ -12,7 +12,7 @@ import { getSupabase } from './supabase.js';
 /** Bumped whenever the sim or the net protocol changes incompatibly — a
  *  version mismatch between peers would desync within seconds, so the lobby
  *  refuses to start across versions. */
-export const NET_VERSION = 8; // v8: Atomkraftwerk/Atomprogramm/Kernschmelze + Building.rotated (Hash)
+export const NET_VERSION = 8; // v8: Atom-Tier, Building.rotated, Radar/Techzentrum unique
 
 export const MAX_SEATS = 4;
 

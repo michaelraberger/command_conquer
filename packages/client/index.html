@@ -66,6 +66,41 @@
       #help-btn:hover {
         border-color: #4da6ff;
       }
+      /* Floating resource chip (top-left, next to the ?-button): money +
+         power at a glance without looking at the sidebar. Read-only HUD. */
+      #floatstats {
+        position: fixed;
+        top: 10px;
+        left: 48px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        background: rgba(16, 20, 26, 0.85);
+        border: 1px solid #2c3a4a;
+        border-radius: 15px;
+        padding: 5px 14px;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        color: #d7e0ea;
+        pointer-events: none;
+        z-index: 7;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      }
+      #floatstats .money {
+        color: #ffd94d;
+        font-weight: 700;
+      }
+      #floatstats .power {
+        color: #53c94f;
+      }
+      #floatstats .power.deficit {
+        color: #e04a3a;
+        animation: floatstats-blink 1s steps(2) infinite;
+      }
+      @keyframes floatstats-blink {
+        50% { opacity: 0.45; }
+      }
       /* Shortcut menu: hidden modal, shown when #help gets .open. */
       #help {
         position: fixed;
@@ -674,6 +709,83 @@
       #sw-alert small {
         font-size: 11px;
         color: #d99080;
+      }
+      /* Floating build band over the selected production building. */
+      #buildband {
+        position: fixed;
+        display: none;
+        transform: translate(-50%, -100%);
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        max-width: 380px;
+        padding: 6px 8px;
+        background: rgba(14, 19, 25, 0.92);
+        border: 1px solid #2c3a4a;
+        border-radius: 8px;
+        z-index: 5;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      #buildband .bb-tile {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #1a222c;
+        border: 1px solid #2c3a4a;
+        border-radius: 4px;
+        color: #d7e0ea;
+        font: inherit;
+        font-size: 11px;
+        padding: 4px 7px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #buildband .bb-tile:hover {
+        border-color: #4da6ff;
+      }
+      #buildband .bb-cost {
+        color: #ffd94d;
+        font-size: 10px;
+      }
+      #buildband .bb-tile.locked {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #buildband .bb-tile.queued {
+        border-color: #ffd94d;
+      }
+      #buildband .bb-tile.queued::after {
+        content: attr(data-pct);
+        color: #ffd94d;
+        font-size: 10px;
+      }
+      #buildband .bb-tile.ready {
+        border-color: #53c94f;
+        color: #aef0a0;
+        animation: lowpulse 1s ease-in-out infinite;
+      }
+      /* Green success banner: research completed (positive twin of #attack). */
+      #research-done {
+        position: fixed;
+        left: calc((100% - 210px) / 2);
+        top: 104px;
+        transform: translateX(-50%);
+        display: none;
+        padding: 8px 20px;
+        border-radius: 6px;
+        background: rgba(10, 40, 14, 0.92);
+        border: 1px solid #53c94f;
+        color: #aef0a0;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        text-align: center;
+        pointer-events: none;
+        z-index: 6;
+      }
+      #research-done strong {
+        font-size: 14px;
+        letter-spacing: 2px;
+        color: #6fe06a;
       }
       #groups {
         position: fixed;
@@ -2380,6 +2492,23 @@
     <div id="debug" class="overlay"></div>
     <div id="pause"><span>PAUSE</span><small>P zum Fortsetzen</small></div>
 
+    <div id="research-done"><strong></strong></div>
+
+    <div id="buildband"></div>
+
+    <div id="esc-menu" class="fullscreen" style="z-index: 9">
+      <div class="panel" style="width: 300px">
+        <h1 style="font-size: 18px">SPIELMENÜ</h1>
+        <div id="esc-paused" class="sub">Das Spiel ist pausiert.</div>
+        <div id="esc-mp-hint" class="sub" style="display: none; color: #e0954a">
+          Internet-Partie: läuft im Hintergrund weiter
+        </div>
+        <button id="esc-continue">Weiterspielen (Esc)</button>
+        <button id="esc-restart">Neu starten</button>
+        <button id="esc-mainmenu">Hauptmenü</button>
+      </div>
+    </div>
+
     <div id="stats-overlay">
       <div class="stats-box">
         <h2>STATISTIK</h2>
@@ -2427,6 +2556,10 @@
       </div>
     </div>
     <button id="help-btn" title="Tastenkürzel (F1)">?</button>
+    <div id="floatstats">
+      <span class="money">$ 0</span>
+      <span class="power">⚡ 0/0</span>
+    </div>
     <button id="techtree-btn" title="Technologiebaum (T)">🧬</button>
     <div id="techtree">
       <div class="tt-card">
@@ -2482,6 +2615,7 @@
           <h3>Spiel</h3>
           <dl>
             <dt>P</dt><dd>Pause</dd>
+            <dt>Esc</dt><dd>Spielmenü (Weiterspielen · Neu starten · Hauptmenü)</dd>
             <dt>Enter</dt><dd>Chat im Mehrspieler-Spiel (Enter sendet, Esc bricht ab)</dd>
             <dt>Tab</dt><dd>Statistik-Übersicht ein-/ausblenden</dd>
             <dt>F6</dt><dd>Spiel speichern (Cloud, Konto nötig; Laden im Hauptmenü)</dd>

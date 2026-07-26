@@ -16,6 +16,8 @@ import type { PrismLinkOverlay } from './render/prismLinks.js';
 import type { RallyOverlay } from './render/rally.js';
 import { session } from './session.js';
 import type { Alerts } from './ui/alerts.js';
+import type { BuildBand } from './ui/buildBand.js';
+import type { ResearchAlert } from './ui/researchAlert.js';
 import type { SuperweaponAlert } from './ui/swAlert.js';
 import type { DebugOverlay } from './ui/debug.js';
 import type { GroupBar } from './ui/groupBar.js';
@@ -69,6 +71,8 @@ export interface LoopDeps {
   hotkeys: Hotkeys;
   alerts: Alerts;
   swAlert: SuperweaponAlert;
+  researchAlert: ResearchAlert;
+  buildBand: BuildBand;
   groups: ControlGroups;
   groupBar: GroupBar;
   onGameOver: (winner: number) => void;
@@ -115,6 +119,7 @@ export function startLoop(
       // Per tick, not per frame: the lost-unit check reads this tick's DEATH
       // events, which are gone once the next tick runs in the same frame.
       deps.alerts.update(state);
+      deps.researchAlert.update(state);
       accumulator -= TICK_MS;
       steps++;
     }
@@ -137,6 +142,7 @@ export function startLoop(
     if (attackActive) attackBanner.firstElementChild!.textContent = deps.alerts.message();
     attackBanner.style.display = attackActive ? 'flex' : 'none';
     deps.swAlert.update(state);
+    deps.researchAlert.render(state.tick);
 
     const { width, height } = app.screen;
     deps.camera.update(app.ticker.deltaMS, width, height);
@@ -150,6 +156,7 @@ export function startLoop(
     deps.rally.update(state, deps.controls.selectedBuilding);
     deps.groupBar.sync();
     deps.sidebar.update();
+    deps.buildBand.update();
     deps.debug.update(state, app.ticker.FPS, deps.controls.selected.size);
   });
 }

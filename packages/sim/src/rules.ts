@@ -1098,6 +1098,7 @@ export const BUILDING_RULES = {
     buildable: true,
     factions: null,
     sight: 4,
+    unique: true,
   },
   RADAR: {
     name: 'Radarturm',
@@ -1120,6 +1121,7 @@ export const BUILDING_RULES = {
     // The radar sweep: by far the widest sight in the game — the tower itself
     // uncovers a huge patch of map.
     sight: 11,
+    unique: true,
   },
   BRIDGE: {
     name: 'Brücke',

@@ -55,6 +55,10 @@ export class Sidebar {
   private activeTab: ProductionCategory = 'building';
   private itemEls: ItemEl[] = [];
   private creditsEl = document.getElementById('credits')!;
+  /** Floating top-left HUD chip: money + power without glancing right. */
+  private floatEl = document.getElementById('floatstats')!;
+  private floatMoneyEl = this.floatEl.querySelector('.money')!;
+  private floatPowerEl = this.floatEl.querySelector('.power')!;
   private factionEl = document.getElementById('faction')!;
   private powerBarEl = document.getElementById('powerbar')!;
   private powerFillEl = document.getElementById('powerfill')!;
@@ -179,12 +183,23 @@ export class Sidebar {
     return this.player().queues[category];
   }
 
+  /** Production category an item belongs to (mirrors the sim's categoryOf). */
+  static categoryOf(item: string): ProductionCategory {
+    return isBuildingType(item) ? 'building' : unitRule(item as UnitType).category;
+  }
+
   private onItemClick(item: string): void {
+    this.clickItem(item);
+  }
+
+  /** Start/collect production for `item` — shared by the sidebar tiles and
+   *  the floating build band (category derives from the item itself). */
+  clickItem(item: string): void {
     if (item === 'WALL') {
       this.placement.activate('WALL');
       return;
     }
-    const q = this.queue(this.activeTab);
+    const q = this.queue(Sidebar.categoryOf(item));
     if (q.item === item && q.ready && isBuildingType(item)) {
       this.placement.activate(item);
       return;
@@ -194,9 +209,15 @@ export class Sidebar {
   }
 
   private onItemCancel(item: string): void {
-    const q = this.queue(this.activeTab);
+    this.cancelItem(item);
+  }
+
+  /** Cancel `item` if it occupies its queue (sidebar right-click + band). */
+  cancelItem(item: string): void {
+    const category = Sidebar.categoryOf(item);
+    const q = this.queue(category);
     if (q.item === item) {
-      this.send({ type: 'BUILD_CANCEL', playerId: session.localPlayer, category: this.activeTab });
+      this.send({ type: 'BUILD_CANCEL', playerId: session.localPlayer, category });
       if (this.placement.active === item) this.placement.cancel();
     }
   }
@@ -218,6 +239,15 @@ export class Sidebar {
     // Flash the bar and raise the on-map warning while power is short.
     this.powerBarEl.classList.toggle('low', deficit);
     this.lowPowerEl.style.display = deficit ? 'flex' : 'none';
+
+    // Floating top-left chip mirrors both values (update() only runs in-game,
+    // so showing it here keeps it off the menus).
+    (this.floatEl as HTMLElement).style.display = 'flex';
+    const floatMoney = `$ ${player.credits}`;
+    if (this.floatMoneyEl.textContent !== floatMoney) this.floatMoneyEl.textContent = floatMoney;
+    const floatPower = `⚡ ${used}/${produced}`;
+    if (this.floatPowerEl.textContent !== floatPower) this.floatPowerEl.textContent = floatPower;
+    this.floatPowerEl.classList.toggle('deficit', deficit);
 
     for (const el of this.itemEls) {
       if (el.item === 'WALL') {
