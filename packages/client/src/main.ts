@@ -1,6 +1,7 @@
 import {
   applyBalance,
   cellCenter,
+  constructBuilding,
   createGame,
   tick,
   type BalanceConfig,
@@ -398,8 +399,13 @@ export async function startGame(
   controls.onManualSelect = () => groups.clearMarks();
   const groupBar = new GroupBar(groups);
   if (import.meta.env.DEV) {
-    // Dev-Konsole/E2E-Checks: Zugriff auf Auswahl & Gruppen (nur im Dev-Build).
-    (window as unknown as Record<string, unknown>).__cacDebug = { state, controls, groups };
+    // Dev-Konsole/E2E-Checks: Zugriff auf Auswahl, Gruppen & Spawns (nur Dev-Build).
+    (window as unknown as Record<string, unknown>).__cacDebug = {
+      state,
+      controls,
+      groups,
+      constructBuilding,
+    };
   }
   const sidebar = new Sidebar(state, sendCommand, placement, controls);
   const buildBand = new BuildBand(state, controls, sidebar, world);

@@ -516,6 +516,38 @@ function prismAt(
     .stroke({ width: 1, color: 0x37322a, alpha: 0.9 });
 }
 
+/**
+ * Hyperboloid cooling tower: wide base, waisted middle, slightly flared top —
+ * the iconic nuclear silhouette a straight cylinder can't deliver. Sampled as
+ * a polygon (base→waist→top), light left half, shaded right half, open throat.
+ */
+function coolingTower(g: Graphics, x: number, yBase: number, rBase: number, h: number, base: number): void {
+  const waist = rBase * 0.64;
+  const rTop = rBase * 0.8;
+  const tw = 0.62; // waist sits at 62 % of the height
+  const radiusAt = (f: number): number =>
+    f <= tw
+      ? waist + (rBase - waist) * Math.pow((tw - f) / tw, 1.5)
+      : waist + (rTop - waist) * Math.pow((f - tw) / (1 - tw), 1.2);
+  const steps = [0, 0.2, 0.4, 0.62, 0.8, 1];
+  const left: number[] = [];
+  const right: number[] = [];
+  for (const f of steps) {
+    const r = radiusAt(f);
+    const y = yBase - h * f;
+    left.push(x - r, y);
+    right.unshift(x + r, y);
+  }
+  g.poly([...left, ...right]).fill(shade(base, 0.9)).stroke({ width: 1, color: 0x37322a, alpha: 0.6 });
+  // Shaded right half for volume.
+  const rightHalf: number[] = [];
+  for (const f of steps) rightHalf.push(x, yBase - h * f);
+  g.poly([...rightHalf, ...right.slice()]).fill(shade(base, 0.72));
+  // Open throat at the top.
+  g.ellipse(x, yBase - h, rTop, rTop * 0.45).fill(base).stroke({ width: 1, color: 0x37322a, alpha: 0.8 });
+  g.ellipse(x, yBase - h, rTop * 0.72, rTop * 0.3).fill(shade(base, 0.5));
+}
+
 /** Simple upright cylinder (cooling tower, silo). */
 function cylinder(g: Graphics, x: number, yBase: number, r: number, h: number, base: number): void {
   g.rect(x - r, yBase - h, r * 2, h).fill(shade(base, 0.78));
@@ -550,6 +582,33 @@ interface BuildingArt {
 function teamMark(g: Graphics, w: number, h: number, e: number): void {
   const c = iso(w / 2, h / 2);
   g.poly([c.x, c.y - e - 6, c.x + 13, c.y - e, c.x, c.y - e + 6, c.x - 13, c.y - e]).fill(0xffffff);
+}
+
+/**
+ * Yellow/black radiation trefoil, painted flat onto a roof plane: the y axis
+ * is squashed like the iso ground, so the disc reads as lying on the deck.
+ */
+function radiationSign(g: Graphics, x: number, y: number, r: number): void {
+  const sq = 0.55; // iso squash of the roof plane
+  g.ellipse(x, y, r, r * sq).fill(0xffd800).stroke({ width: 1, color: 0x1a1a1a });
+  const blade = (center: number): void => {
+    const pts: number[] = [];
+    const a0 = center - Math.PI / 6;
+    const a1 = center + Math.PI / 6;
+    for (let i = 0; i <= 5; i++) {
+      const a = a0 + ((a1 - a0) * i) / 5;
+      pts.push(x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.9 * sq);
+    }
+    for (let i = 5; i >= 0; i--) {
+      const a = a0 + ((a1 - a0) * i) / 5;
+      pts.push(x + Math.cos(a) * r * 0.35, y + Math.sin(a) * r * 0.35 * sq);
+    }
+    g.poly(pts).fill(0x1a1a1a);
+  };
+  blade(-Math.PI / 2); // one blade up, two down-left/down-right (classic)
+  blade(-Math.PI / 2 + (Math.PI * 2) / 3);
+  blade(-Math.PI / 2 - (Math.PI * 2) / 3);
+  g.ellipse(x, y, r * 0.2, r * 0.2 * sq).fill(0x1a1a1a);
 }
 
 /** Interpolate between two projected points. */
@@ -714,21 +773,48 @@ const BUILDING_ART: Record<BuildingType, BuildingArt> = {
   ATOM: {
     frameTop: 60,
     fx: 0x9fff6e,
-    body: (g, w, h, fx) => {
+    body: (g, w, h) => {
       concretePlate(g, w, h);
       prismAt(g, 0.15, 0.15, 1.7, 1.7, 16, 0xa8a08d);
-      // Wide cooling tower with a waisted silhouette hint (lighter rim ring).
+      // Iconic waisted cooling tower (hyperboloid silhouette, open throat).
       const tower = iso(0.6, 1.1);
-      cylinder(g, tower.x, tower.y - 8, 13, 38, 0xcfc9bb);
-      g.ellipse(tower.x, tower.y - 46, 10, 4.5).fill(0x8d8778); // open throat
-      // Containment dome on a low drum, steel grey with a highlight arc.
+      coolingTower(g, tower.x, tower.y - 8, 14, 42, 0xcfc9bb);
+      // Containment dome: drum with hazard stripes, filled dome curve with
+      // layered shading and meridian seams — reads as a reactor, not a stick.
       const dome = iso(1.5, 0.8);
-      cylinder(g, dome.x, dome.y - 6, 11, 10, 0xb8b2a4);
-      g.ellipse(dome.x, dome.y - 16, 11, 8).fill(0xc9c4b8).stroke({ width: 1, color: 0x37322a, alpha: 0.8 });
-      g.arc(dome.x - 3, dome.y - 19, 6, Math.PI, Math.PI * 1.6).stroke({ width: 2, color: 0xe8e4da, alpha: 0.8 });
-      // Reactor glow at the dome's base — the ADVPOWER core idiom in green.
-      g.circle(dome.x, dome.y - 8, 5).fill(fx).stroke({ width: 1, color: 0xd6ffc0 });
-      g.circle(dome.x, dome.y - 8, 9).stroke({ width: 1, color: fx, alpha: 0.5 });
+      const drumR = 12;
+      cylinder(g, dome.x, dome.y - 4, drumR, 8, 0xb2ac9e);
+      // Yellow/black hazard band along the drum front.
+      for (let i = 0; i < 6; i++) {
+        const x0 = dome.x - 9 + i * 3;
+        g.rect(x0, dome.y - 7, 3, 3).fill(i % 2 === 0 ? 0xffd800 : 0x1a1a1a);
+      }
+      const baseY = dome.y - 12;
+      const k = drumR * 1.2; // Bezier-Kontrollhöhe → Kuppelhöhe ≈ 0.9·r
+      g.moveTo(dome.x - drumR, baseY)
+        .bezierCurveTo(dome.x - drumR, baseY - k, dome.x + drumR, baseY - k, dome.x + drumR, baseY)
+        .closePath()
+        .fill(0xc4bfb1)
+        .stroke({ width: 1, color: 0x37322a, alpha: 0.85 });
+      // Volume: light zenith patch (upper left) + shaded right flank.
+      g.ellipse(dome.x - 3, baseY - drumR * 0.55, 5.5, 3.5).fill(0xdedacd);
+      g.moveTo(dome.x + 2, baseY)
+        .bezierCurveTo(dome.x + 5, baseY - k * 0.9, dome.x + drumR, baseY - k * 0.45, dome.x + drumR, baseY)
+        .closePath()
+        .fill({ color: 0x8f897b, alpha: 0.55 });
+      // Meridian seams toward the apex — the classic segmented dome look.
+      const apexY = baseY - drumR * 0.9;
+      g.moveTo(dome.x - drumR * 0.55, baseY - 1)
+        .quadraticCurveTo(dome.x - drumR * 0.35, apexY + 2, dome.x, apexY)
+        .stroke({ width: 1, color: 0x37322a, alpha: 0.35 });
+      g.moveTo(dome.x + drumR * 0.55, baseY - 1)
+        .quadraticCurveTo(dome.x + drumR * 0.35, apexY + 2, dome.x, apexY)
+        .stroke({ width: 1, color: 0x37322a, alpha: 0.35 });
+      // Apex vent nub.
+      g.ellipse(dome.x, apexY, 2.2, 1.2).fill(0x9a9486).stroke({ width: 1, color: 0x37322a, alpha: 0.5 });
+      // Radiation trefoil on the flat roof — yellow/black, unmistakably nuclear.
+      const sign = iso(1.25, 1.45);
+      radiationSign(g, sign.x, sign.y - 16, 9);
     },
     team: (g) => teamMark(g, 1, 1.75, 12),
   },
