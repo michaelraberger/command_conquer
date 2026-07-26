@@ -59,6 +59,7 @@ export class Sidebar {
   private floatEl = document.getElementById('floatstats')!;
   private floatMoneyEl = this.floatEl.querySelector('.money')!;
   private floatPowerEl = this.floatEl.querySelector('.power')!;
+  private floatResearchEl = this.floatEl.querySelector('.research') as HTMLElement;
   private factionEl = document.getElementById('faction')!;
   private powerBarEl = document.getElementById('powerbar')!;
   private powerFillEl = document.getElementById('powerfill')!;
@@ -248,6 +249,16 @@ export class Sidebar {
     const floatPower = `⚡ ${used}/${produced}`;
     if (this.floatPowerEl.textContent !== floatPower) this.floatPowerEl.textContent = floatPower;
     this.floatPowerEl.classList.toggle('deficit', deficit);
+    // Laufende Forschung als drittes Badge: Name + Fortschritt in Prozent.
+    if (player.research) {
+      const rule = techRule(player.research.tech);
+      const percent = Math.min(99, Math.trunc((player.research.progress * 100) / rule.time));
+      const text = `🔬 ${rule.name} ${percent}%`;
+      if (this.floatResearchEl.textContent !== text) this.floatResearchEl.textContent = text;
+      this.floatResearchEl.style.display = '';
+    } else if (this.floatResearchEl.style.display !== 'none') {
+      this.floatResearchEl.style.display = 'none';
+    }
 
     for (const el of this.itemEls) {
       if (el.item === 'WALL') {
