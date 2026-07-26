@@ -44,6 +44,15 @@ export interface AiTuning {
   navalCap?: number;
   useHighTech?: boolean;
   incomeBonus?: number;
+  /** Utility weights (ai/score.ts): attack timing, target choice, retreat. */
+  attackThreshold?: number;
+  wArmyRatio?: number;
+  wTargetWeakness?: number;
+  wEscalation?: number;
+  wValue?: number;
+  wDefense?: number;
+  wDist?: number;
+  retreatPermille?: number;
 }
 
 /** Standing order a placed/spawned unit starts with. */

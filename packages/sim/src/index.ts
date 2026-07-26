@@ -225,4 +225,12 @@ export { canPlaceBuilding } from './systems/placement.js';
 export { findFreeAirfield } from './systems/airbase.js';
 export { powerBalance, startProduction } from './systems/production.js';
 export { aiSystem } from './ai/controller.js';
+export { setBtTrace, type BtTrace, type Status as BtStatus } from './ai/bt.js';
+export {
+  computeInfluence,
+  debugInfluenceSnapshot,
+  resetInfluenceCache,
+  type InfluenceSnapshot,
+  type InfluenceView,
+} from './ai/influence.js';
 export { tick, TICKS_PER_SECOND, TICK_MS } from './tick.js';
