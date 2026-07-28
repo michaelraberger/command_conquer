@@ -4,6 +4,14 @@ import { GEM_VALUE, HARVEST_CAPACITY, HARVEST_RATE } from '../rules.js';
 import { dockCell, storageCapacity, type Building, type GameState, type Unit } from '../state.js';
 
 /**
+ * After a failed dispatch (dock blocked, ore unreachable) the harvester waits
+ * this many ticks before flooding another full A*. Without the backoff a
+ * stuck harvester re-pathed EVERY tick — measured 4–11 ms/tick sim cost.
+ * Reuses blockedTicks, which is dormant while the unit has no path.
+ */
+const HARVEST_RETRY_TICKS = 30;
+
+/**
  * Harvester state machine: drive to ore → extract while parked → return to
  * the refinery dock → unload into credits → repeat. Idle harvesters put
  * themselves to work (classic C&C behavior); manual MOVE/STOP interrupts.
@@ -12,8 +20,12 @@ export function harvestSystem(state: GameState): void {
   for (const unit of state.units) {
     if (unit.type !== 'HARVESTER') continue;
 
-    // Auto-dispatch when completely idle.
+    // Auto-dispatch when completely idle (after a cooldown from failures).
     if (unit.order === null && unit.path === null) {
+      if (unit.blockedTicks > 0) {
+        unit.blockedTicks--;
+        continue;
+      }
       if (unit.cargo >= HARVEST_CAPACITY) {
         if (ownRefinery(state, unit.owner)) {
           const cx = unit.cell % state.mapWidth;
@@ -72,6 +84,7 @@ function handleHarvest(state: GameState, unit: Unit, cx: number, cy: number): vo
     const path = findPath(state, ucx, ucy, cx, cy, { avoidUnits: false, selfId: unit.id, owner: unit.owner });
     if (!path) {
       unit.order = null;
+      unit.blockedTicks = HARVEST_RETRY_TICKS; // Backoff statt Tick-für-Tick-Flut
       return;
     }
     unit.path = path;
@@ -116,6 +129,7 @@ function handleReturn(state: GameState, unit: Unit, backCx: number, backCy: numb
     const path = findPath(state, ucx, ucy, dock.cx, dock.cy, { avoidUnits: false, selfId: unit.id, owner: unit.owner });
     if (!path) {
       unit.order = null;
+      unit.blockedTicks = HARVEST_RETRY_TICKS; // Backoff statt Tick-für-Tick-Flut
       return;
     }
     unit.path = path;

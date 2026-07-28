@@ -642,10 +642,18 @@ export function recallDefenders(state: GameState, player: Player): boolean {
 export function retreatHurt(state: GameState, player: Player, params: AiParams): boolean {
   const home = homeBase(state, player);
   if (!home) return false;
-  const hurt = hurtUnitIds(combatPool(state, player), params.retreatPermille);
+  const combat = combatPool(state, player);
+  const hurt = hurtUnitIds(combat, params.retreatPermille);
   if (hurt.size === 0) return false;
+  // Idempotent: units already walking without a standing order are on their
+  // retreat from a previous pass — re-issuing MOVE cost a full A* per unit
+  // per pass (measured ~6 ms) for zero behavior change.
+  const ids = combat
+    .filter((u) => hurt.has(u.id) && !(u.order === null && u.path !== null))
+    .map((u) => u.id);
+  if (ids.length === 0) return false;
   applyCommands(state, [
-    { type: 'MOVE', playerId: player.id, unitIds: [...hurt], cx: home.cx + 1, cy: home.cy + 1 },
+    { type: 'MOVE', playerId: player.id, unitIds: ids, cx: home.cx + 1, cy: home.cy + 1 },
   ]);
   return true;
 }
@@ -742,11 +750,19 @@ export function manageInvasion(state: GameState, player: Player, params: AiParam
   const tcy = Math.floor(transport.cell / w);
   const pax = transport.passengers.length;
 
-  // Board nearby infantry until full, unless troops are already walking aboard.
+  // Board nearby infantry until full, unless troops are already walking
+  // aboard. Engineers stay ashore: boarding overwrote their CAPTURE order and
+  // trainInfantry kept replacing the "missing" engineer — an endless loop on
+  // island maps with neutral capturables.
   const boarding = state.units.some((u) => u.owner === player.id && u.order?.kind === 'BOARD');
   if (pax < TRANSPORT_CAPACITY && transport.path === null && !boarding) {
     const inf = state.units
-      .filter((u) => u.owner === player.id && unitRule(u.type).category === 'infantry')
+      .filter(
+        (u) =>
+          u.owner === player.id &&
+          unitRule(u.type).category === 'infantry' &&
+          u.type !== 'ENGINEER',
+      )
       .slice(0, TRANSPORT_CAPACITY - pax)
       .map((u) => u.id);
     if (inf.length > 0) {

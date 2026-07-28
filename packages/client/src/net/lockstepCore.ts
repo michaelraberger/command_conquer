@@ -75,6 +75,16 @@ export class LockstepScheduler {
    *  the same filter runs on every client, keeping the merge deterministic). */
   addFrame(seat: number, frame: TurnFrame): void {
     if (seat < 0 || seat >= this.seatCount) return;
+    // Turn-Fenster: Nicht-Ganzzahlen und Turns weit jenseits des Spielstands
+    // wuerden die Frame-Maps unbegrenzt fuellen (Speicher-DoS) und
+    // newestCompleteTurn in lange Schleifen treiben.
+    if (
+      !Number.isInteger(frame.turn) ||
+      frame.turn < 0 ||
+      frame.turn > this.executedTurnWatermark + MAX_AHEAD_TURNS + MAX_TURNS_PER_SEND
+    ) {
+      return;
+    }
     const dropAt = this.dropped[seat];
     if (dropAt !== null && frame.turn >= dropAt!) return;
     const bySeat = this.frames[seat]!;

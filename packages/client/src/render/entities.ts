@@ -333,8 +333,12 @@ export class EntityRenderer {
     }
   }
 
+  /** Unit-type → facing-sprites, built ONCE — the per-call record literal
+   *  allocated ~15k throwaway objects per second at 250 units × 60 fps. */
+  private unitSpriteSets: Record<Unit['type'], UnitSprite[]> | null = null;
+
   private spriteFor(unit: Unit): UnitSprite {
-    const sets: Record<Unit['type'], UnitSprite[]> = {
+    const sets = (this.unitSpriteSets ??= {
       TANK: this.tex.tank,
       MAMMOTH: this.tex.mammoth,
       ARTILLERY: this.tex.artillery,
@@ -363,7 +367,7 @@ export class EntityRenderer {
       SUB: this.tex.sub,
       MISSILESUB: this.tex.missilesub,
       TRANSPORT: this.tex.transport,
-    };
+    });
     return sets[unit.type][unit.facing]!;
   }
 

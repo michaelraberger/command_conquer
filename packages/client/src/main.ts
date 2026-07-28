@@ -3,6 +3,7 @@ import {
   cellCenter,
   constructBuilding,
   createGame,
+  resetInfluenceCache,
   spawnUnit,
   tick,
   type BalanceConfig,
@@ -110,6 +111,9 @@ async function loadCheatCodes(): Promise<CheatCodes> {
 }
 
 async function setupFromChoice(choice: StartChoice): Promise<GameSetup> {
+  // Der Influence-Cache der KI haelt sonst den kompletten State der
+  // Vorpartie fest (~1 MB auf grossen Karten).
+  resetInfluenceCache();
   const seed = (Math.random() * 0xffffffff) >>> 0;
   session.localPlayer = 0;
   const options = {

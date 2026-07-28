@@ -48,3 +48,27 @@ Cloud-Funktionen sind dann ausgeblendet ("Gefecht gegen KI" braucht kein Login).
 
 Der `anon`-Key ist bewusst öffentlich — die Zugriffskontrolle übernehmen die
 Row-Level-Security-Policies aus der Migration.
+
+## Multiplayer-Härtung (Stand des Security-Reviews)
+
+Der Client validiert seit dem Review jede eingehende Realtime-Nachricht
+strukturell (`packages/client/src/net/validate.ts`): Schema, Wertebereiche,
+Turn-Fenster, Längen-Limits, Resend-/Chat-Drosseln. Damit sind Remote-Freeze
+und Speicher-DoS durch präparierte Payloads abgedeckt.
+
+**Bewusst offen** bleibt die Absender-Authentizität: Broadcast-Payloads tragen
+ihre Sitz-/Host-Angabe selbst, und ohne private Kanäle kann jeder Teilnehmer
+des Kanals fremde Sitze behaupten (Frames unterdrücken, Drop/Abort senden).
+Der Weg dahin, wenn öffentliche Partien geplant sind:
+
+1. Im Supabase-Dashboard Realtime „private channels" aktivieren.
+2. Policy auf `realtime.messages`, die Topics `cac:lobby:%` / `cac:game:%`
+   nur für `authenticated` freigibt (später: nur für die registrierten
+   Teilnehmer einer Partie, dazu braucht es eine `matches`-Tabelle).
+3. Im Client `config: { private: true }` bei `supabase.channel(...)` setzen
+   (lobby.ts, lockstep.ts) und die Sitz-Bindung über die dann verifizierbare
+   Absender-Identität ziehen.
+
+Bis dahin gilt: Der 6-stellige Join-Code (kryptographisch zufällig, ~1e9
+Kombinationen) ist die Zugangskontrolle — für private Partien unter Bekannten
+angemessen, für offene Lobbys nicht.

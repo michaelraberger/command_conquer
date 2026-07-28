@@ -589,7 +589,8 @@ export class Sidebar {
       const refresh = (): void => {
         const r = this.player().research;
         if (r === null || r.tech !== startedTech) return; // key change rebuilds next frame
-        const pct = Math.round((r.progress / rule.time) * 100);
+        // trunc wie das Forschungs-Badge oben links — beide zeigen dieselbe Zahl.
+        const pct = Math.trunc((r.progress * 100) / rule.time);
         const text = `Forschung: ${rule.name} — ${pct} %`;
         if (label.textContent !== text) label.textContent = text;
         fill.style.width = `${pct}%`;

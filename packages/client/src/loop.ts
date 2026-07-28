@@ -93,9 +93,12 @@ export function startLoop(
 ): void {
   let accumulator = 0;
   let gameOverReported = false;
+  /** A crashed tick permanently stops the sim (rendering keeps running). */
+  let fatal = false;
   const attackBanner = document.getElementById('attack')!;
 
   app.ticker.add(() => {
+    if (fatal) return;
     accumulator += Math.min(app.ticker.deltaMS, 250);
     // Lockstep catch-up: when the driver is behind the network frontier
     // (hidden tab, long stall), grant extra tick budget beyond wall time.
@@ -112,7 +115,17 @@ export function startLoop(
         break;
       }
       deps.entities.snapshotPrev(state);
-      tick(state, driver.commandsFor(state.tick));
+      // Ein Wurf in tick() (z. B. durch einen boesartigen Netz-Command, der
+      // die Schema-Validierung umgehen sollte) liess state.tick unveraendert —
+      // derselbe Turn lief jeden Frame erneut in den Absturz: Dauer-Freeze
+      // plus Fehler-Spam. Einmal fangen, Loop stilllegen, Fehler melden.
+      try {
+        tick(state, driver.commandsFor(state.tick));
+      } catch (err) {
+        console.error('Sim-Tick abgebrochen:', err);
+        fatal = true;
+        break;
+      }
       driver.onTicked(state);
       deps.effects.ingest(state.events); // events are cleared next tick
       deps.onSimEvents?.(state.events);

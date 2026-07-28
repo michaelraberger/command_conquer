@@ -172,11 +172,16 @@ export class Lobby {
       this.handlePresence();
     });
     channel.on('broadcast', { event: 'settings' }, ({ payload }) => {
-      this.settings = payload as LobbySettings;
+      // Fremdgesteuerter Payload: nur wohlgeformte Settings uebernehmen.
+      const settings = sanitizeSettings(payload);
+      if (!settings) return;
+      this.settings = settings;
       this.events.onSettings(this.settings);
     });
     channel.on('broadcast', { event: 'start' }, ({ payload }) => {
-      this.handleStart(payload as StartPayload);
+      const start = sanitizeStartPayload(payload);
+      if (!start) return;
+      this.handleStart(start);
     });
 
     const status = await new Promise<string>((resolve) => {
@@ -332,4 +337,69 @@ export class Lobby {
     this.channel = null;
     if (ch) await getSupabase()?.removeChannel(ch);
   }
+}
+
+/** Wohlgeformte Lobby-Settings oder null — Broadcasts sind fremdgesteuert. */
+function sanitizeSettings(payload: unknown): LobbySettings | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Record<string, unknown>;
+  if (p.mapType !== 'BADLANDS' && p.mapType !== 'RIVER' && p.mapType !== 'ISLANDS') return null;
+  if (typeof p.mapSize !== 'number' || !Number.isInteger(p.mapSize)) return null;
+  if (p.mapSize < 32 || p.mapSize > 256) return null;
+  let cloudMap: LobbySettings['cloudMap'] = null;
+  if (p.cloudMap !== undefined && p.cloudMap !== null) {
+    const c = p.cloudMap as Record<string, unknown>;
+    if (typeof c.id !== 'string' || c.id.length > 64) return null;
+    if (typeof c.name !== 'string') return null;
+    if (typeof c.maxPlayers !== 'number' || !Number.isInteger(c.maxPlayers)) return null;
+    cloudMap = { id: c.id, name: c.name.slice(0, 64), maxPlayers: c.maxPlayers };
+  }
+  return { mapType: p.mapType, mapSize: p.mapSize, cloudMap };
+}
+
+/** Wohlgeformter Start-Payload oder null. Autoritaet bleibt offen (siehe
+ *  supabase/README.md zu privaten Realtime-Kanaelen) — aber Struktur, Limits
+ *  und Wertebereiche werden hier hart erzwungen. */
+function sanitizeStartPayload(payload: unknown): StartPayload | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Record<string, unknown>;
+  if (typeof p.version !== 'number') return null;
+  if (typeof p.seed !== 'number' || !Number.isInteger(p.seed) || p.seed < 0 || p.seed > 0xffffffff) {
+    return null;
+  }
+  if (p.mapType !== 'BADLANDS' && p.mapType !== 'RIVER' && p.mapType !== 'ISLANDS') return null;
+  for (const key of ['mapWidth', 'mapHeight'] as const) {
+    const v = p[key];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 32 || v > 256) return null;
+  }
+  if (typeof p.mapLabel !== 'string' || p.mapLabel.length > 64) return null;
+  if (p.cloudMapId !== null && (typeof p.cloudMapId !== 'string' || p.cloudMapId.length > 64)) {
+    return null;
+  }
+  if (!Array.isArray(p.seats) || p.seats.length < 2 || p.seats.length > MAX_SEATS) return null;
+  const seats: StartPayload['seats'] = [];
+  for (const raw of p.seats) {
+    const s = raw as Record<string, unknown>;
+    if (typeof s.userId !== 'string' || s.userId.length === 0 || s.userId.length > 64) return null;
+    if (typeof s.username !== 'string') return null;
+    if (s.faction !== 'ALLIES' && s.faction !== 'SOVIETS') return null;
+    seats.push({ userId: s.userId, username: s.username.slice(0, 24), faction: s.faction });
+  }
+  let balance: StartPayload['balance'] = null;
+  if (p.balance !== undefined && p.balance !== null) {
+    if (typeof p.balance !== 'object' || Array.isArray(p.balance)) return null;
+    if (JSON.stringify(p.balance).length > 65536) return null; // applyBalance prueft die Keys
+    balance = p.balance as StartPayload['balance'];
+  }
+  return {
+    version: p.version,
+    seed: p.seed,
+    mapType: p.mapType,
+    mapWidth: p.mapWidth as number,
+    mapHeight: p.mapHeight as number,
+    cloudMapId: (p.cloudMapId as string | null) ?? null,
+    mapLabel: p.mapLabel,
+    balance,
+    seats,
+  };
 }

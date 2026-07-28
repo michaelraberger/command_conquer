@@ -1,4 +1,4 @@
-import { createGame, type CustomMapData, type MapType } from '@cac/sim';
+import { createGame, validateCustomMap, type CustomMapData, type MapType } from '@cac/sim';
 import { getMap, publicMaps } from '../net/mapsRepo.js';
 import { colorCss, paintMapData } from '../render/palette.js';
 
@@ -40,6 +40,8 @@ function cachedMap(id: string): Promise<CustomMapData> {
 }
 
 function paintCustom(canvas: HTMLCanvasElement, map: CustomMapData): void {
+  // Fremde Galerie-Daten: nie ungeprueft ein Canvas in Kartengroesse anlegen.
+  if (validateCustomMap(map).errors.length > 0) return;
   canvas.width = map.width;
   canvas.height = map.height;
   const ctx = canvas.getContext('2d')!;

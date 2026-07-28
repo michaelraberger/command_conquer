@@ -67,6 +67,8 @@ export function losBlockedByWall(
   const steps = Math.trunc((2 * longest) / SUBCELL) + 1; // ~half-cell sampling
   const fromCell = Math.trunc(y0 / SUBCELL) * state.mapWidth + Math.trunc(x0 / SUBCELL);
   const toCell = Math.trunc(y1 / SUBCELL) * state.mapWidth + Math.trunc(x1 / SUBCELL);
+  let lastId = 0;
+  let lastB: Building | undefined;
   for (let i = 1; i < steps; i++) {
     const sx = x0 + Math.trunc((dx * i) / steps);
     const sy = y0 + Math.trunc((dy * i) / steps);
@@ -74,7 +76,13 @@ export function losBlockedByWall(
     if (cell === fromCell || cell === toCell) continue;
     const id = state.structures[cell]!;
     if (id === 0 || id === ignoreId) continue;
-    const b = state.buildings.find((s) => s.id === id);
+    // Consecutive samples cross the same footprint — memoize the last lookup
+    // instead of a linear buildings.find per sample (combat hot path).
+    if (id !== lastId) {
+      lastId = id;
+      lastB = state.buildings.find((s) => s.id === id);
+    }
+    const b = lastB;
     if (b && (b.type === 'WALL' || b.type === 'GATE')) {
       // Own/allied walls don't block the shooter's line of fire.
       if (shooterOwner !== undefined && !areEnemies(state, shooterOwner, b.owner)) continue;

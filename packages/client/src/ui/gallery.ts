@@ -87,8 +87,11 @@ function renderMapList(wrap: HTMLElement, rows: MapRow[], own: boolean, emptyTex
       (own ? (row.is_public ? ' · öffentlich' : ' · privat') : '');
 
     // Preview lazily from the full map data (cheap paint, no createGame).
+    // Erst Plausibilität: maps.data kommt per REST von fremden Nutzern —
+    // absurde Dimensionen/Array-Längen dürfen kein Canvas allozieren.
     void getMap(row.id)
       .then((map) => {
+        if (!plausibleMapData(map)) return;
         const canvas = el.querySelector('canvas')!;
         paintMapData(canvas.getContext('2d')!, {
           mapWidth: map.width,
@@ -240,3 +243,19 @@ async function refreshSaves(): Promise<void> {
 }
 
 const errText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+/** Strukturelle Plausibilität einer Galerie-Karte vor dem Vorschau-Malen. */
+function plausibleMapData(map: {
+  width: number;
+  height: number;
+  terrain: ArrayLike<number>;
+  ore: ArrayLike<number>;
+  resourceKind: ArrayLike<number>;
+}): boolean {
+  if (!Number.isInteger(map.width) || !Number.isInteger(map.height)) return false;
+  if (map.width < 16 || map.width > 256 || map.height < 16 || map.height > 256) return false;
+  const cells = map.width * map.height;
+  return (
+    map.terrain.length === cells && map.ore.length === cells && map.resourceKind.length === cells
+  );
+}

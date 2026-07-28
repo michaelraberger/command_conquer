@@ -29,10 +29,20 @@ const FOLLOW_GAP = Math.round(2.5 * SUBCELL);
 const FOLLOW_GAP_SQ = FOLLOW_GAP * FOLLOW_GAP;
 
 /**
+ * Cross-map A* calls per tick for fresh ATTACK_MOVE orders. An AI wave gives
+ * 60+ units their order in ONE tick; pathing them all synchronously cost a
+ * measured 130–184 ms spike. Budgeted units simply try again next tick
+ * (deterministic: id-order iteration), so a wave fans out over a few ticks
+ * while small player selections still path instantly.
+ */
+const MAX_ORDER_PATHS_PER_TICK = 12;
+
+/**
  * Targeting, chasing and firing for units. Runs BEFORE movement each tick so
  * a unit that halts to fire doesn't take a step first.
  */
 export function combatSystem(state: GameState): void {
+  let orderPathBudget = MAX_ORDER_PATHS_PER_TICK;
   for (const unit of state.units) {
     if (unit.cooldown > 0) unit.cooldown--;
     const rule = unitRule(unit.type);
@@ -85,6 +95,8 @@ export function combatSystem(state: GameState): void {
           unit.pathIndex = 0;
           continue;
         }
+        if (orderPathBudget <= 0) continue; // wave spike guard: retry next tick
+        orderPathBudget--;
         const path = findPath(state, cx, cy, order.cx, order.cy, {
           avoidUnits: false,
           selfId: unit.id,

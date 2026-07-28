@@ -9,11 +9,17 @@ import {
   HISTORY_TURNS,
   INPUT_DELAY_TURNS,
   LockstepScheduler,
+  MAX_TURNS_PER_SEND,
   TICKS_PER_TURN,
   turnOfTick,
-  type TurnFrame,
 } from './lockstepCore.js';
 import type { MatchStart } from './lobby.js';
+import {
+  sanitizeControlMsg,
+  sanitizeFrameMsg,
+  type ControlMsgShape as ControlMsg,
+  type FrameMsgShape as FrameMsg,
+} from './validate.js';
 
 /** Timer cadence. Deliberately shorter than TURN_MS: the interval only POLLS —
  *  which turns are due comes from the wall clock (FrameSender.dueTurn), so a
@@ -38,18 +44,6 @@ const DROP_GRACE_TURNS = 25;
 const MAX_CATCHUP_TICKS = 7;
 /** Chat lines are capped — nobody pastes a novel into the game channel. */
 const CHAT_MAX_LEN = 200;
-
-interface FrameMsg {
-  seat: number;
-  frames: TurnFrame[];
-  hashTurn?: number;
-  hash?: string;
-}
-
-type ControlMsg =
-  | { kind: 'drop'; seat: number; fromTurn: number; by: number }
-  | { kind: 'abort'; by: number }
-  | { kind: 'req'; seat: number; fromTurn: number; toTurn: number; by: number };
 
 export interface RemoteDriverEvents {
   /** Blocked on missing frames: seat names to display, or null to clear. */
@@ -77,7 +71,7 @@ export class RemoteDriver implements TickDriver {
   private timer: number | null = null;
 
   /** Dev diagnostics (read via window.__mpDriver in dev builds). */
-  readonly debug = { sent: 0, received: 0, sendErrors: 0, started: false, presence: 0 };
+  readonly debug = { sent: 0, received: 0, sendErrors: 0, rejected: 0, started: false, presence: 0 };
 
   /** UI hook: an incoming chat line from another seat (see ui/chat.ts). */
   onChat: ((seat: number, text: string) => void) | null = null;
@@ -93,6 +87,9 @@ export class RemoteDriver implements TickDriver {
   private readonly peerHashes = new Map<number, string>();
   private pendingHash: { turn: number; hash: string } | null = null;
   private lastReqAt = 0;
+  /** Drosseln pro Sitz: Resend-Antworten und Chat (Flood-Schutz). */
+  private readonly lastReqReplyAt: number[];
+  private readonly lastChatAt: number[];
 
   constructor(
     private readonly match: MatchStart,
@@ -101,6 +98,8 @@ export class RemoteDriver implements TickDriver {
     this.core = new LockstepScheduler(match.seats.length, match.localSeat);
     this.sender = new FrameSender(match.localSeat);
     this.lastSeenAt = match.seats.map(() => Date.now());
+    this.lastReqReplyAt = match.seats.map(() => 0);
+    this.lastChatAt = match.seats.map(() => 0);
   }
 
   /** Subscribe the game channel and wait at the start barrier until every
@@ -114,17 +113,33 @@ export class RemoteDriver implements TickDriver {
     this.channel = channel;
 
     channel.on('broadcast', { event: 'frame' }, ({ payload }) => {
-      this.handleFrame(payload as FrameMsg);
+      // Broadcast-Payloads sind fremdgesteuert: erst Schema, dann Logik.
+      const msg = sanitizeFrameMsg(payload, this.match.seats.length);
+      if (!msg) {
+        this.debug.rejected++;
+        return;
+      }
+      this.handleFrame(msg);
     });
     channel.on('broadcast', { event: 'control' }, ({ payload }) => {
-      this.handleControl(payload as ControlMsg);
+      const msg = sanitizeControlMsg(payload, this.match.seats.length);
+      if (!msg) {
+        this.debug.rejected++;
+        return;
+      }
+      this.handleControl(msg);
     });
     // Chat rides the same channel as plain broadcast: pure presentation,
     // never a sim input — latency/ordering cannot desync anything.
     channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
       const msg = payload as { seat?: unknown; text?: unknown };
-      if (typeof msg.seat !== 'number' || typeof msg.text !== 'string') return;
+      if (typeof msg.seat !== 'number' || !Number.isInteger(msg.seat)) return;
+      if (msg.seat < 0 || msg.seat >= this.match.seats.length) return;
+      if (typeof msg.text !== 'string') return;
       if (msg.seat === this.match.localSeat) return; // never trust an echo
+      const now = Date.now();
+      if (now - this.lastChatAt[msg.seat]! < 500) return; // Flood-Drossel
+      this.lastChatAt[msg.seat] = now;
       this.onChat?.(msg.seat, msg.text.slice(0, CHAT_MAX_LEN));
     });
     channel.on('presence', { event: 'sync' }, () => {
@@ -178,6 +193,8 @@ export class RemoteDriver implements TickDriver {
     this.lastProgressAt = Date.now();
     this.core.noteExecuted(state.tick);
     const turn = turnOfTick(state.tick);
+    // Sende-Log hinter dem Resend-Horizont kappen (sonst ~27k Eintraege/h).
+    this.sender.pruneBelow(turn - MAX_TURNS_PER_SEND * 2);
     // Hash the state after the LAST tick of a hash turn completed.
     if (state.tick % TICKS_PER_TURN === TICKS_PER_TURN - 1 && turn % HASH_PERIOD_TURNS === 0) {
       const hash = hashState(state);
@@ -285,7 +302,9 @@ export class RemoteDriver implements TickDriver {
           kind: 'req',
           seat,
           fromTurn: neededTurn,
-          toTurn: neededTurn + INPUT_DELAY_TURNS,
+          // Nach Verlust eines Catch-up-Batches fehlen bis zu 45 Turns —
+          // ein 3-Turn-Fenster hieße ~30 s Schneckengang bis zur Heilung.
+          toTurn: neededTurn + MAX_TURNS_PER_SEND,
           by: this.match.localSeat,
         };
         void this.channel?.send({ type: 'broadcast', event: 'control', payload: control });
@@ -335,6 +354,10 @@ export class RemoteDriver implements TickDriver {
     this.lastAnyMessageAt = Date.now();
     if (msg.kind === 'req') {
       if (msg.seat !== this.match.localSeat) return;
+      // Amplifikationsschutz: pro anfragendem Sitz max. eine Antwort/Sekunde.
+      const now = Date.now();
+      if (now - this.lastReqReplyAt[msg.by]! < 1000) return;
+      this.lastReqReplyAt[msg.by] = now;
       const frames = this.sender.framesForRange(msg.fromTurn, msg.toTurn);
       if (frames.length > 0) {
         const reply: FrameMsg = { seat: this.match.localSeat, frames };
