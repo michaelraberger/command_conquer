@@ -5,6 +5,7 @@ import {
   TERRAIN_DIRT,
   TERRAIN_GRASS,
   TERRAIN_SAND,
+  TRANSPORT_CAPACITY,
   buildingMaxHp,
   buildingRule,
   cellCenter,
@@ -40,6 +41,8 @@ interface UnitView {
   lastHp: number;
   /** Last drawn ammo count (combat aircraft; -1 = never drawn). */
   lastAmmo: number;
+  /** Last drawn passenger count (carriers; -1 = never drawn). */
+  lastCargo: number;
   prevX: number;
   prevY: number;
   /** Aircraft fly at altitude and always draw above ground entities. */
@@ -87,7 +90,7 @@ const OFFLINE_TINT = 0x424a55;
 /** Metallic red glow for entities protected by the iron curtain. */
 const CURTAIN_TINT = 0xff6a55;
 /** Screen-pixel lift for aircraft (body drawn this far above its ground shadow). */
-const AIR_ALTITUDE = 24;
+export const AIR_ALTITUDE = 24;
 /** zIndex floor for aircraft so they always render above ground entities. */
 const AIR_Z = 1_000_000;
 /** Sub-cell draw offsets for infantry sharing a tile (slot = id % 3). */
@@ -619,13 +622,21 @@ export class EntityRenderer {
     const maxHp = rule.maxHp;
     // Combat aircraft also surface their ammo state while rearming/empty, so
     // a plane heading home explains itself even when not selected.
-    const show = isSelected || unit.hp < maxHp || (rule.ammo !== undefined && unit.ammo < rule.ammo);
+    // Transporte zeigen ihre Belegung, sobald jemand an Bord ist.
+    const cargo = rule.carrier === true ? unit.passengers.length : -1;
+    const show =
+      isSelected ||
+      unit.hp < maxHp ||
+      (rule.ammo !== undefined && unit.ammo < rule.ammo) ||
+      cargo > 0;
     view.bar.visible = show;
-    if (!show || (unit.hp === view.lastHp && unit.ammo === view.lastAmmo)) return;
+    if (!show || (unit.hp === view.lastHp && unit.ammo === view.lastAmmo && cargo === view.lastCargo)) return;
     view.lastHp = unit.hp;
     view.lastAmmo = unit.ammo;
+    view.lastCargo = cargo;
     drawBar(view.bar, 24, Math.max(0, unit.hp / maxHp));
     if (rule.ammo !== undefined) drawAmmoPips(view.bar, 24, unit.ammo, rule.ammo);
+    if (rule.carrier === true) drawCargoPips(view.bar, 24, unit.passengers.length);
   }
 
   private createView(unit: Unit): UnitView {
@@ -686,6 +697,7 @@ export class EntityRenderer {
       lastRank: -1,
       lastHp: -1,
       lastAmmo: -1,
+      lastCargo: -1,
       prevX: unit.x,
       prevY: unit.y,
       air,
@@ -711,6 +723,20 @@ function drawBar(bar: Graphics, width: number, pct: number): void {
 }
 
 /** Ammo pips under the health bar (combat aircraft): amber = loaded rack. */
+/** Kapazitäts-Pips eines Transports: belegte Plätze grün, freie dunkel. */
+function drawCargoPips(bar: Graphics, width: number, aboard: number): void {
+  const max = TRANSPORT_CAPACITY;
+  const gap = 1;
+  const pipW = Math.max(1, Math.floor((width - (max - 1) * gap) / max));
+  const total = max * pipW + (max - 1) * gap;
+  const y = BAR_HEIGHT + 2;
+  bar.rect(-total / 2 - 1, y - 1, total + 2, 5).fill({ color: 0x101010, alpha: 0.85 });
+  for (let i = 0; i < max; i++) {
+    const x = -total / 2 + i * (pipW + gap);
+    bar.rect(x, y, pipW, 3).fill(i < aboard ? 0x53c94f : { color: 0x4a4a42, alpha: 0.9 });
+  }
+}
+
 function drawAmmoPips(bar: Graphics, width: number, ammo: number, max: number): void {
   const gap = 1;
   const pipW = Math.max(1, Math.floor((width - (max - 1) * gap) / max));

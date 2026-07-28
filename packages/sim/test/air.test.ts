@@ -204,6 +204,27 @@ describe('air transport', () => {
     expect(unitRule('AIRLIFT').carrier).toBe(true);
     expect(unitRule('AIRLIFT').weapon).toBeNull();
   });
+
+  it('lifts only infantry — vehicles need the transport ship', () => {
+    const state = arena();
+    const lift = spawnUnit(state, 'AIRLIFT', 0, 12, 20);
+    const rifleman = spawnUnit(state, 'RIFLEMAN', 0, 13, 20);
+    const mammoth = spawnUnit(state, 'MAMMOTH', 0, 13, 21);
+    tick(state, [
+      { type: 'LOAD', playerId: 0, unitIds: [rifleman.id, mammoth.id], transportId: lift.id },
+    ]);
+    for (let i = 0; i < 100 && lift.passengers.length < 1; i++) tick(state);
+    // The rifleman is aboard; the mammoth never even got a BOARD order.
+    expect(lift.passengers.map((p) => p.type)).toEqual(['RIFLEMAN']);
+    expect(state.units.some((u) => u.id === mammoth.id)).toBe(true);
+    expect(mammoth.order).toBeNull();
+
+    // The SHIP still ferries heavy vehicles (boarding is distance-based).
+    const ship = spawnUnit(state, 'TRANSPORT', 0, 14, 21);
+    tick(state, [{ type: 'LOAD', playerId: 0, unitIds: [mammoth.id], transportId: ship.id }]);
+    for (let i = 0; i < 100 && ship.passengers.length < 1; i++) tick(state);
+    expect(ship.passengers.map((p) => p.type)).toEqual(['MAMMOTH']);
+  });
 });
 
 describe('air determinism', () => {

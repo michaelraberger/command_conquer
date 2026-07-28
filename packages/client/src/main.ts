@@ -3,6 +3,7 @@ import {
   cellCenter,
   constructBuilding,
   createGame,
+  spawnUnit,
   tick,
   type BalanceConfig,
   type Command,
@@ -405,6 +406,7 @@ export async function startGame(
       controls,
       groups,
       constructBuilding,
+      spawnUnit,
     };
   }
   const sidebar = new Sidebar(state, sendCommand, placement, controls);

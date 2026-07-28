@@ -10,9 +10,11 @@ import {
   type Building,
   type Command,
   type GameState,
+  type Unit,
 } from '@cac/sim';
 import { Container, Graphics, type Application, type FederatedPointerEvent } from 'pixi.js';
 import { CURSORS } from '../render/cursors.js';
+import { AIR_ALTITUDE } from '../render/entities.js';
 import { screenToCell, worldToScreen } from '../render/iso.js';
 import { session } from '../session.js';
 import type { PlacementMode } from '../ui/placement.js';
@@ -151,10 +153,14 @@ export class Controls {
     }
   }
 
-  /** Screen position of a unit in stage coordinates. */
-  private unitStagePos(fx: number, fy: number): { x: number; y: number } {
-    const p = worldToScreen(fx, fy);
-    return { x: p.x + this.world.position.x, y: p.y + this.world.position.y };
+  /** Screen position of a unit in stage coordinates. Aircraft render
+   *  AIR_ALTITUDE px above their ground anchor — picking must match the
+   *  sprite the player actually sees, or clicks on a flying transport fall
+   *  through to MOVE commands (the "Heli lädt nicht"-Bug). */
+  private unitStagePos(unit: Unit): { x: number; y: number } {
+    const p = worldToScreen(unit.x, unit.y);
+    const lift = unitRule(unit.type).air === true ? AIR_ALTITUDE : 0;
+    return { x: p.x + this.world.position.x, y: p.y + this.world.position.y - lift };
   }
 
   private clickSelect(e: FederatedPointerEvent): void {
@@ -163,7 +169,7 @@ export class Controls {
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
       if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - e.global.x;
       const dy = p.y - e.global.y;
       const d = dx * dx + dy * dy;
@@ -200,7 +206,7 @@ export class Controls {
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
       if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) {
         this.selected.add(unit.id);
       }
@@ -218,7 +224,7 @@ export class Controls {
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer) continue;
       if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
       if (dx * dx + dy * dy < r2) return true;
@@ -232,7 +238,7 @@ export class Controls {
     let bestDist = PICK_RADIUS * PICK_RADIUS;
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer || unitRule(unit.type).carrier !== true) continue;
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
       const d = dx * dx + dy * dy;
@@ -252,7 +258,7 @@ export class Controls {
       if (unit.owner !== session.localPlayer) continue;
       if (unitRule(unit.type).hidden === true) continue; // scripted paradrop plane
       if (unit.hp >= unitRule(unit.type).maxHp) continue; // only damaged units
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
       const d = dx * dx + dy * dy;
@@ -272,7 +278,7 @@ export class Controls {
     for (const unit of this.state.units) {
       if (unit.owner !== session.localPlayer || this.selected.has(unit.id)) continue;
       if (unitRule(unit.type).hidden === true) continue;
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
       const d = dx * dx + dy * dy;
@@ -292,7 +298,7 @@ export class Controls {
     for (const unit of this.state.units) {
       if (unit.owner === session.localPlayer) continue;
       if (fog[toCell(unit.y) * this.state.mapWidth + toCell(unit.x)] !== FOG_VISIBLE) continue;
-      const p = this.unitStagePos(unit.x, unit.y);
+      const p = this.unitStagePos(unit);
       const dx = p.x - global.x;
       const dy = p.y - global.y;
       const d = dx * dx + dy * dy;
@@ -414,10 +420,14 @@ export class Controls {
     if (!e.ctrlKey) {
       const transportId = this.ownTransportAt(e.global);
       if (transportId !== null) {
+        // Mirrors the sim's LOAD rule: air transports lift only infantry.
+        const carrier = byId.get(transportId);
+        const airCarrier = carrier !== undefined && unitRule(carrier.type).air === true;
         const boarders = unitIds.filter((id) => {
           const u = byId.get(id);
           if (!u || u.id === transportId) return false;
           const rule = unitRule(u.type);
+          if (airCarrier && rule.category !== 'infantry') return false;
           return rule.air !== true && rule.category !== 'naval';
         });
         if (boarders.length > 0) {

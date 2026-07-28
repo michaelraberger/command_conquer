@@ -337,8 +337,12 @@ export function applyCommands(state: GameState, commands: Command[]): void {
             unitRule(u.type).carrier === true,
         );
         if (!transport) break;
+        // Air transports lift only infantry — vehicles need the ship. The
+        // ship still ferries every ground unit (tanks, harvesters, MCVs).
+        const airCarrier = unitRule(transport.type).air === true;
         for (const unit of ownedUnits(state, cmd.unitIds, cmd.playerId)) {
           if (isAir(unit) || isNaval(unit)) continue; // only ground units ride
+          if (airCarrier && unitRule(unit.type).category !== 'infantry') continue;
           unit.order = { kind: 'BOARD', targetId: transport.id };
           unit.path = null; // transport system takes over pathing (chase)
           unit.pathIndex = 0;
