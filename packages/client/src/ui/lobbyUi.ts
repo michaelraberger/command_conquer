@@ -259,7 +259,7 @@ export function initLobbyUi(): void {
     if (!lobby || playerCount < 2) return;
     startBtn.disabled = true;
     void import('../main.js').then(async ({ loadBalance }) => {
-      const error = lobby?.startWith(await loadBalance()) ?? null;
+      const error = (await lobby?.startWith(await loadBalance())) ?? null;
       if (error) {
         lobbyErrorEl.textContent = error;
         startBtn.disabled = false;
@@ -277,6 +277,7 @@ export function initLobbyUi(): void {
   });
 
   document.getElementById('mp-leave')!.addEventListener('click', () => {
+    lobby?.cleanupIfUnstarted(); // Host: Registry-Zeile der Lobby abräumen
     void lobby?.leave();
     showEntry();
   });

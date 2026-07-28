@@ -108,7 +108,12 @@ export class RemoteDriver implements TickDriver {
     const supabase = getSupabase();
     if (!supabase) throw new Error('Cloud nicht konfiguriert.');
     const channel = supabase.channel(`cac:game:${this.match.code}`, {
-      config: { presence: { key: String(this.match.localSeat) }, broadcast: { self: false } },
+      // private: nur in public.matches registrierte Teilnehmer (Migration 0006).
+      config: {
+        presence: { key: String(this.match.localSeat) },
+        broadcast: { self: false },
+        private: true,
+      },
     });
     this.channel = channel;
 
@@ -155,7 +160,9 @@ export class RemoteDriver implements TickDriver {
     });
     if (status !== 'SUBSCRIBED') {
       this.shutdown();
-      throw new Error('Verbindung zum Spielkanal fehlgeschlagen.');
+      throw new Error(
+        'Verbindung zum Spielkanal fehlgeschlagen (Realtime-Autorisierung? Migration 0006 prüfen).',
+      );
     }
     await channel.track({ seat: this.match.localSeat });
 

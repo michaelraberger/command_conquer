@@ -49,26 +49,34 @@ Cloud-Funktionen sind dann ausgeblendet ("Gefecht gegen KI" braucht kein Login).
 Der `anon`-Key ist bewusst öffentlich — die Zugriffskontrolle übernehmen die
 Row-Level-Security-Policies aus der Migration.
 
-## Multiplayer-Härtung (Stand des Security-Reviews)
+## Multiplayer-Härtung
 
-Der Client validiert seit dem Review jede eingehende Realtime-Nachricht
-strukturell (`packages/client/src/net/validate.ts`): Schema, Wertebereiche,
-Turn-Fenster, Längen-Limits, Resend-/Chat-Drosseln. Damit sind Remote-Freeze
-und Speicher-DoS durch präparierte Payloads abgedeckt.
+Zwei Schichten, beide aktiv:
 
-**Bewusst offen** bleibt die Absender-Authentizität: Broadcast-Payloads tragen
-ihre Sitz-/Host-Angabe selbst, und ohne private Kanäle kann jeder Teilnehmer
-des Kanals fremde Sitze behaupten (Frames unterdrücken, Drop/Abort senden).
-Der Weg dahin, wenn öffentliche Partien geplant sind:
+1. **Struktur-Validierung im Client** (`packages/client/src/net/validate.ts`):
+   Schema, Wertebereiche, Turn-Fenster, Längen-Limits, Resend-/Chat-Drosseln
+   für jede eingehende Realtime-Nachricht.
+2. **Private Realtime-Kanäle + Partien-Registry** (Migration
+   `0006_private_channels.sql`, ab Client-Version dieser Migration Pflicht):
+   - Lobby-Kanäle (`cac:lobby:<CODE>`) verlangen einen angemeldeten Nutzer;
+     der geheime Code regelt weiterhin, wer die Lobby findet.
+   - Der Host reserviert den Code bei Lobby-Erstellung in `public.matches`
+     (RLS erzwingt `host = auth.uid()` — das Host-Feld ist authentisch).
+   - Beim Start friert der Host die Teilnehmerliste ein; die Policy auf
+     `realtime.messages` lässt NUR diese Nutzer in den Spielkanal
+     (`cac:game:<CODE>`). Außenstehende sind damit komplett draußen, auch
+     wenn sie den Code kennen.
+   - Joiner verifizieren den Start-Broadcast gegen die `matches`-Zeile
+     statt dem Payload zu glauben.
 
-1. Im Supabase-Dashboard Realtime „private channels" aktivieren.
-2. Policy auf `realtime.messages`, die Topics `cac:lobby:%` / `cac:game:%`
-   nur für `authenticated` freigibt (später: nur für die registrierten
-   Teilnehmer einer Partie, dazu braucht es eine `matches`-Tabelle).
-3. Im Client `config: { private: true }` bei `supabase.channel(...)` setzen
-   (lobby.ts, lockstep.ts) und die Sitz-Bindung über die dann verifizierbare
-   Absender-Identität ziehen.
+**Wichtig:** Ohne eingespielte Migration 0006 verweigert Realtime die
+privaten Kanäle — Multiplayer zeigt dann eine entsprechende Fehlermeldung.
 
-Bis dahin gilt: Der 6-stellige Join-Code (kryptographisch zufällig, ~1e9
-Kombinationen) ist die Zugangskontrolle — für private Partien unter Bekannten
-angemessen, für offene Lobbys nicht.
+**Restrisiko (bewusst akzeptiert):** Innerhalb einer laufenden Partie können
+sich registrierte Teilnehmer gegenseitig weiterhin nicht kryptographisch
+zuordnen (Broadcast trägt keine verifizierte Absender-Identität) — ein
+böswilliger *Mitspieler* könnte fremde Sitze stören. Das fängt der
+Desync-Hash ab; echte Abhilfe bräuchte signierte Nachrichten oder einen
+Relay-Server. `matches`-Zeilen sind wenige Bytes; alte Zeilen räumt der
+Host beim Verlassen einer ungestarteten Lobby ab, gestartete bleiben als
+Historie stehen.

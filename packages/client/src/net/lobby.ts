@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { BalanceConfig, Faction, MapType, MultiplayerSeat } from '@cac/sim';
 import { getSupabase } from './supabase.js';
+import { deleteMatch, getMatch, registerLobbyCode, setMatchParticipants } from './matchesRepo.js';
 
 /**
  * Private match lobby over a Supabase Realtime channel — no DB tables, no own
@@ -12,7 +13,7 @@ import { getSupabase } from './supabase.js';
 /** Bumped whenever the sim or the net protocol changes incompatibly — a
  *  version mismatch between peers would desync within seconds, so the lobby
  *  refuses to start across versions. */
-export const NET_VERSION = 8; // v8: Atom-Tier, Building.rotated, Radar/Techzentrum unique
+export const NET_VERSION = 9; // v9: private Realtime-Kanäle + matches-Registry (0006)
 
 export const MAX_SEATS = 4;
 
@@ -156,7 +157,9 @@ export class Lobby {
     if (!supabase) throw new Error('Cloud nicht konfiguriert.');
 
     const channel = supabase.channel(`cac:lobby:${this.code}`, {
-      config: { presence: { key: this.self.userId }, broadcast: { self: true } },
+      // private: Realtime-Authorization prüft die Policies aus Migration 0006 —
+      // ohne Login kommt niemand mehr in den Kanal, Code hin oder her.
+      config: { presence: { key: this.self.userId }, broadcast: { self: true }, private: true },
     });
     this.channel = channel;
 
@@ -194,6 +197,10 @@ export class Lobby {
     const before = this.presencePlayers();
     if (this.isHost) {
       if (before.length > 0) return false; // code already in use
+      // Code sofort in der Registry beanspruchen (RLS: host = auth.uid()).
+      // Scheitert der Insert (Kollision/Vorab-Besetzung), gilt der Raum als
+      // unbrauchbar und Lobby.create zieht einen frischen Code.
+      if (!(await registerLobbyCode(this.code, this.self.userId))) return false;
     } else {
       if (!before.some((p) => p.host)) return false; // no host → dead room
       if (before.length >= MAX_SEATS) {
@@ -267,7 +274,7 @@ export class Lobby {
   /** Host: freeze the current line-up and start the match on every client.
    *  The balance snapshot rides along so all sims run identical rules.
    *  Returns an error message when starting is not possible right now. */
-  startWith(balance: BalanceConfig | undefined): string | null {
+  async startWith(balance: BalanceConfig | undefined): Promise<string | null> {
     if (!this.isHost || this.started) return null;
     const players = this.presencePlayers();
     if (players.length < 2) return 'Mindestens 2 Spieler nötig.';
@@ -292,12 +299,26 @@ export class Lobby {
         .slice(0, MAX_SEATS)
         .map((p) => ({ userId: p.userId, username: p.username, faction: p.faction })),
     };
+    // Teilnehmer VOR dem Start-Broadcast einfrieren: die Realtime-Policy
+    // lässt nur diese Nutzer in den Spielkanal, und Joiner verifizieren den
+    // Start gegen genau diese Zeile.
+    const ok = await setMatchParticipants(
+      this.code,
+      payload.seats.map((s) => s.userId),
+    );
+    if (!ok) return 'Partie konnte nicht registriert werden (Migration 0006 eingespielt?).';
     void this.channel?.send({ type: 'broadcast', event: 'start', payload });
     return null;
   }
 
   private handleStart(payload: StartPayload): void {
     if (this.started || this.closed) return;
+    void this.verifyAndStart(payload);
+  }
+
+  /** Start-Broadcasts sind fremdgesteuert: erst gegen die matches-Zeile
+   *  prüfen (deren host-Feld ist RLS-authentisch), dann starten. */
+  private async verifyAndStart(payload: StartPayload): Promise<void> {
     if (payload.version !== NET_VERSION) {
       this.close('Versionen passen nicht zusammen — bitte beide Seiten neu laden.');
       return;
@@ -307,6 +328,20 @@ export class Lobby {
       this.close('Partie wurde ohne dich gestartet.');
       return;
     }
+    if (!this.isHost) {
+      const row = await getMatch(this.code);
+      const seatIds = payload.seats.map((s) => s.userId);
+      const authentic =
+        row !== null &&
+        row.host === payload.seats[0]!.userId &&
+        seatIds.every((id) => row.participants.includes(id)) &&
+        row.participants.includes(this.self.userId);
+      if (!authentic) {
+        this.close('Start konnte nicht verifiziert werden.');
+        return;
+      }
+    }
+    if (this.started || this.closed) return; // Rennen mit close() während await
     this.started = true;
     const match: MatchStart = {
       code: this.code,
@@ -323,6 +358,11 @@ export class Lobby {
     // The lobby channel is done — the match runs on cac:game:<CODE>.
     void this.leave();
     this.events.onStart(match);
+  }
+
+  /** Host verlässt eine nie gestartete Lobby: Registry-Zeile abräumen. */
+  cleanupIfUnstarted(): void {
+    if (this.isHost && !this.started) void deleteMatch(this.code);
   }
 
   private close(reason: string): void {
